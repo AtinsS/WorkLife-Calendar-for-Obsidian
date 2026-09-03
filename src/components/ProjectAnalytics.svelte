@@ -81,7 +81,6 @@
     return result;
   }
 
-  $: maxMs = projectStats.length > 0 ? Math.max(...projectStats.map((p) => p.totalMs)) : 0;
   $: totalMs = projectStats.reduce((sum, p) => sum + p.totalMs, 0);
 
   function getShare(ms: number): string {

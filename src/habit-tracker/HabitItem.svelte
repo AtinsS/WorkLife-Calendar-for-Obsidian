@@ -58,6 +58,9 @@
   }
 </script>
 
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+<!-- svelte-ignore a11y-aria-activedescendant-has-tabindex -->
+<!-- svelte-ignore a11y-no-noninteractive-tabindex -->
 <div
   class="habit-item"
   class:completed={isCompleted && !isMultiTarget}
@@ -65,7 +68,7 @@
   class:fully-done={isMultiTarget && currentCount >= targetCount}
   on:keydown={handleKeydown}
   tabindex="0"
-  role="listitem"
+  role="group"
   style="--habit-color: {habit.color}"
   aria-label={habit.title}
 >

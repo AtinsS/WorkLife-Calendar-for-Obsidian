@@ -7,7 +7,7 @@ import { loadModuleData, saveModuleData } from "../io/vaultStorage";
 export const financeData = writable<IFinanceData>({});
 
 let pluginInstance: CalendarPlugin | null = null;
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let saveTimeout: number | null = null;
 let loaded = false;
 let storeIsDirty = false; // true when store has unsaved local edits
 let isSaving = false; // true while a write to vault is in-flight

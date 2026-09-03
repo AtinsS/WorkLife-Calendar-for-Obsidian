@@ -337,6 +337,8 @@
     }
     // Delegate deadline click → navigate to month view + blink
     calendarEl?.addEventListener("click", handleDeadlineClick);
+    // Right-click context menu on events
+    calendarEl?.addEventListener("contextmenu", handleEventContextMenu);
     // ResizeObserver
     if (calendarEl) {
       resizeObserver = new ResizeObserver(() => {
@@ -360,6 +362,7 @@
     mqlSmallPhone?.removeEventListener("change", handleBreakpointChange);
     calendarEl?.removeEventListener("keydown", handleKeyNav);
     calendarEl?.removeEventListener("click", handleDeadlineClick);
+    calendarEl?.removeEventListener("contextmenu", handleEventContextMenu);
     resizeObserver?.disconnect();
     if (highlightInterval) clearInterval(highlightInterval);
     document.removeEventListener("visibilitychange", updateEventHighlight);
@@ -542,7 +545,7 @@
         const dateKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 
         el.style.cursor = "default";
-        el.addEventListener("mouseenter", (e: MouseEvent) => {
+        el.addEventListener("mouseenter", (_e: MouseEvent) => {
           const weather = weatherByDate.get(dateKey);
           if (!weather) return;
           const tooltip = document.createElement("div");
@@ -603,7 +606,7 @@
   }
 
   async function fetchEvents(
-    fetchInfo: { start: Date; end: Date },
+    _fetchInfo: { start: Date; end: Date },
     successCallback: (events: any[]) => void,
   ): Promise<void> {
     try {
@@ -616,8 +619,7 @@
 
       const appInstance = get(app);
       if (appInstance) {
-        const start = fetchInfo.start;
-        const end = fetchInfo.end;
+        // Weather fetching handled elsewhere
       }
 
       successCallback(events);
@@ -941,7 +943,6 @@
     if (info.event.extendedProps?.isDeadlineEvent) {
       const task = resolveTask(info.event);
       if (!task) return;
-      // Find the parent task's event element in the calendar and blink it
       requestAnimationFrame(() => {
         setTimeout(() => {
           const taskEl = calendarEl?.querySelector(
@@ -976,19 +977,34 @@
         }
       }
     }
+    // Left-click on event — do nothing (context menu is on right-click)
+  }
+
+  function handleEventContextMenu(e: MouseEvent): void {
+    e.preventDefault();
+    // Find the FullCalendar event element under the cursor
+    const target = e.target as HTMLElement;
+    const eventEl = target.closest(".fc-event") as HTMLElement | null;
+    if (!eventEl) return;
+
+    // Get the event ID from FullCalendar's data attribute
+    const eventId = eventEl.dataset.eventId || eventEl.getAttribute("data-event-id");
+    if (!eventId) return;
+
+    const allEvents = calendar?.getEvents() || [];
+    const fcEvent = allEvents.find((ev) => ev.id === eventId);
+    if (!fcEvent) return;
+
+    const task = resolveTask(fcEvent);
+    if (!task) return;
 
     const menuWidth = 220;
     const menuHeight = 260;
-    let x = info.jsEvent?.clientX ?? 0;
-    let y = info.jsEvent?.clientY ?? 0;
-
-    if (x + menuWidth > window.innerWidth) {
-      x = window.innerWidth - menuWidth - 8;
-    }
+    let x = e.clientX;
+    let y = e.clientY;
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 8;
     if (x < 8) x = 8;
-    if (y + menuHeight > window.innerHeight) {
-      y = Math.max(8, y - menuHeight - 4);
-    }
+    if (y + menuHeight > window.innerHeight) y = Math.max(8, y - menuHeight - 4);
 
     openContextMenu(task, x, y);
   }
@@ -1130,6 +1146,19 @@
         };
         if (allDay) {
           taskChanges.estimatedTime = null;
+          taskChanges.endTime = null;
+        } else if (newTime && task.endTime && task.scheduledTime) {
+          // Recalculate endTime to preserve the original duration
+          const [oh, om] = task.scheduledTime.split(":").map(Number);
+          const [eh, em] = task.endTime.split(":").map(Number);
+          const durationMin = (eh * 60 + em) - (oh * 60 + om);
+          if (durationMin > 0) {
+            const [nh, nm] = newTime.split(":").map(Number);
+            const totalMin = nh * 60 + nm + durationMin;
+            const newEndH = Math.floor(totalMin / 60) % 24;
+            const newEndM = totalMin % 60;
+            taskChanges.endTime = `${String(newEndH).padStart(2, "0")}:${String(newEndM).padStart(2, "0")}`;
+          }
         }
         updateTask(task.id, taskChanges);
         const updatedTask = get(tasks).find((t) => t.id === task.id);

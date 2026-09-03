@@ -35,7 +35,6 @@
   const HOUR_HEIGHT = 64;
 
   let currentDate = m();
-  let containerEl: HTMLDivElement;
   let scrollEl: HTMLDivElement;
   let contextMenuTask: ITask | null = null;
   let contextMenuEl: HTMLDivElement | null = null;
@@ -239,7 +238,7 @@
     return `${String(hour >= 24 ? hour - 24 : hour).padStart(2, "0")}:00`;
   }
 
-  function openContextMenu(task: ITask, e: MouseEvent) {
+  function openContextMenu(task: ITask, e: MouseEvent | KeyboardEvent) {
     e.stopPropagation();
     closeContextMenu();
     contextMenuTask = task;
@@ -346,7 +345,7 @@
   });
 </script>
 
-<div class="mobile-schedule" bind:this={containerEl}>
+<div class="mobile-schedule">
   <!-- Header -->
   <div class="ms-header">
     <button class="ms-nav-btn" on:click={viewMode === "day" ? prevDay : prevMonth} aria-label={$t("mobileSchedule.back")}>‹</button>
@@ -399,6 +398,7 @@
           {@const isSelected = day.format("YYYY-MM-DD") === dateStr}
           {@const isWeekend = day.day() === 0 || day.day() === 6}
           {@const dayTasks = getTasksForDay(day)}
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
           <div
             class="ms-month-day"
             class:other-month={!isCurrentMonth}
@@ -406,6 +406,7 @@
             class:selected={isSelected}
             class:weekend={isWeekend}
             on:click={() => selectMonthDay(day)}
+            on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') selectMonthDay(day); }}
             role="button"
             tabindex="0"
           >
@@ -466,12 +467,14 @@
 
       <!-- Task blocks (timed) -->
       {#each timedTasks as task (task.id)}
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
         <div
           class="ms-task-block"
           class:done={task.status === "done"}
           class:paused={task.status === "paused"}
           style={getTaskStyle(task)}
           on:click={(e) => openContextMenu(task, e)}
+          on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openContextMenu(task, e); }}
           role="button"
           tabindex="0"
         >
@@ -514,10 +517,12 @@
         </div>
         <div class="ms-untimed-list">
           {#each untimedTasks as task (task.id)}
+            <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
             <div
               class="ms-untimed-task"
               class:done={task.status === "done"}
               on:click={(e) => openContextMenu(task, e)}
+              on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openContextMenu(task, e); }}
               role="button"
               tabindex="0"
             >
@@ -1131,7 +1136,7 @@
     text-transform: uppercase;
   }
 
-  .ms-untimed-add {
+  :global(.ms-untimed-add) {
     width: 24px;
     height: 24px;
     border-radius: 6px;
@@ -1146,7 +1151,7 @@
     transition: background 0.15s;
   }
 
-  .ms-untimed-add:hover {
+  :global(.ms-untimed-add:hover) {
     background: var(--mcp-accent-dim, rgba(95,153,225,0.12));
     color: var(--mcp-text, #e8ecf0);
   }

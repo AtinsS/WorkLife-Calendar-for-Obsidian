@@ -16,6 +16,8 @@ import {
   VIEW_TYPE_HABIT_ANALYTICS,
   VIEW_TYPE_FINANCE,
   VIEW_TYPE_FINANCIAL_ANALYTICS,
+  VIEW_TYPE_KANBAN,
+  VIEW_TYPE_HABIT_PANEL,
 } from "./constants";
 import { settings } from "./ui/stores";
 import { app as appStore } from "./stores/appStore";
@@ -35,6 +37,8 @@ import MobileTaskTrackerView from "./views/MobileTaskTrackerView";
 import HabitAnalyticsView from "./views/HabitAnalyticsView";
 import FinanceView from "./views/FinanceView";
 import FinancialAnalyticsView from "./views/FinancialAnalyticsView";
+import KanbanView from "./views/KanbanView";
+import HabitPanelView from "./views/HabitPanelView";
 import { initTaskStores, reloadTaskStores, immediateSave as immediateTaskSave } from "./task-tracker/stores";
 import { cleanupTimers } from "./task-tracker/TimerManager";
 import {
@@ -67,7 +71,8 @@ export default class CalendarPlugin extends Plugin {
   private view: CalendarView;
   private ribbonIconsRegistered = false;
   private ribbonIcons: HTMLElement[] = [];
-  private syncReloadTimer: ReturnType<typeof setTimeout> | null = null;
+  private habitRibbonIcon: HTMLElement | null = null;
+  private syncReloadTimer: number | null = null;
   public notificationService: NotificationService;
   private dtwPanel: DateTimeWeather | null = null;
   private dtwContainer: HTMLElement | null = null;
@@ -215,6 +220,16 @@ export default class CalendarPlugin extends Plugin {
       (leaf: WorkspaceLeaf) => new FinancialAnalyticsView(leaf, this)
     );
 
+    safeRegisterView(
+      VIEW_TYPE_KANBAN,
+      (leaf: WorkspaceLeaf) => new KanbanView(leaf, this)
+    );
+
+    safeRegisterView(
+      VIEW_TYPE_HABIT_PANEL,
+      (leaf: WorkspaceLeaf) => new HabitPanelView(leaf, this)
+    );
+
     this.addCommand({
       id: "show-calendar-view",
       name: "Open view",
@@ -246,6 +261,30 @@ export default class CalendarPlugin extends Plugin {
       callback: () => this.activateFinanceView(),
     });
 
+    this.addCommand({
+      id: "quick-add-task",
+      name: tRaw("main.commands.quickAddTask"),
+      hotkeys: [{ modifiers: ["Ctrl", "Alt"], key: "n" }],
+      callback: () => {
+        const now = window.moment ? window.moment() : (globalThis as any).moment();
+        void import("./task-tracker/QuickAddModal").then(({ QuickAddModal }) => {
+          new QuickAddModal(this.app, now, () => {}).open();
+        });
+      },
+    });
+
+    this.addCommand({
+      id: "open-kanban-view",
+      name: tRaw("main.commands.openKanban"),
+      callback: () => this.activateKanbanView(),
+    });
+
+    this.addCommand({
+      id: "open-habit-panel",
+      name: tRaw("main.commands.openHabitPanel"),
+      callback: () => this.activateHabitPanelView(),
+    });
+
     // Remove orphaned ribbon icons from previous instance (hot-reload safety)
     document.querySelectorAll("[data-mcp-ribbon]").forEach(el => el.remove());
 
@@ -273,6 +312,21 @@ export default class CalendarPlugin extends Plugin {
       });
       financeIcon.dataset.mcpRibbon = "true";
       this.ribbonIcons.push(financeIcon);
+
+      const kanbanIcon = this.addRibbonIcon("layout-grid", tRaw("main.ribbon.kanban"), () => {
+        void this.activateKanbanView();
+      });
+      kanbanIcon.dataset.mcpRibbon = "true";
+      this.ribbonIcons.push(kanbanIcon);
+
+      // Habit panel ribbon — only show when mode is "separate"
+      const habitIcon = this.addRibbonIcon("flame", tRaw("main.ribbon.habits"), () => {
+        void this.activateHabitPanelView();
+      });
+      habitIcon.dataset.mcpRibbon = "true";
+      this.ribbonIcons.push(habitIcon);
+      this.habitRibbonIcon = habitIcon;
+      this.updateHabitRibbonVisibility();
 
       this.ribbonIconsRegistered = true;
     }
@@ -645,6 +699,14 @@ export default class CalendarPlugin extends Plugin {
     return this.activateView(VIEW_TYPE_FINANCIAL_ANALYTICS);
   }
 
+  async activateKanbanView(): Promise<void> {
+    return this.activateView(VIEW_TYPE_KANBAN);
+  }
+
+  async activateHabitPanelView(): Promise<void> {
+    return this.activateView(VIEW_TYPE_HABIT_PANEL);
+  }
+
   /**
    * Find the actual plugin directory path inside .obsidian/plugins/.
    * The folder name may differ from manifest.id (e.g. "WorkLife Calendar" vs "calendar-plugin-remastered").
@@ -725,5 +787,14 @@ export default class CalendarPlugin extends Plugin {
   async writeOptions(changes: Partial<ISettings>): Promise<void> {
     settings.update((old) => ({ ...old, ...changes }));
     await this.saveData(this.options);
+    if (changes.habitTrackerMode !== undefined || changes.showHabitTracker !== undefined) {
+      this.updateHabitRibbonVisibility();
+    }
+  }
+
+  private updateHabitRibbonVisibility(): void {
+    if (!this.habitRibbonIcon) return;
+    const habitMode = this.options.habitTrackerMode || (this.options.showHabitTracker === false ? "hidden" : "panel");
+    this.habitRibbonIcon.style.display = habitMode === "separate" ? "" : "none";
   }
 }

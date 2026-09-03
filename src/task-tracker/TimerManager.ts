@@ -7,7 +7,7 @@ import { tRaw } from "../i18n";
 export const activeTimers = writable<Map<string, number>>(new Map());
 export const timerTick = writable<number>(0);
 
-let tickInterval: ReturnType<typeof setInterval> | null = null;
+let tickInterval: number | null = null;
 
 function startTickInterval(): void {
   if (tickInterval) return;

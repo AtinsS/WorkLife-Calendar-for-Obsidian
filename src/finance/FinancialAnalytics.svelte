@@ -8,8 +8,6 @@
     addManualIncomeSource,
     updateManualIncomeSource,
     removeManualIncomeSource,
-    getTotalManualIncome,
-    getIncomeCategories,
     addIncomeCategory,
     removeIncomeCategory,
   } from "./financialAnalyticsStorage";
@@ -1139,7 +1137,7 @@
     border-color: var(--mcp-accent);
   }
 
-  .fa-cat-manage-btn {
+  :global(.fa-cat-manage-btn) {
     padding: 5px 10px;
     border: 1px solid var(--mcp-glass-border);
     border-radius: 16px;
@@ -1150,7 +1148,7 @@
     transition: all 0.2s ease;
   }
 
-  .fa-cat-manage-btn:hover {
+  :global(.fa-cat-manage-btn:hover) {
     border-color: var(--mcp-accent);
     color: var(--mcp-accent);
   }

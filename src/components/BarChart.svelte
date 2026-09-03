@@ -9,7 +9,6 @@
 
   let canvas: HTMLCanvasElement;
   let container: HTMLDivElement;
-  let tooltip: HTMLDivElement;
   let hoveredBar: number = -1;
 
   interface DayData {

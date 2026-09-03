@@ -54,6 +54,8 @@ export interface ISettings {
   timeLogCleanupThreshold: number;
 
   // Habit Tracker settings
+  showHabitTracker?: boolean;
+  habitTrackerMode?: "panel" | "separate" | "hidden";
   habitLogCleanupThreshold: number;
 
   // Sync settings
@@ -168,6 +170,8 @@ export const defaultSettings = Object.freeze({
   autoCleanupThreshold: 180,
   timeLogCleanupThreshold: 180,
 
+  showHabitTracker: true,
+  habitTrackerMode: "panel" as const,
   habitLogCleanupThreshold: 1000,
 
   syncToVault: true,
@@ -430,6 +434,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addUserNameSetting(general);
     this.addShowStatusBarSetting(general);
     this.addDtwShowOnAllPagesSetting(general);
+    this.addHabitTrackerModeSetting(general);
     this.addWorkTaskSettings(general);
 
     // Dashboard tab
@@ -606,6 +611,21 @@ export class CalendarSettingsTab extends PluginSettingTab {
         toggle.setValue(this.plugin.options.dtwShowOnAllPages);
         toggle.onChange(async (value) => {
           await await this.plugin.writeOptions({ dtwShowOnAllPages: value });
+        });
+      });
+  }
+
+  addHabitTrackerModeSetting(container: HTMLElement): void {
+    new Setting(container)
+      .setName(tRaw("settings.general.habitTrackerMode"))
+      .setDesc(tRaw("settings.general.habitTrackerModeDesc"))
+      .addDropdown((dropdown) => {
+        dropdown.addOption("panel", tRaw("settings.general.habitModePanel"));
+        dropdown.addOption("separate", tRaw("settings.general.habitModeSeparate"));
+        dropdown.addOption("hidden", tRaw("settings.general.habitModeHidden"));
+        dropdown.setValue(this.plugin.options.habitTrackerMode || "panel");
+        dropdown.onChange(async (value: "panel" | "separate" | "hidden") => {
+          await this.plugin.writeOptions({ habitTrackerMode: value });
         });
       });
   }
@@ -1160,7 +1180,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     key: string,
     defaultValue: string
   ): void {
-    const currentColor = (this.plugin.options as Record<string, string | undefined>)[key] || defaultValue;
+    const currentColor = (this.plugin.options as unknown as Record<string, string | undefined>)[key] || defaultValue;
 
     new Setting(container)
       .setName(name)
@@ -1723,7 +1743,7 @@ priority: medium
 
     new Setting(container)
       .setName(tRaw("settings.appearance.navInstructionsTitle"))
-      .setDesc(wrapper);
+      .setDesc(wrapper as unknown as DocumentFragment);
   }
 
   addNavBtnStyleSettings(container: HTMLElement): void {

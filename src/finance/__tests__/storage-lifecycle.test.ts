@@ -33,8 +33,9 @@ import {
   removeManualIncomeSource,
   getTotalManualIncome,
 } from "../financialAnalyticsStorage";
-import { TFile } from "obsidian";
+import { TFile, App } from "obsidian";
 import type CalendarPlugin from "../../main";
+import type { FinanceMonthData } from "../types";
 
 // ── Vault mock ───────────────────────────────────────────────
 let vaultStore: Record<string, string> = {};
@@ -77,7 +78,7 @@ async function flushDebounce(): Promise<void> {
 }
 
 /** Read parsed finance data from the split vault file. */
-function getParsedFinanceVault(): Record<string, unknown> {
+function getParsedFinanceVault(): Record<string, FinanceMonthData> {
   const raw = vaultStore["calendar-data/finance.json"];
   if (!raw) return {};
   return JSON.parse(raw);

@@ -93,10 +93,21 @@ If this plugin saves you time and helps with your work, you can support its deve
 
 ### ✅ Tasks and Time Management
 - **4 statuses:** *To Do* → *In Progress* → *Paused* → *Done*.
-- **Quick task creation** — Right-click a day in the calendar → enter a name → task created. Supports time parsing: `14:00 buy milk`, `14-15 meeting`, `from 14:00 to 15:00 meeting`.
+- **Quick task creation** — `Ctrl+Alt+N` from anywhere in Obsidian opens a smart input dialog. Supports natural language parsing with color-highlighted preview:
+  - Time: `14:00 buy milk`, `14-15 meeting`, `from 16:00 to 18:00 meeting`
+  - Date: `tomorrow buy milk`, `friday report`, `25.07 meeting`, `+3 task`
+  - Priority: `! urgent`, `~ medium`, `- low`
+  - Date and time work at any position: `tomorrow at 14:00 buy milk` or `buy milk tomorrow at 14:00`
+  - Press `Enter` to open the full task editor with pre-filled data, or use the `⋯` button
+- **Kanban Board** — visual task management with 4 columns (To Do / In Progress / Paused / Done):
+  - Drag & drop tasks between columns to change status
+  - Create tasks directly in the "To Do" column
+  - Rich task cards with project color, time, deadline, priority, work badge, recurrence, note link, and live timer
+  - Date filters: Today / All / Specific date
+  - Right-click context menu for editing and deleting
 - **Recurring tasks:** daily / weekly / monthly with customizable intervals.
 - **Projects:** task grouping with color coding.
-- **Timer:** built-in time tracking with auto-resume on Obsidian restart.
+- **Timer:** built-in time tracking with auto-resume on Obsidian restart. Live timer on Kanban cards with pause indication.
 - **Checklists:** create a checklist for each task.
 - **Deadlines and estimates:** compare planned and actual time, notifications for approaching deadlines.
 - **Two-way sync** with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) and [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugins via standard `.md` files.
@@ -105,6 +116,8 @@ If this plugin saves you time and helps with your work, you can support its deve
 - Flexible frequency (days of the week, day of the month).
 - Quantitative goals for each habit.
 - Streak counting and visual indicators on the calendar.
+- **Display modes** — choose where habits appear: in the task panel (default), as a separate tab, or hidden. Configure in Settings → General → "Habits mode".
+- **Full CRUD** — create, edit, delete habits from the habit panel and from the dashboard.
 
 ### 💰 Finances and Analytics
 - **Income:** automatic calculation based on hourly rates from work tasks or manual entry.
@@ -116,7 +129,7 @@ If this plugin saves you time and helps with your work, you can support its deve
 - Customizable accent color.
 - Glassmorphism panels with customizable background and transparency.
 - **Info panel** under the tabs (date, time, weather, tasks) with display settings.
-- **Dashboard** for quick access to notes.
+- **Dashboard** for quick access to notes, with inline task and habit management (create, edit, delete).
 
 ### 🌍 Localization and Language
 - **Two languages:** Russian and English. Switch in the plugin settings.

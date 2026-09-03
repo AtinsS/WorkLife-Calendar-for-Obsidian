@@ -1,13 +1,11 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { get } from "svelte/store";
   import moment from "moment";
   import type { App } from "obsidian";
   import { FileSuggestModal } from "../modals/FileSuggestModal";
   import type { DashboardData, DashboardCard } from "./types";
   import {
     loadDashboard,
-    saveDashboard,
     addCard,
     updateCard,
     deleteCard,
@@ -15,8 +13,13 @@
     deleteLink,
     reorderCards,
   } from "./storage";
-  import { tasks, projects, updateTaskStatus } from "../task-tracker/stores";
-  import { habits, habitLogs, toggleHabitCompletion, getHabitProgressOnDate } from "../habit-tracker/stores";
+  import { tasks, projects, updateTaskStatus, addTask, updateTask, removeTask } from "../task-tracker/stores";
+  import { habits, toggleHabitCompletion, getHabitProgressOnDate, addHabit, updateHabit, removeHabit } from "../habit-tracker/stores";
+  import { TaskModal } from "../task-tracker/TaskModal";
+  import { HabitModal } from "../habit-tracker/HabitModal";
+  import type { ITask } from "../task-tracker/types";
+  import type { IHabit } from "../habit-tracker/types";
+  import { getDateUID } from "obsidian-daily-notes-interface";
   import { getCurrentMonthKey, financeData } from "../finance/storage";
   import { settings } from "../ui/stores";
   import { t } from "../i18n";
@@ -150,6 +153,50 @@
     return s === "progress" ? "◐" : s === "done" ? "✓" : "";
   }
 
+  // Task CRUD
+  function openCreateTask() {
+    const todayDateUID = getDateUID(now, "day");
+    new TaskModal(appInstance, (taskData) => {
+      addTask({
+        ...taskData,
+        dateUID: todayDateUID,
+        status: "todo",
+        completed: false,
+        sortOrder: todayAllTasks.length,
+      } as Omit<ITask, "id" | "createdAt" | "updatedAt">);
+    }, undefined, todayStr).open();
+  }
+
+  function openEditTask(task: ITask) {
+    new TaskModal(appInstance, (changes) => {
+      updateTask(task.id, changes);
+    }, task).open();
+  }
+
+  function deleteTask(taskId: string) {
+    removeTask(taskId);
+  }
+
+  // Habit CRUD
+  function openCreateHabit() {
+    new HabitModal(appInstance, (habitData) => {
+      addHabit({
+        ...habitData,
+        sortOrder: habitTotalCount,
+      } as Omit<IHabit, "id" | "createdAt">);
+    }).open();
+  }
+
+  function openEditHabit(habit: IHabit) {
+    new HabitModal(appInstance, (changes) => {
+      updateHabit(habit.id, changes);
+    }, habit).open();
+  }
+
+  function deleteHabit(habitId: string) {
+    removeHabit(habitId);
+  }
+
   onMount(async () => {
     data = await loadDashboard(appInstance, filePath);
   });
@@ -236,25 +283,32 @@
   <!-- Widgets row -->
   <div class="dashboard__widgets">
     <!-- Tasks widget -->
-    {#if showTasksWidget && todayTotal > 0}
+    {#if showTasksWidget}
       <div class="dash-widget-wrap">
         <button class="dash-widget dash-widget--tasks" class:expanded={tasksExpanded} on:click={() => tasksExpanded = !tasksExpanded}>
           <span class="dash-widget__icon">✅</span>
           <span class="dash-widget__label">{$t("dashboard.tasks")}</span>
-          <div class="dash-widget__bar"><div class="dash-widget__bar-fill" style="width:{todayProgress}%"></div></div>
-          <span class="dash-widget__count">{todayDone}/{todayTotal}</span>
-          <span class="dash-widget__chevron" class:open={tasksExpanded}>›</span>
+          {#if todayTotal > 0}
+            <div class="dash-widget__bar"><div class="dash-widget__bar-fill" style="width:{todayProgress}%"></div></div>
+            <span class="dash-widget__count">{todayDone}/{todayTotal}</span>
+          {/if}
+          <button class="dash-widget__add-btn" on:click|stopPropagation={openCreateTask} title={$t("dashboard.addCard")}>+</button>
+          {#if todayTotal > 0}<span class="dash-widget__chevron" class:open={tasksExpanded}>›</span>{/if}
         </button>
-        {#if tasksExpanded}
+        {#if tasksExpanded && todayTotal > 0}
           <div class="dash-widget__dropdown">
             {#each todayAllTasks as task (task.id)}
               {@const project = $projects.find(p => p.id === task.projectId)}
-              <button class="dash-task" class:done={task.status === "done"} on:click|stopPropagation={() => cycleTaskStatus(task)}>
-                <span class="dash-task-check" class:checked={task.status === "done"} class:in-progress={task.status === "progress"}>{statusIcon(task.status)}</span>
+              <div class="dash-task" class:done={task.status === "done"}>
+                <button class="dash-task-check" class:checked={task.status === "done"} class:in-progress={task.status === "progress"} on:click|stopPropagation={() => cycleTaskStatus(task)}>{statusIcon(task.status)}</button>
                 <span class="dash-task-title" class:strike={task.status === "done"}>{task.title}</span>
                 {#if task.scheduledTime}<span class="dash-task-time">{task.scheduledTime}</span>{/if}
                 {#if project}<span class="dash-task-project" style="color:{project.color}">{project.icon || "📁"}</span>{/if}
-              </button>
+                <div class="dash-task-actions">
+                  <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => openEditTask(task)} title={$t("common.edit")}>✎</button>
+                  <button class="dash-btn dash-btn--sm dash-btn--danger" on:click|stopPropagation={() => deleteTask(task.id)} title={$t("common.delete")}>✕</button>
+                </div>
+              </div>
             {/each}
           </div>
         {/if}
@@ -262,25 +316,32 @@
     {/if}
 
     <!-- Habits widget -->
-    {#if showHabitsWidget && habitTotalCount > 0}
+    {#if showHabitsWidget}
       <div class="dash-widget-wrap">
         <button class="dash-widget dash-widget--habits" class:expanded={habitsExpanded} on:click={() => habitsExpanded = !habitsExpanded}>
           <span class="dash-widget__icon">🔥</span>
           <span class="dash-widget__label">{$t("dashboard.habits")}</span>
-          <div class="dash-widget__bar"><div class="dash-widget__bar-fill" style="width:{habitTotalCount > 0 ? Math.round(habitDoneCount / habitTotalCount * 100) : 0}%"></div></div>
-          <span class="dash-widget__count">{habitDoneCount}/{habitTotalCount}</span>
-          <span class="dash-widget__chevron" class:open={habitsExpanded}>›</span>
+          {#if habitTotalCount > 0}
+            <div class="dash-widget__bar"><div class="dash-widget__bar-fill" style="width:{habitTotalCount > 0 ? Math.round(habitDoneCount / habitTotalCount * 100) : 0}%"></div></div>
+            <span class="dash-widget__count">{habitDoneCount}/{habitTotalCount}</span>
+          {/if}
+          <button class="dash-widget__add-btn" on:click|stopPropagation={openCreateHabit} title={$t("dashboard.addCard")}>+</button>
+          {#if habitTotalCount > 0}<span class="dash-widget__chevron" class:open={habitsExpanded}>›</span>{/if}
         </button>
-        {#if habitsExpanded}
+        {#if habitsExpanded && habitTotalCount > 0}
           <div class="dash-widget__dropdown">
             {#each todayHabits as habit (habit.id)}
-              <button class="dash-habit" class:done={habit.progress === 2} style="--hc:{habit.color}" on:click|stopPropagation={() => toggleHabitCompletion(habit.id, todayStr, habit.targetCount || 1)}>
-                <span class="dash-habit-check" class:checked={habit.progress === 2}>
+              <div class="dash-habit" class:done={habit.progress === 2} style="--hc:{habit.color}">
+                <button class="dash-habit-check" class:checked={habit.progress === 2} on:click|stopPropagation={() => toggleHabitCompletion(habit.id, todayStr, habit.targetCount || 1)}>
                   {#if habit.progress === 2}<svg class="dash-check-svg" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="2" fill="none"/></svg>{/if}
-                </span>
+                </button>
                 <span class="dash-habit-icon">{habit.icon}</span>
                 <span class="dash-habit-name" class:strike={habit.progress === 2}>{habit.title}</span>
-              </button>
+                <div class="dash-habit-actions">
+                  <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => openEditHabit(habit)} title={$t("common.edit")}>✎</button>
+                  <button class="dash-btn dash-btn--sm dash-btn--danger" on:click|stopPropagation={() => deleteHabit(habit.id)} title={$t("common.delete")}>✕</button>
+                </div>
+              </div>
             {/each}
           </div>
         {/if}
@@ -386,7 +447,8 @@
 
 <!-- Edit card modal -->
 {#if showCardModal}
-  <div class="dash-popup-overlay" on:click={(e) => closeModal(e, () => { showCardModal = false; editingCard = null; })}>
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+  <div class="dash-popup-overlay" role="dialog" aria-modal="true" on:click={(e) => closeModal(e, () => { showCardModal = false; editingCard = null; })} on:keydown={(e) => { if (e.key === 'Escape') { showCardModal = false; editingCard = null; } }}>
     <div class="dash-popup">
       <h3 class="dash-popup__title">{$t("dashboard.editCard")}</h3>
       <label class="dash-popup__label">
@@ -407,7 +469,8 @@
 
 <!-- Add link modal -->
 {#if showLinkModal}
-  <div class="dash-popup-overlay" on:click={(e) => closeModal(e, () => { showLinkModal = false; addingLinkToCardId = null; })}>
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+  <div class="dash-popup-overlay" role="dialog" aria-modal="true" on:click={(e) => closeModal(e, () => { showLinkModal = false; addingLinkToCardId = null; })} on:keydown={(e) => { if (e.key === 'Escape') { showLinkModal = false; addingLinkToCardId = null; } }}>
     <div class="dash-popup">
       <h3 class="dash-popup__title">{$t("dashboard.addLink")}</h3>
       <label class="dash-popup__label">
@@ -431,7 +494,8 @@
 
 <!-- Add card modal -->
 {#if showAddCardModal}
-  <div class="dash-popup-overlay" on:click={(e) => closeModal(e, () => { showAddCardModal = false; })}>
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+  <div class="dash-popup-overlay" role="dialog" aria-modal="true" on:click={(e) => closeModal(e, () => { showAddCardModal = false; })} on:keydown={(e) => { if (e.key === 'Escape') { showAddCardModal = false; } }}>
     <div class="dash-popup">
       <h3 class="dash-popup__title">{$t("dashboard.newCard")}</h3>
       <label class="dash-popup__label">
@@ -479,6 +543,27 @@
   .dash-widget__chevron { font-size: 18px; color: var(--text-muted); transition: transform 0.2s ease; flex-shrink: 0; }
   .dash-widget__chevron.open { transform: rotate(90deg); }
 
+  .dash-widget__add-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border: none;
+    background: var(--background-modifier-hover, rgba(255,255,255,0.06));
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s, color 0.15s;
+  }
+  .dash-widget__add-btn:hover {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+  }
+
   .dash-widget__dropdown {
     background: var(--background-secondary);
     border: 1px solid var(--background-modifier-border);
@@ -514,6 +599,18 @@
   .dash-task-time { font-size: 11px; font-weight: 600; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 5px; flex-shrink: 0; }
   .dash-task-project { font-size: 13px; flex-shrink: 0; }
 
+  .dash-task-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .dash-task:hover .dash-task-actions { opacity: 1; }
+  @media (max-width: 768px) {
+    .dash-task-actions { opacity: 0.6; }
+  }
+
   /* Habit rows */
   .dash-habit {
     display: flex; align-items: center; gap: 8px;
@@ -536,6 +633,18 @@
   .dash-habit-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .dash-habit-name.strike { text-decoration: line-through; color: var(--text-muted); }
 
+  .dash-habit-actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .dash-habit:hover .dash-habit-actions { opacity: 1; }
+  @media (max-width: 768px) {
+    .dash-habit-actions { opacity: 0.6; }
+  }
+
   /* Goal rows */
   .dash-goal { display: flex; align-items: center; gap: 8px; padding: 7px 8px; font-size: 13px; }
   .dash-goal-icon { font-size: 14px; flex-shrink: 0; }
@@ -554,7 +663,7 @@
     cursor: grabbing;
   }
 
-  .dashboard-card.dragging {
+  :global(.dashboard-card.dragging) {
     opacity: 0.4;
     transform: scale(0.98);
   }

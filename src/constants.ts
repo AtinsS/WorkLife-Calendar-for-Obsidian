@@ -8,5 +8,7 @@ export const VIEW_TYPE_MOBILE_TASKS = "calendar-mobile-tasks";
 export const VIEW_TYPE_HABIT_ANALYTICS = "calendar-habit-analytics";
 export const VIEW_TYPE_FINANCE = "calendar-finance";
 export const VIEW_TYPE_FINANCIAL_ANALYTICS = "calendar-financial-analytics";
+export const VIEW_TYPE_KANBAN = "calendar-kanban";
+export const VIEW_TYPE_HABIT_PANEL = "calendar-habit-panel";
 
 export const TRIGGER_ON_OPEN = "calendar:open";

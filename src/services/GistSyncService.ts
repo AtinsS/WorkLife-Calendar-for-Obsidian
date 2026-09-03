@@ -32,7 +32,7 @@ export const gistSyncStatus = writable<GistSyncStatus>({
 });
 
 let pluginInstance: CalendarPlugin | null = null;
-let autoSyncTimeout: ReturnType<typeof setTimeout> | null = null;
+let autoSyncTimeout: number | null = null;
 let unsubscribers: (() => void)[] = [];
 let autoSyncEnabled = false;
 

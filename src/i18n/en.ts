@@ -106,6 +106,11 @@ export const en = {
       statusBarDesc: "Display a panel with date, time, weather and tasks below tabs",
       statusBarAllPages: "Panel on all pages",
       statusBarAllPagesDesc: "Show the info panel on every open tab (otherwise only on the first)",
+      habitTrackerMode: "Habits mode",
+      habitTrackerModeDesc: "Where to display the habit panel",
+      habitModePanel: "In task panel",
+      habitModeSeparate: "Separate tab",
+      habitModeHidden: "Hidden",
       sectionTaskTracker: "Task tracker",
       showTaskTracker: "Show task tracker",
       showTaskTrackerDesc: "Display the task panel in the sidebar",
@@ -357,12 +362,17 @@ export const en = {
       openSchedule: "Open schedule",
       openAnalytics: "Open analytics",
       openFinance: "Open finance distribution",
+      quickAddTask: "Quick add task",
+      openKanban: "Open Kanban board",
+      openHabitPanel: "Open habit panel",
     },
     ribbon: {
       tasks: "Tasks",
       calendar: "Calendar",
       analytics: "Analytics",
       finance: "Finance",
+      kanban: "Kanban",
+      habits: "Habits",
     },
     contextMenu: {
       insertDateTimeWeather: "Insert date, time and weather block",
@@ -404,6 +414,7 @@ export const en = {
       hintTime: "time before text",
       hintRange: "time range",
       hintPriority: "! high, ~ medium, - low",
+      hintDate: "date: tomorrow, fri, 07/25",
       hintExampleTime: "14:00 buy milk",
       hintExampleRange: "14-15 buy milk / 14:00-15:00 buy milk",
       hintExamplePriority: "! buy milk",
@@ -632,6 +643,11 @@ export const en = {
     deleteCategoryTitle: "Delete category",
     editNamePlaceholder: "Name",
     addCategoriesManage: "Add categories for income sources",
+  },
+
+  // Kanban board
+  kanban: {
+    title: "Kanban Board",
   },
 
   // Dashboard

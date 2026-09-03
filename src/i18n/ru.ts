@@ -106,6 +106,11 @@ export const ru = {
       statusBarDesc: "Отображать панель с датой, временем, погодой и задачами под вкладками",
       statusBarAllPages: "Панель на всех страницах",
       statusBarAllPagesDesc: "Показывать панель информации на каждой открытой вкладке (иначе — только на первой)",
+      habitTrackerMode: "Режим привычек",
+      habitTrackerModeDesc: "Где отображать панель привычек",
+      habitModePanel: "В панели задач",
+      habitModeSeparate: "Отдельная вкладка",
+      habitModeHidden: "Скрыть",
       sectionTaskTracker: "Трекер задач",
       showTaskTracker: "Показывать трекер задач",
       showTaskTrackerDesc: "Отображать панель задач в боковой панели",
@@ -357,12 +362,17 @@ export const ru = {
       openSchedule: "Открыть расписание",
       openAnalytics: "Открыть аналитику",
       openFinance: "Открыть распределение финансов",
+      quickAddTask: "Быстро добавить задачу",
+      openKanban: "Открыть Канбан-доску",
+      openHabitPanel: "Открыть панель привычек",
     },
     ribbon: {
       tasks: "Задачи",
       calendar: "Календарь",
       analytics: "Аналитика",
       finance: "Финансы",
+      kanban: "Канбан",
+      habits: "Привычки",
     },
     contextMenu: {
       insertDateTimeWeather: "Вставить блок даты, времени и погоды",
@@ -404,6 +414,7 @@ export const ru = {
       hintTime: "время перед текстом",
       hintRange: "временной диапазон",
       hintPriority: "! высокий, ~ средний, - низкий",
+      hintDate: "дата: завтра, пт, 25.07",
       hintExampleTime: "14:00 текст",
       hintExampleRange: "14-15 текст / 14:00-15:00 текст",
       hintExamplePriority: "! текст",
@@ -632,6 +643,11 @@ export const ru = {
     deleteCategoryTitle: "Удалить категорию",
     editNamePlaceholder: "Название",
     addCategoriesManage: "Добавьте категории для источников дохода",
+  },
+
+  // Kanban board
+  kanban: {
+    title: "Канбан-доска",
   },
 
   // Dashboard

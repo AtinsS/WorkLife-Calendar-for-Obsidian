@@ -6,7 +6,7 @@ import type CalendarPlugin from "src/main";
 // Obsidian's type defs export moment as `typeof Moment` (the module namespace),
 // but at runtime it's the callable moment function. Cast once here.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Obsidian types moment as namespace, runtime is callable
-const momentFn = moment as (inp?: unknown, format?: string, strict?: boolean) => Moment;
+const momentFn = moment as unknown as (inp?: unknown, format?: string, strict?: boolean) => Moment;
 import { tasks } from "src/task-tracker/stores";
 import type { ITask } from "src/task-tracker/types";
 import type { ISettings } from "src/settings";
@@ -39,7 +39,7 @@ export const defaultNotificationSettings: NotificationSettings = {
 
 export class NotificationService {
   private plugin: CalendarPlugin;
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: number | null = null;
   private firedReminders = new Set<string>();
   private firedOverdue = new Set<string>();
   private firedDeadline = new Set<string>();

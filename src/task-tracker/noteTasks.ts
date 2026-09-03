@@ -497,7 +497,7 @@ export async function syncTaskToNote(task: ITask, app: App): Promise<void> {
 }
 
 // Debounce таймеры для предотвращения гонки данных
-const syncDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const syncDebounceTimers = new Map<string, number>();
 const SYNC_DEBOUNCE_MS = 300;
 
 // Валидные значения полей

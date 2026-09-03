@@ -22,7 +22,7 @@ export const financialAnalyticsData = writable<IFinancialAnalyticsData>({
 });
 
 let pluginInstance: CalendarPlugin | null = null;
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let saveTimeout: number | null = null;
 let loaded = false;
 let storeIsDirty = false;
 let isSaving = false;

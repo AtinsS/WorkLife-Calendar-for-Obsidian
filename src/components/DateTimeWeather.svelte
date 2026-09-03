@@ -296,9 +296,13 @@
   {/if}
   {#if totalToday > 0}
     <span class="dtw-sep"></span>
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <span
       class="dtw-item dtw-hoverable"
+      role="button"
+      tabindex="0"
       on:click={() => switchToTasks()}
+      on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchToTasks(); }}
       on:mouseenter={(e) => {
         if (todayTaskList.length > 0)
           showTooltip(e.currentTarget, $t("dtw.tasksToday"), todayTaskList.map(t => ({ status: t.status, name: t.title })));
@@ -311,9 +315,13 @@
   {/if}
   {#if inProgressCount > 0}
     <span class="dtw-sep"></span>
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <span
       class="dtw-item dtw-hoverable"
+      role="button"
+      tabindex="0"
       on:click={() => switchToTasks()}
+      on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchToTasks(); }}
       on:mouseenter={(e) => {
         if (inProgressTaskList.length > 0)
           showTooltip(e.currentTarget, $t("dtw.inProgress"), inProgressTaskList.map(t => ({ status: t.status, name: t.title })));
@@ -326,9 +334,13 @@
   {/if}
   {#if habitTotalCount > 0}
     <span class="dtw-sep"></span>
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <span
       class="dtw-item dtw-hoverable dtw-habits-trigger"
+      role="button"
+      tabindex="0"
       on:click={() => { const el = document.querySelector('.dtw-habits-trigger'); if (el) showHabitTooltip(el); }}
+      on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { const el = document.querySelector('.dtw-habits-trigger'); if (el) showHabitTooltip(el); } }}
       on:mouseenter={(e) => {
         if (todayHabitList.length > 0)
           showTooltip(e.currentTarget, $t("dtw.habits"), todayHabitList.map(h => ({ status: h.completed ? "done" : "todo", name: `${h.icon} ${h.title}` })));
@@ -341,9 +353,13 @@
   {/if}
   {#if monthGoals.length > 0}
     <span class="dtw-sep"></span>
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
     <span
       class="dtw-item dtw-hoverable"
+      role="button"
+      tabindex="0"
       on:click={() => switchToTasks()}
+      on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchToTasks(); }}
       on:mouseenter={(e) => {
         if (monthGoals.length > 1)
           showTooltip(e.currentTarget, $t("dtw.monthGoals"), monthGoals.map(g => ({ status: g.done ? "done" : "progress", name: `${g.icon} ${g.name}: ${g.done ? "✓" : g.remaining.toLocaleString($t("locale.numberLocale")) + " " + $t("locale.currencySymbol")}` })));
@@ -417,7 +433,7 @@
     }
   }
 
-  .dtw-habit-tooltip .dtw-habit-row {
+  :global(.dtw-habit-tooltip .dtw-habit-row) {
     cursor: pointer;
     transition: background 0.15s ease;
     border-radius: 4px;
@@ -425,16 +441,16 @@
     margin: 0 -6px;
   }
 
-  .dtw-habit-tooltip .dtw-habit-row:hover {
+  :global(.dtw-habit-tooltip .dtw-habit-row:hover) {
     background: var(--background-modifier-hover);
   }
 
-  .dtw-habit-tooltip .dtw-habit-item-icon {
+  :global(.dtw-habit-tooltip .dtw-habit-item-icon) {
     font-size: 12px;
     flex-shrink: 0;
   }
 
-  .dtw-sync {
+  :global(.dtw-sync) {
     display: inline-flex;
     align-items: center;
     padding: 0 4px;

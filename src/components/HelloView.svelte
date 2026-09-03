@@ -87,7 +87,7 @@
   {#if weatherAnim}
     <div class="hello-weather {weatherAnim}">
       {#if weatherAnim === "weather-rain"}
-        {#each Array(40) as _, i}
+        {#each Array(40) as _, __}
           <div class="raindrop" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 2}s; animation-duration: {0.5 + Math.random() * 0.5}s"></div>
         {/each}
       {:else if weatherAnim === "weather-clouds"}
@@ -101,11 +101,11 @@
       {:else if weatherAnim === "weather-gloom"}
         <div class="gloom-overlay"></div>
       {:else if weatherAnim === "weather-storm"}
-        {#each Array(60) as _, i}
+        {#each Array(60) as _, __}
           <div class="raindrop heavy" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 1.5}s; animation-duration: {0.3 + Math.random() * 0.4}s"></div>
         {/each}
       {:else if weatherAnim === "weather-snow"}
-        {#each Array(50) as _, i}
+        {#each Array(50) as _, __}
           <div class="snowflake" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 5}s; animation-duration: {3 + Math.random() * 4}s; font-size: {8 + Math.random() * 10}px; opacity: {0.4 + Math.random() * 0.4}">*</div>
         {/each}
       {:else if weatherAnim === "weather-sun"}

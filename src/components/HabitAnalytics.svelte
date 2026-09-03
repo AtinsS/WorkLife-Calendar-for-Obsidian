@@ -439,14 +439,14 @@
     gap: 10px;
   }
 
-  .habit-analytics-header h2 {
+  :global(.habit-analytics-header h2) {
     margin: 0;
     font-size: 20px;
     font-weight: 700;
     letter-spacing: -0.02em;
   }
 
-  .habit-analytics-select {
+  :global(.habit-analytics-select) {
     border-radius: var(--mcp-radius-sm);
     border: 1px solid var(--mcp-glass-border);
     background: var(--mcp-glass-bg);
@@ -457,13 +457,13 @@
     transition: all 0.2s ease;
   }
 
-  .habit-analytics-select:focus {
+  :global(.habit-analytics-select:focus) {
     border-color: var(--mcp-accent);
     outline: none;
     box-shadow: 0 0 0 3px var(--mcp-accent-dim);
   }
 
-  .habit-analytics-empty {
+  :global(.habit-analytics-empty) {
     text-align: center;
     padding: 40px 16px;
     color: var(--text-muted);
@@ -557,7 +557,7 @@
   }
 
   /* Weekly Bar Chart */
-  .weekly-chart {
+  :global(.weekly-chart) {
     display: flex;
     align-items: flex-end;
     gap: 6px;
@@ -567,7 +567,7 @@
     background: var(--mcp-glass-highlight);
   }
 
-  .weekly-bar-wrapper {
+  :global(.weekly-bar-wrapper) {
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -576,7 +576,7 @@
     justify-content: flex-end;
   }
 
-  .weekly-bar-info {
+  :global(.weekly-bar-info) {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -584,21 +584,21 @@
     min-height: 20px;
   }
 
-  .weekly-bar-percent {
+  :global(.weekly-bar-percent) {
     font-size: 10px;
     font-weight: 700;
     color: var(--text-accent);
     white-space: nowrap;
   }
 
-  .weekly-bar-earnings {
+  :global(.weekly-bar-earnings) {
     font-size: 9px;
     font-weight: 500;
     color: var(--mcp-success, rgba(34, 197, 94, 0.9));
     white-space: nowrap;
   }
 
-  .weekly-bar {
+  :global(.weekly-bar) {
     width: 100%;
     max-width: 36px;
     background: linear-gradient(
@@ -613,11 +613,11 @@
       opacity 0.2s ease;
   }
 
-  .weekly-bar:hover {
+  :global(.weekly-bar:hover) {
     opacity: 0.85;
   }
 
-  .weekly-bar-label {
+  :global(.weekly-bar-label) {
     font-size: 9px;
     color: var(--text-muted);
     margin-top: 6px;
@@ -632,7 +632,7 @@
     gap: 12px;
   }
 
-  .section-subtitle {
+  :global(.section-subtitle) {
     font-size: 12px;
     color: var(--text-muted);
     margin: -8px 0 16px;
@@ -834,7 +834,7 @@
     font-weight: 500;
   }
 
-  .time-stat-delta {
+  :global(.time-stat-delta) {
     font-size: 10px;
     font-weight: 600;
     margin-top: 4px;
@@ -1097,7 +1097,7 @@
       grid-template-columns: 1fr;
     }
 
-    .weekly-chart {
+    :global(.weekly-chart) {
       height: 90px;
     }
 

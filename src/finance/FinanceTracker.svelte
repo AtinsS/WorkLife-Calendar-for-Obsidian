@@ -72,8 +72,8 @@
   // ── Sync income from tasks/analytics (only when not editing manually) ──
   // Guard: only sync after data has been loaded from disk and user is not in manual mode
   $: {
-    const _tasks = $tasks;
-    const _analytics = $financialAnalyticsData;
+    void $tasks;
+    void $financialAnalyticsData;
     // Use a microtask to avoid updating during the same tick as the store reload above
     if (incomeSource !== "manual" && monthData.updatedAt && monthKey) {
       const income = getIncomeForSource(incomeSource);
@@ -480,7 +480,8 @@
             <button class="goal-done-btn" on:click={() => editingMainCatId = null}>✓</button>
           </div>
         {:else}
-          <div class="category-row" on:click={() => editingMainCatId = cat.id}>
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <div class="category-row" role="button" tabindex="0" on:click={() => editingMainCatId = cat.id} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editingMainCatId = cat.id; }}>
             <span class="cat-icon-display">{cat.icon}</span>
             <span class="cat-name-display">{cat.name}</span>
             <span class="cat-amount-display">{formatMoney(cat.amount)} {$t("locale.currencySymbol")}</span>
@@ -514,7 +515,8 @@
             <button class="goal-done-btn" on:click={() => editingGoalId = null}>✓</button>
           </div>
         {:else}
-          <div class="goal-row" on:click={() => editingGoalId = goal.id}>
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <div class="goal-row" role="button" tabindex="0" on:click={() => editingGoalId = goal.id} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editingGoalId = goal.id; }}>
             <span class="goal-icon">{goal.icon}</span>
             <div class="goal-info">
               <div class="goal-header">
@@ -564,7 +566,8 @@
             <button class="goal-done-btn" on:click={() => editingSavingsId = null}>✓</button>
           </div>
         {:else}
-          <div class="category-row" on:click={() => editingSavingsId = cat.id}>
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <div class="category-row" role="button" tabindex="0" on:click={() => editingSavingsId = cat.id} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editingSavingsId = cat.id; }}>
             <span class="cat-icon-display">{cat.icon}</span>
             <span class="cat-name-display">{cat.name}</span>
             <span class="cat-amount-display">{formatMoney(cat.amount)} {$t("locale.currencySymbol")}</span>
@@ -600,7 +603,8 @@
         <button class="rules-cancel-btn" on:click={() => { editingRules = false; rulesText = monthData.distributionRules.join("\n"); }}>{$t("common.cancel")}</button>
       </div>
     {:else}
-      <div class="rules-display" on:click={startEditRules}>
+      <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+      <div class="rules-display" role="button" tabindex="0" on:click={startEditRules} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') startEditRules(); }}>
         {#each monthData.distributionRules as rule, i}
           <div class="rule-item">
             <span class="rule-number">{i + 1}</span>
@@ -716,7 +720,7 @@
     transform: translateY(-1px);
   }
 
-  .month-display {
+  :global(.month-display) {
     min-width: 180px;
     text-align: center;
     font-size: 14px;
@@ -998,7 +1002,7 @@
     text-align: right;
   }
 
-  .cat-check {
+  :global(.cat-check) {
     width: 26px;
     height: 26px;
     border-radius: 50%;
@@ -1016,12 +1020,12 @@
     opacity: 0.5;
   }
 
-  .cat-check:hover {
+  :global(.cat-check:hover) {
     opacity: 1;
     transform: scale(1.1);
   }
 
-  .cat-check.completed {
+  :global(.cat-check.completed) {
     background: var(--fi-green);
     border-color: var(--fi-green);
     color: #fff;

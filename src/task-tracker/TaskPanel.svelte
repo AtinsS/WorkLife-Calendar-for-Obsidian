@@ -8,7 +8,7 @@
   import {
     tasks, projects, selectedDate, activeTab, taskFilter,
     addTask, updateTask, updateTaskStatus, removeTask,
-    createNextRecurringInstance, reorderProjects, clearAllRecurringTasks, resetTaskTimer,
+    createNextRecurringInstance, clearAllRecurringTasks, resetTaskTimer,
   } from "./stores";
   import { createNoteTask, deleteNoteTask, shouldSyncTaskToNote, syncTaskToNote } from "./noteTasks";
   import { settings } from "../ui/stores";
@@ -323,7 +323,8 @@
           <span class="project-picker-arrow" class:rotated={showProjectPicker}>▾</span>
         </button>
         {#if showProjectPicker}
-          <div class="task-tracker-mob-project-dropdown" on:click|stopPropagation>
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <div class="task-tracker-mob-project-dropdown" on:click|stopPropagation on:keydown|stopPropagation>
             <button class="project-dropdown-item" class:active={$taskFilter.projectId === null}
               on:click={() => { taskFilter.update(f => ({ ...f, projectId: null })); showProjectPicker = false; }}>
               <span>📋</span> {$t("tasks.tabs.all")}
@@ -348,7 +349,8 @@
       <div class="task-tracker-menu-wrapper">
         <button class="task-tracker-btn" on:click|stopPropagation={toggleMenu} title={$t("tasks.panel.more")}>⋮</button>
         {#if showMenu}
-          <div class="task-tracker-dropdown" on:click|stopPropagation role="menu">
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <div class="task-tracker-dropdown" on:click|stopPropagation on:keydown|stopPropagation role="menu" tabindex="-1">
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { onOpenSchedule?.(); closeMenu(); }}>{$t("tasks.panel.menuSchedule")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { openProjectSettings(); closeMenu(); }}>{$t("tasks.panel.menuProjects")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { showTimeLogs = true; closeMenu(); }}>{$t("tasks.panel.menuTimeLogs")}</button>
@@ -367,7 +369,8 @@
     <div class="task-tracker-mob-date">
       {#if currentDate}
         <button class="date-nav-btn" on:click={prevDay}>‹</button>
-        <span class="task-tracker-date" on:click={goToday}>{formatDate(currentDate)}</span>
+        <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+        <span class="task-tracker-date" role="button" tabindex="0" on:click={goToday} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToday(); }}>{formatDate(currentDate)}</span>
         <button class="date-nav-btn" on:click={nextDay}>›</button>
       {:else}
         <span class="task-tracker-date-all">{$t("tasks.panel.allTasks")}</span>
@@ -383,7 +386,8 @@
         {#if currentDate}
           <div class="task-tracker-date-nav">
             <button class="date-nav-btn" on:click={prevDay} title={$t("tasks.panel.prevDay")}>‹</button>
-            <span class="task-tracker-date" on:click={goToday} title={$t("tasks.panel.today")}>{formatDate(currentDate)}</span>
+            <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+            <span class="task-tracker-date" role="button" tabindex="0" on:click={goToday} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToday(); }} title={$t("tasks.panel.today")}>{formatDate(currentDate)}</span>
             <button class="date-nav-btn" on:click={nextDay} title={$t("tasks.panel.nextDay")}>›</button>
           </div>
         {:else}
@@ -408,7 +412,8 @@
         <div class="task-tracker-menu-wrapper">
           <button class="task-tracker-btn" on:click|stopPropagation={toggleMenu}>⋮</button>
           {#if showMenu}
-            <div class="task-tracker-dropdown" on:click|stopPropagation role="menu">
+            <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <div class="task-tracker-dropdown" on:click|stopPropagation on:keydown|stopPropagation role="menu" tabindex="-1">
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { openProjectSettings(); closeMenu(); }}>{$t("tasks.panel.menuProjects")}</button>
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { showTimeLogs = true; closeMenu(); }}>{$t("tasks.panel.menuTimeLogs")}</button>
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { clearCompletedTasks(); closeMenu(); }}>{$t("tasks.panel.menuCleanDone")}</button>

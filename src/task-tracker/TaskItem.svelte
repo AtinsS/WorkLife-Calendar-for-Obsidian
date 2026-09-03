@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import type { App } from "obsidian";
   import type { ITask, TaskStatus } from "./types";
-  import { updateTask, updateTaskStatus, removeTask, resetTaskTimer, projects, activeTab, calculateTaskEarnings, tasks, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem } from "./stores";
+  import { updateTask, updateTaskStatus, removeTask, resetTaskTimer, projects, activeTab, tasks, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem } from "./stores";
   import { get } from "svelte/store";
   import { getActiveTimer, formatDuration, formatEstimate } from "./TimerManager";
   import { TaskModal } from "./TaskModal";

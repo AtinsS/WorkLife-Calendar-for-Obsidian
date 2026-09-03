@@ -5,7 +5,7 @@ import type { Moment } from "moment";
 // Obsidian's type defs export moment as `typeof Moment` (the module namespace),
 // but at runtime it's the callable moment function. Cast once here.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Obsidian types moment as namespace, runtime is callable
-const momentFn = moment as (inp?: unknown, format?: string, strict?: boolean) => Moment;
+const momentFn = moment as unknown as (inp?: unknown, format?: string, strict?: boolean) => Moment;
 
 import type CalendarPlugin from "src/main";
 import { getDateUID } from "obsidian-daily-notes-interface";
@@ -18,7 +18,7 @@ import { settings } from "../ui/stores";
 import { tRaw } from "../i18n";
 
 let pluginInstance: CalendarPlugin | null = null;
-let saveTimeout: ReturnType<typeof setTimeout> | null = null;
+let saveTimeout: number | null = null;
 let loaded = false;
 
 const DEFAULT_AUTO_CLEANUP_THRESHOLD = 180;
@@ -263,11 +263,12 @@ function startTaskTimer(id: string): void {
     return;
   }
 
+  // Fresh start from todo/done — reset accumulated work time
   startTimer(id);
   tasks.update((current) =>
     current.map((t) =>
       t.id === id
-        ? { ...t, status: "progress" as TaskStatus, completed: false, timerStartedAt: Date.now(), updatedAt: Date.now() }
+        ? { ...t, status: "progress" as TaskStatus, completed: false, timerStartedAt: Date.now(), totalWorkTime: 0, updatedAt: Date.now() }
         : t
     )
   );
