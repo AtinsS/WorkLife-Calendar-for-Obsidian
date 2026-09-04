@@ -1,6 +1,7 @@
 import "moment/locale/ru";
 import { moment, App, Plugin, WorkspaceLeaf, MarkdownView, View } from "obsidian";
 import type { Moment, WeekSpec } from "moment";
+import type { IconName } from "obsidian";
 import { get } from "svelte/store";
 
 const registeredMarkdownCodeBlocks = new Set<string>();
@@ -71,6 +72,7 @@ export default class CalendarPlugin extends Plugin {
   private view: CalendarView;
   private ribbonIconsRegistered = false;
   private ribbonIcons: HTMLElement[] = [];
+  private ribbonDefs: { el: HTMLElement; key: string }[] = [];
   private habitRibbonIcon: HTMLElement | null = null;
   private syncReloadTimer: number | null = null;
   public notificationService: NotificationService;
@@ -141,6 +143,7 @@ export default class CalendarPlugin extends Plugin {
     // Set the app store so components can access the Obsidian App instance
     appStore.set(this.app);
 
+    let lastLocale = get(locale);
     this.register(
       settings.subscribe((value) => {
         this.options = value;
@@ -149,6 +152,11 @@ export default class CalendarPlugin extends Plugin {
         if (value.language) {
           initLocale(value.language);
           moment.locale(get(locale) || "ru");
+          const newLocale = get(locale);
+          if (newLocale !== lastLocale) {
+            lastLocale = newLocale;
+            this.updateRibbonLabels();
+          }
         }
       })
     );
@@ -266,6 +274,7 @@ export default class CalendarPlugin extends Plugin {
       name: tRaw("main.commands.quickAddTask"),
       hotkeys: [{ modifiers: ["Ctrl", "Alt"], key: "n" }],
       callback: () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Obsidian global moment
         const now = window.moment ? window.moment() : (globalThis as any).moment();
         void import("./task-tracker/QuickAddModal").then(({ QuickAddModal }) => {
           new QuickAddModal(this.app, now).open();
@@ -289,46 +298,7 @@ export default class CalendarPlugin extends Plugin {
     document.querySelectorAll("[data-mcp-ribbon]").forEach(el => el.remove());
 
     if (!this.ribbonIconsRegistered) {
-      const tasksIcon = this.addRibbonIcon("checkbox-glyph", tRaw("main.ribbon.tasks"), () => {
-        void this.activateTaskView();
-      });
-      tasksIcon.dataset.mcpRibbon = "true";
-      this.ribbonIcons.push(tasksIcon);
-
-      const calendarIcon = this.addRibbonIcon("calendar-with-checkmark", tRaw("main.ribbon.calendar"), () => {
-        void this.activateCalendarView();
-      });
-      calendarIcon.dataset.mcpRibbon = "true";
-      this.ribbonIcons.push(calendarIcon);
-
-      const analyticsIcon = this.addRibbonIcon("bar-chart", tRaw("main.ribbon.analytics"), () => {
-        void this.activateHabitAnalyticsView();
-      });
-      analyticsIcon.dataset.mcpRibbon = "true";
-      this.ribbonIcons.push(analyticsIcon);
-
-      const financeIcon = this.addRibbonIcon("coins", tRaw("main.ribbon.finance"), () => {
-        void this.activateFinanceView();
-      });
-      financeIcon.dataset.mcpRibbon = "true";
-      this.ribbonIcons.push(financeIcon);
-
-      const kanbanIcon = this.addRibbonIcon("layout-grid", tRaw("main.ribbon.kanban"), () => {
-        void this.activateKanbanView();
-      });
-      kanbanIcon.dataset.mcpRibbon = "true";
-      this.ribbonIcons.push(kanbanIcon);
-
-      // Habit panel ribbon — only show when mode is "separate"
-      const habitIcon = this.addRibbonIcon("flame", tRaw("main.ribbon.habits"), () => {
-        void this.activateHabitPanelView();
-      });
-      habitIcon.dataset.mcpRibbon = "true";
-      this.ribbonIcons.push(habitIcon);
-      this.habitRibbonIcon = habitIcon;
-      this.updateHabitRibbonVisibility();
-
-      this.ribbonIconsRegistered = true;
+      this.registerRibbonIcons();
     }
 
     // Register calendar-nav code block processor
@@ -789,6 +759,36 @@ export default class CalendarPlugin extends Plugin {
     await this.saveData(this.options);
     if (changes.habitTrackerMode !== undefined || changes.showHabitTracker !== undefined) {
       this.updateHabitRibbonVisibility();
+    }
+  }
+
+  private registerRibbonIcons(): void {
+    const defs: [string, IconName, () => void][] = [
+      ["main.ribbon.tasks", "checkbox-glyph", () => this.activateTaskView()],
+      ["main.ribbon.calendar", "calendar-with-checkmark", () => this.activateCalendarView()],
+      ["main.ribbon.analytics", "bar-chart", () => this.activateHabitAnalyticsView()],
+      ["main.ribbon.finance", "coins", () => this.activateFinanceView()],
+      ["main.ribbon.kanban", "layout-grid", () => this.activateKanbanView()],
+      ["main.ribbon.habits", "flame", () => this.activateHabitPanelView()],
+    ];
+
+    for (const [key, icon, cb] of defs) {
+      const el = this.addRibbonIcon(icon, tRaw(key), () => cb());
+      el.dataset.mcpRibbon = "true";
+      this.ribbonIcons.push(el);
+      this.ribbonDefs.push({ el, key });
+    }
+
+    this.habitRibbonIcon = this.ribbonIcons[this.ribbonIcons.length - 1];
+    this.updateHabitRibbonVisibility();
+    this.ribbonIconsRegistered = true;
+  }
+
+  private updateRibbonLabels(): void {
+    for (const { el, key } of this.ribbonDefs) {
+      const label = tRaw(key);
+      el.setAttribute("aria-label", label);
+      el.setAttribute("title", label);
     }
   }
 

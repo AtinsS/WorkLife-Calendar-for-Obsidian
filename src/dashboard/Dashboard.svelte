@@ -14,7 +14,7 @@
     reorderCards,
   } from "./storage";
   import { tasks, projects, updateTaskStatus, addTask, updateTask, removeTask } from "../task-tracker/stores";
-  import { habits, toggleHabitCompletion, getHabitProgressOnDate, addHabit, updateHabit, removeHabit } from "../habit-tracker/stores";
+  import { habits, habitLogs, toggleHabitCompletion, getHabitProgressOnDate, addHabit, updateHabit, removeHabit } from "../habit-tracker/stores";
   import { TaskModal } from "../task-tracker/TaskModal";
   import { HabitModal } from "../habit-tracker/HabitModal";
   import type { ITask } from "../task-tracker/types";
@@ -122,14 +122,17 @@
   $: todayProgress = todayTotal > 0 ? Math.round((todayDone / todayTotal) * 100) : 0;
 
   // Habits widget data
-  $: todayHabits = $habits
-    .filter((h) => !h.archived)
-    .map((h) => ({ ...h, progress: getHabitProgressOnDate(h.id, todayStr) }))
-    .sort((a, b) => {
-      if (a.progress === 2 && b.progress !== 2) return 1;
-      if (a.progress !== 2 && b.progress === 2) return -1;
-      return a.sortOrder - b.sortOrder;
-    });
+  $: todayHabits = (() => {
+    void $habitLogs; // re-render when habit logs change
+    return $habits
+      .filter((h) => !h.archived)
+      .map((h) => ({ ...h, progress: getHabitProgressOnDate(h.id, todayStr) }))
+      .sort((a, b) => {
+        if (a.progress === 2 && b.progress !== 2) return 1;
+        if (a.progress !== 2 && b.progress === 2) return -1;
+        return a.sortOrder - b.sortOrder;
+      });
+  })();
   $: habitDoneCount = todayHabits.filter((h) => h.progress === 2).length;
   $: habitTotalCount = todayHabits.length;
 
@@ -522,35 +525,35 @@
 
   .dash-widget {
     display: flex; align-items: center; gap: 10px;
-    padding: 12px 16px;
+    padding: 10px 14px;
     background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 10px;
     cursor: pointer; font-family: inherit; color: inherit;
-    transition: all 0.15s ease; text-align: left; width: 100%;
+    transition: all 0.2s ease; text-align: left; width: 100%;
   }
-  .dash-widget:hover { border-color: var(--background-modifier-border-hover, rgba(255,255,255,0.12)); }
-  .dash-widget.expanded { border-radius: 12px 12px 0 0; border-color: var(--background-modifier-border-hover, rgba(255,255,255,0.12)); }
+  .dash-widget:hover { background: var(--background-modifier-hover); border-color: rgba(255,255,255,0.08); }
+  .dash-widget.expanded { border-radius: 10px 10px 0 0; border-color: rgba(255,255,255,0.08); }
 
-  .dash-widget__icon { font-size: 20px; flex-shrink: 0; }
+  .dash-widget__icon { font-size: 18px; flex-shrink: 0; }
   .dash-widget__label { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text-normal); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .dash-widget__bar { width: 60px; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+  .dash-widget__bar { width: 52px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
   .dash-widget__bar-fill { height: 100%; background: var(--interactive-accent); border-radius: 2px; transition: width 0.4s ease; }
   .dash-widget__bar-fill.goal-fill { background: linear-gradient(90deg, var(--interactive-accent), #3dd68c); }
 
-  .dash-widget__count { font-size: 12px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
-  .dash-widget__chevron { font-size: 18px; color: var(--text-muted); transition: transform 0.2s ease; flex-shrink: 0; }
+  .dash-widget__count { font-size: 11px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
+  .dash-widget__chevron { font-size: 16px; color: var(--text-faint); transition: transform 0.2s ease; flex-shrink: 0; }
   .dash-widget__chevron.open { transform: rotate(90deg); }
 
   .dash-widget__add-btn {
-    width: 22px;
-    height: 22px;
-    border-radius: 6px;
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
     border: none;
-    background: var(--background-modifier-hover, rgba(255,255,255,0.06));
-    color: var(--text-muted);
-    font-size: 16px;
+    background: rgba(255,255,255,0.04);
+    color: var(--text-faint);
+    font-size: 14px;
     line-height: 1;
     cursor: pointer;
     display: flex;
@@ -566,38 +569,38 @@
 
   .dash-widget__dropdown {
     background: var(--background-secondary);
-    border: 1px solid var(--background-modifier-border);
+    border: 1px solid rgba(255,255,255,0.04);
     border-top: none;
-    border-radius: 0 0 12px 12px;
-    padding: 6px 10px 10px;
-    display: flex; flex-direction: column; gap: 2px;
+    border-radius: 0 0 10px 10px;
+    padding: 4px 8px 8px;
+    display: flex; flex-direction: column; gap: 1px;
     animation: dd-open 0.15s ease;
   }
-  @keyframes dd-open { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes dd-open { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 
   /* Task rows */
   .dash-task {
-    display: flex; align-items: center; gap: 10px;
-    padding: 7px 8px; background: transparent; border: 1px solid transparent;
-    border-radius: 8px; cursor: pointer; transition: all 0.15s ease;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; background: transparent; border: none;
+    border-radius: 6px; cursor: pointer; transition: all 0.15s ease;
     width: 100%; text-align: left; color: var(--text-normal); font-family: inherit; font-size: 13px;
   }
   .dash-task:hover { background: rgba(255,255,255,0.03); }
-  .dash-task.done { opacity: 0.5; }
+  .dash-task.done { opacity: 0.45; }
 
   .dash-task-check {
-    width: 18px; height: 18px; border-radius: 4px;
-    border: 2px solid rgba(255,255,255,0.12); background: transparent;
+    width: 16px; height: 16px; border-radius: 4px;
+    border: 1.5px solid rgba(255,255,255,0.15); background: transparent;
     display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: all 0.2s ease; color: transparent; font-size: 11px;
+    flex-shrink: 0; transition: all 0.2s ease; color: transparent; font-size: 10px;
   }
   .dash-task-check.checked { background: var(--interactive-accent); border-color: var(--interactive-accent); color: #fff; }
   .dash-task-check.in-progress { border-color: var(--interactive-accent); color: var(--interactive-accent); }
 
-  .dash-task-title { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .dash-task-title.strike { text-decoration: line-through; color: var(--text-muted); }
-  .dash-task-time { font-size: 11px; font-weight: 600; color: var(--text-muted); background: rgba(255,255,255,0.04); padding: 2px 6px; border-radius: 5px; flex-shrink: 0; }
-  .dash-task-project { font-size: 13px; flex-shrink: 0; }
+  .dash-task-title { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: 12.5px; }
+  .dash-task-title.strike { text-decoration: line-through; color: var(--text-faint); }
+  .dash-task-time { font-size: 10px; font-weight: 600; color: var(--text-faint); background: rgba(255,255,255,0.03); padding: 1px 5px; border-radius: 4px; flex-shrink: 0; }
+  .dash-task-project { font-size: 12px; flex-shrink: 0; }
 
   .dash-task-actions {
     display: flex;
@@ -613,25 +616,25 @@
 
   /* Habit rows */
   .dash-habit {
-    display: flex; align-items: center; gap: 8px;
-    padding: 7px 8px; background: transparent; border: 1px solid transparent;
-    border-radius: 8px; cursor: pointer; transition: all 0.15s ease;
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 8px; background: transparent; border: none;
+    border-radius: 6px; cursor: pointer; transition: all 0.15s ease;
     width: 100%; text-align: left; color: var(--text-normal); font-family: inherit; font-size: 13px;
   }
   .dash-habit:hover { background: rgba(255,255,255,0.03); }
-  .dash-habit.done { opacity: 0.5; }
+  .dash-habit.done { opacity: 0.45; }
 
   .dash-habit-check {
-    width: 18px; height: 18px; border-radius: 4px;
-    border: 2px solid rgba(255,255,255,0.1); background: transparent;
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.12); background: transparent;
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; transition: all 0.2s ease; color: transparent;
   }
   .dash-habit-check.checked { background: var(--hc, #3DD68C); border-color: var(--hc, #3DD68C); color: #fff; }
-  .dash-check-svg { width: 10px; height: 10px; }
-  .dash-habit-icon { font-size: 14px; flex-shrink: 0; line-height: 1; }
-  .dash-habit-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .dash-habit-name.strike { text-decoration: line-through; color: var(--text-muted); }
+  .dash-check-svg { width: 8px; height: 8px; }
+  .dash-habit-icon { font-size: 13px; flex-shrink: 0; line-height: 1; }
+  .dash-habit-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: 12.5px; }
+  .dash-habit-name.strike { text-decoration: line-through; color: var(--text-faint); }
 
   .dash-habit-actions {
     display: flex;
@@ -646,12 +649,12 @@
   }
 
   /* Goal rows */
-  .dash-goal { display: flex; align-items: center; gap: 8px; padding: 7px 8px; font-size: 13px; }
-  .dash-goal-icon { font-size: 14px; flex-shrink: 0; }
+  .dash-goal { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 12.5px; }
+  .dash-goal-icon { font-size: 13px; flex-shrink: 0; }
   .dash-goal-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .dash-goal-bar { width: 60px; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+  .dash-goal-bar { width: 52px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
   .dash-goal-bar-fill { height: 100%; background: linear-gradient(90deg, var(--interactive-accent), #3dd68c); border-radius: 2px; transition: width 0.4s ease; }
-  .dash-goal-amt { font-size: 11px; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
+  .dash-goal-amt { font-size: 10px; color: var(--text-faint); flex-shrink: 0; white-space: nowrap; }
 
   /* Card drag & drop */
   .dashboard-card[draggable="true"] {

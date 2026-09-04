@@ -390,6 +390,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
         cls: "settings-tab-content",
       });
       container.style.display = tab.key === this.activeTab ? "" : "none";
+      // Tab description
+      const descKey = `settings.tabs.${tab.key}Desc`;
+      const desc = tRaw(descKey);
+      if (desc && desc !== descKey) {
+        container.createEl("p", { cls: "settings-tab-desc", text: desc });
+      }
       tabContainers[tab.key] = container;
     }
 
@@ -398,6 +404,9 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
     // General tab
     const general = tabContainers["general"];
+
+    // ── Interface ──
+    new Setting(general).setName(tRaw("settings.general.sectionInterface")).setHeading();
 
     // Language setting
     new Setting(general)
@@ -432,6 +441,10 @@ export class CalendarSettingsTab extends PluginSettingTab {
       });
 
     this.addUserNameSetting(general);
+
+    // ── Panels & widgets ──
+    new Setting(general).setName(tRaw("settings.general.sectionPanels")).setHeading();
+
     this.addShowStatusBarSetting(general);
     this.addDtwShowOnAllPagesSetting(general);
     this.addHabitTrackerModeSetting(general);

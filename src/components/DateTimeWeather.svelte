@@ -21,6 +21,7 @@
   let unsubTasks: (() => void) | null = null;
   let unsubFinance: (() => void) | null = null;
   let unsubHabits: (() => void) | null = null;
+  let unsubHabitLogs: (() => void) | null = null;
   let monthGoals: { name: string; icon: string; remaining: number; done: boolean }[] = [];
 
   let todayTaskList: { title: string; status: string }[] = [];
@@ -259,6 +260,7 @@
     unsubTasks = tasks.subscribe(() => updateStats());
     unsubFinance = financeData.subscribe(() => updateMonthGoal());
     unsubHabits = habits.subscribe(() => updateHabits());
+    unsubHabitLogs = habitLogs.subscribe(() => updateHabits());
     updateStats();
     updateMonthGoal();
     updateHabits();
@@ -273,6 +275,7 @@
     unsubTasks?.();
     unsubFinance?.();
     unsubHabits?.();
+    unsubHabitLogs?.();
     removeTooltip();
   });
 </script>

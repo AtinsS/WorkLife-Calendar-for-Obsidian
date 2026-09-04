@@ -5,6 +5,7 @@ import { get } from "svelte/store";
 import { tRaw, locale } from "../i18n";
 import { addTask } from "./stores";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Obsidian global moment
 const wm = window.moment as any;
 
 interface ParsedSegment {

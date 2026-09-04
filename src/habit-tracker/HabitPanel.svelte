@@ -9,13 +9,18 @@
     updateHabit,
     removeHabit,
     toggleHabitCompletion,
+    getHabitStats,
   } from "./stores";
   import { selectedDate } from "../task-tracker/stores";
   import HabitItem from "./HabitItem.svelte";
   import { HabitModal } from "./HabitModal";
   import { t } from "../i18n";
+  import { app } from "../stores/appStore";
+  import { get } from "svelte/store";
+  import { VIEW_TYPE_HABIT_ANALYTICS } from "../constants";
 
   export let appInstance: App;
+  export let showAnalytics: boolean = false;
 
   $: currentDate = $selectedDate;
   $: dateStr = extractDateStr(currentDate);
@@ -99,6 +104,29 @@
   function handleDelete(event: CustomEvent<{ habit: IHabit }>) {
     removeHabit(event.detail.habit.id);
   }
+
+  // Mini-analytics
+  $: habitStats = showAnalytics
+    ? activeHabits.map((h) => ({ habit: h, stats: getHabitStats(h.id) }))
+    : [];
+
+  function openAnalytics(): void {
+    const appRef = get(app) as App;
+    if (!appRef) return;
+    const existing = appRef.workspace.getLeavesOfType(VIEW_TYPE_HABIT_ANALYTICS);
+    if (existing.length) {
+      appRef.workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = appRef.workspace.getLeaf("tab");
+    if (leaf) {
+      leaf.setViewState({ type: VIEW_TYPE_HABIT_ANALYTICS, active: true });
+      appRef.workspace.revealLeaf(leaf);
+    }
+  }
+
+  $: streakLabel = $t("habits.panel.streak");
+  $: rateLabel = $t("habits.panel.rate");
 </script>
 
 <div class="habit-tracker-panel">
@@ -139,6 +167,31 @@
       {/each}
     {/if}
   </div>
+
+  {#if showAnalytics && habitStats.length > 0}
+    <div class="habit-mini-analytics">
+      <div class="habit-mini-analytics-header">
+        <span class="habit-mini-analytics-title">{$t("habits.panel.details")}</span>
+        <button class="habit-tracker-btn analytics-btn" on:click|stopPropagation={openAnalytics}>
+          {$t("habits.panel.detailsBtn")}
+        </button>
+      </div>
+      <div class="habit-mini-stats">
+        {#each habitStats as { habit, stats } (habit.id)}
+          <div class="habit-mini-stat" style="--hc:{habit.color}">
+            <span class="habit-mini-stat-icon">{habit.icon || "📌"}</span>
+            <span class="habit-mini-stat-name">{habit.title}</span>
+            <span class="habit-mini-stat-val" title={streakLabel}>
+              🔥 {stats.currentStreak}
+            </span>
+            <span class="habit-mini-stat-val" title={rateLabel}>
+              {stats.completionRate}%
+            </span>
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -152,5 +205,69 @@
 
   .add-btn {
     min-width: auto;
+  }
+
+  .habit-mini-analytics {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--background-modifier-border);
+  }
+
+  .habit-mini-analytics-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .habit-mini-analytics-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .analytics-btn {
+    font-size: 11px;
+    padding: 4px 10px;
+    min-height: auto;
+  }
+
+  .habit-mini-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .habit-mini-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    background: var(--background-secondary);
+    font-size: 12px;
+  }
+
+  .habit-mini-stat-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .habit-mini-stat-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-normal);
+  }
+
+  .habit-mini-stat-val {
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    min-width: 36px;
+    text-align: right;
   }
 </style>

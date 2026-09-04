@@ -178,7 +178,6 @@
   width: 100%;
   max-width: none;
   border-radius: var(--mcp-radius);
-  background: var(--mcp-glass-bg);
 }
 
 /* ── Larger sizes for main view ─────────────────────── */
@@ -979,7 +978,6 @@ svg.dot.filled {
    ============================================ */
 .task-tracker-panel,
 .habit-tracker-panel {
-  background: var(--mcp-bg);
   border: 1px solid rgba(255, 255, 255, 0.04);
   padding: 20px 22px;
   width: 100%;
@@ -7325,6 +7323,20 @@ svg.dot.filled {
 
 .settings-tab-content {
   animation: fadeIn 0.15s ease;
+}
+
+.settings-tab-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+  padding: 8px 12px;
+  background: var(--background-secondary);
+  border-radius: 8px;
+  border-left: 3px solid var(--interactive-accent);
+}
+
+.setting-item-heading {
+  justify-content: center;
 }
 
 @keyframes fadeIn {

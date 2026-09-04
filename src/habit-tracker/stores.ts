@@ -107,8 +107,8 @@ export function reloadHabitStores(plugin: CalendarPlugin): void {
   void loadHabitData(plugin).then((data) => {
     habits.set(data.habits);
     habitLogs.set(data.habitLogs);
-    rebuildLogsCache();
     cleanupOldHabitLogs();
+    rebuildLogsCache();
   });
 }
 

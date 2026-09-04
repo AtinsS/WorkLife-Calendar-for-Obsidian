@@ -83,6 +83,13 @@ export const ru = {
       appearance: "Внешний вид",
       sync: "Синхронизация",
       notifications: "Уведомления",
+      generalDesc: "Язык, имя, режим привычек, настройки трекера задач",
+      dashboardDesc: "Виджеты на главной странице и кнопки приветствия",
+      scheduleDesc: "Какие элементы отображать в календарном расписании",
+      weatherDesc: "Прогноз погоды в заголовках календаря",
+      appearanceDesc: "Цвета, стеклянные панели, кнопки навигации в заметках",
+      syncDesc: "Хранилище в хранилище и экспорт в Google Calendar через GitHub Gist",
+      notificationsDesc: "Напоминания о задачах и оповещения",
     },
 
     language: {
@@ -90,6 +97,8 @@ export const ru = {
     },
 
     general: {
+      sectionInterface: "Интерфейс",
+      sectionPanels: "Панели и виджеты",
       userName: "Ваше имя",
       userNameDesc: "Имя будет отображаться в приветствии",
       userNamePlaceholder: "Введите имя...",
@@ -540,6 +549,11 @@ export const ru = {
       title: "Привычки",
       add: "Добавить привычку",
       empty: "Нет привычек. Нажмите + чтобы создать.",
+      details: "Детали по привычкам",
+      detailsBtn: "Открыть аналитику",
+      streak: "Серия",
+      rate: "Вып.",
+      completions: "раз",
     },
     item: {
       undo: "Отменить выполнение",

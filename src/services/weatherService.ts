@@ -21,6 +21,10 @@ interface VisualCrossingDay {
 }
 
 interface OpenMeteoResponse {
+  current?: {
+    time?: string;
+    weather_code?: number;
+  };
   daily?: {
     time?: string[];
     weather_code?: number[];
@@ -173,24 +177,40 @@ export async function fetchWeekWeather(
 async function fetchOpenMeteo(
   lat: number, lon: number, startDate: string, endDate: string
 ): Promise<DayWeather[]> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weather_code,temperature_2m_max,temperature_2m_min&start_date=${startDate}&end_date=${endDate}&timezone=auto`;
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&start_date=${startDate}&end_date=${endDate}&timezone=auto`;
   const response = await requestUrl({ url, method: "GET" });
-  const json: OpenMeteoResponse = response.json as OpenMeteoResponse;
+  const json = response.json as OpenMeteoResponse;
   if (!json?.daily?.time) return [];
 
+  // Use current weather code for today, daily code for other days
+  // Derive today from current.time (same timezone as daily.time) instead of startDate
+  const currentCode = json.current?.weather_code;
+  const currentTime = json.current?.time; // e.g. "2026-09-04T17:15"
+  const todayStr = currentTime ? currentTime.slice(0, 10) : startDate;
+
   const daily = json.daily;
-  return daily.time.map((date: string, i: number) => {
-    const code = Number(daily.weather_code?.[i] ?? 0);
+  const results: DayWeather[] = [];
+  for (let i = 0; i < daily.time.length; i++) {
+    const date = daily.time[i];
+    const rawCode = daily.weather_code?.[i];
+    const rawMax = daily.temperature_2m_max?.[i];
+    const rawMin = daily.temperature_2m_min?.[i];
+    // Skip days where API returned null (outside forecast range)
+    if (rawCode == null || rawMax == null || rawMin == null) continue;
+    const code = (date === todayStr && currentCode != null)
+      ? Number(currentCode)
+      : Number(rawCode);
     const info = getWmoCode(code) || { icon: "🌡️", label: `Code ${code}` };
-    return {
+    results.push({
       date,
-      tempMax: Math.round(daily.temperature_2m_max?.[i] ?? 0),
-      tempMin: Math.round(daily.temperature_2m_min?.[i] ?? 0),
+      tempMax: Math.round(rawMax),
+      tempMin: Math.round(rawMin),
       weatherCode: code,
       icon: info.icon,
       label: info.label,
-    };
-  });
+    });
+  }
+  return results;
 }
 
 async function fetchOpenWeatherMap(

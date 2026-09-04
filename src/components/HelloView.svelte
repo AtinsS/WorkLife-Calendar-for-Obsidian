@@ -165,10 +165,8 @@
     box-sizing: border-box;
     position: relative;
     overflow: hidden;
-    border-radius: 16px;
+    border-radius: 0;
     transition: background 1s ease;
-    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 4%, black 96%, transparent 100%);
-    mask-image: linear-gradient(to bottom, transparent 0%, black 4%, black 96%, transparent 100%);
   }
 
   .hello * { box-sizing: border-box; }

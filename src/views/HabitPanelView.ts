@@ -36,7 +36,7 @@ export default class HabitPanelView extends ItemView {
 
     this.svelteComponent = new HabitPanel({
       target: container as HTMLElement,
-      props: { appInstance: this.plugin.app },
+      props: { appInstance: this.plugin.app, showAnalytics: true },
     });
   }
 

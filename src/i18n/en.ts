@@ -83,6 +83,13 @@ export const en = {
       appearance: "Appearance",
       sync: "Sync",
       notifications: "Notifications",
+      generalDesc: "Language, name, habit mode, task tracker settings",
+      dashboardDesc: "Widgets on the main page and greeting buttons",
+      scheduleDesc: "Which elements to show in the calendar schedule",
+      weatherDesc: "Weather forecast in calendar headers",
+      appearanceDesc: "Colors, glass panels, navigation buttons in notes",
+      syncDesc: "Vault storage and Google Calendar export via GitHub Gist",
+      notificationsDesc: "Task reminders and alerts",
     },
 
     language: {
@@ -90,6 +97,8 @@ export const en = {
     },
 
     general: {
+      sectionInterface: "Interface",
+      sectionPanels: "Panels & widgets",
       userName: "Your name",
       userNameDesc: "Name will be displayed in the greeting",
       userNamePlaceholder: "Enter name...",
@@ -540,6 +549,11 @@ export const en = {
       title: "Habits",
       add: "Add habit",
       empty: "No habits. Click + to create one.",
+      details: "Habit details",
+      detailsBtn: "Open analytics",
+      streak: "Streak",
+      rate: "Rate",
+      completions: "done",
     },
     item: {
       undo: "Undo completion",
