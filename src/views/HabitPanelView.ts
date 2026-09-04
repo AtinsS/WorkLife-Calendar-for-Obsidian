@@ -1,6 +1,5 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 
-import { VIEW_TYPE_HABIT_ANALYTICS } from "../constants";
 import type CalendarPlugin from "../main";
 import HabitPanel from "../habit-tracker/HabitPanel.svelte";
 import { tRaw } from "../i18n";

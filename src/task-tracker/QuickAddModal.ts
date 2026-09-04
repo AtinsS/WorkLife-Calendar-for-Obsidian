@@ -121,12 +121,12 @@ function parseQuickInput(raw: string): ParsedResult {
       const num = dayMap[key];
       if (num === undefined) return null;
       const momentDay = num === 7 ? 0 : num;
-      let target = now.clone().day(momentDay);
+      const target = now.clone().day(momentDay);
       if (target.isBefore(now, "day")) target.add(1, "week");
       return { date: target, label: m[1].toLowerCase() };
     }},
     // DD.MM or DD/MM
-    { re: /(?:^|\s)(\d{1,2})[.\/](\d{1,2})(?:\s|$)/g, resolve: (m) => {
+    { re: /(?:^|\s)(\d{1,2})[./](\d{1,2})(?:\s|$)/g, resolve: (m) => {
       const day = parseInt(m[1]), month = parseInt(m[2]);
       if (day < 1 || day > 31 || month < 1 || month > 12) return null;
       const target = wm({ year: now.year(), month: month - 1, day }) as Moment;

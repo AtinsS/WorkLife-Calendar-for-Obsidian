@@ -268,7 +268,7 @@ export default class CalendarPlugin extends Plugin {
       callback: () => {
         const now = window.moment ? window.moment() : (globalThis as any).moment();
         void import("./task-tracker/QuickAddModal").then(({ QuickAddModal }) => {
-          new QuickAddModal(this.app, now, () => {}).open();
+          new QuickAddModal(this.app, now).open();
         });
       },
     });
@@ -409,7 +409,7 @@ export default class CalendarPlugin extends Plugin {
           onOpenTasks: () => this.activateTaskView(),
           onOpenAnalytics: () => this.activateHabitAnalyticsView(),
           onOpenFinance: () => this.activateFinanceView(),
-          onOpenSchedule: () => this.activateScheduleView(),
+          onOpenSchedule: () => window.innerWidth <= 768 ? this.activateMobileScheduleView() : this.activateScheduleView(),
         },
       });
     });
