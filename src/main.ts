@@ -274,8 +274,11 @@ export default class CalendarPlugin extends Plugin {
       name: tRaw("main.commands.quickAddTask"),
       hotkeys: [{ modifiers: ["Ctrl", "Alt"], key: "n" }],
       callback: () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Obsidian global moment
-        const now = window.moment ? window.moment() : (globalThis as any).moment();
+        const now = window.moment
+          ? window.moment()
+          : (
+              globalThis as unknown as { moment: () => Moment }
+            ).moment();
         void import("./task-tracker/QuickAddModal").then(({ QuickAddModal }) => {
           new QuickAddModal(this.app, now).open();
         });

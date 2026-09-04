@@ -17,7 +17,7 @@ import type { ITask } from "./types";
 
 // --- Cached lookup to avoid N store reads per render ---
 let cachedTasks: ITask[] = [];
-let cachedMap: Map<string, ITask[]> = new Map();
+let cachedMap: Map<string, ITask[]> = new Map<string, ITask[]>();
 let cachedTodayUID = "";
 let lastTodayCheck = 0;
 
@@ -35,7 +35,7 @@ function getTaskMap(): Map<string, ITask[]> {
   const current = get(tasks);
   if (current !== cachedTasks) {
     cachedTasks = current;
-    cachedMap = new Map();
+    cachedMap = new Map<string, ITask[]>();
     for (const t of current) {
       // Index by assigned date
       const arr = cachedMap.get(t.dateUID);

@@ -205,6 +205,6 @@ export async function deleteLink(app: App, cardId: string, linkId: string, fileP
 export async function reorderCards(app: App, cardIds: string[], filePath?: string): Promise<void> {
   const data = await loadDashboard(app, filePath);
   const cardMap = new Map(data.cards.map((c) => [c.id, c]));
-  data.cards = cardIds.map((id) => cardMap.get(id)).filter(Boolean) as DashboardCard[];
+  data.cards = cardIds.map((id) => cardMap.get(id)).filter((c): c is DashboardCard => !!c);
   await saveDashboard(app, data, filePath);
 }

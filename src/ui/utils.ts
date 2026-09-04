@@ -19,8 +19,8 @@ export function partition<T>(
   arr: T[],
   predicate: (elem: T) => boolean
 ): [T[], T[]] {
-  const pass = [];
-  const fail = [];
+  const pass: T[] = [];
+  const fail: T[] = [];
 
   arr.forEach((elem) => {
     if (predicate(elem)) {
@@ -70,5 +70,9 @@ export function getWordCount(text: string): number {
     ].join("|"),
     "g"
   );
-  return (text.match(pattern) || []).length;
+  let count = 0;
+  while (pattern.exec(text) !== null) {
+    count++;
+  }
+  return count;
 }

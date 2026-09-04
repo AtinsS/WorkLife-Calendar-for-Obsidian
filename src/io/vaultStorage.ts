@@ -58,7 +58,7 @@ function simpleHash(str: string): string {
 // --- Per-module write queue ---
 // Serializes writes within each module so concurrent calls don't conflict.
 // Cross-module writes are independent and can run in parallel.
-const moduleQueues: Map<string, Promise<void>> = new Map();
+const moduleQueues = new Map<string, Promise<void>>();
 
 function enqueueModuleWrite(moduleName: string, fn: () => Promise<void>): Promise<void> {
   const current = moduleQueues.get(moduleName) || Promise.resolve();
@@ -192,7 +192,7 @@ export async function saveModuleData(
   // Create backup of current file before overwriting
   const existingContent = await readFileContent(app, primaryPath);
   if (existingContent !== null && existingContent !== "") {
-    await writeFileContent(app, backupPath, existingContent).catch((e) =>
+    await writeFileContent(app, backupPath, existingContent).catch((e: unknown) =>
       console.error(`[vaultStorage] Failed to create backup for ${moduleName}:`, e)
     );
   }

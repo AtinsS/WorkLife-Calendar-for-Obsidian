@@ -5,8 +5,7 @@ import { get } from "svelte/store";
 import { tRaw, locale } from "../i18n";
 import { addTask } from "./stores";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Obsidian global moment
-const wm = window.moment as any;
+const wm = window.moment as (format?: string) => Moment;
 
 interface ParsedSegment {
   type: "priority" | "date" | "time" | "title";
@@ -388,7 +387,7 @@ export class QuickAddModal extends Modal {
 
       this.close();
       this.onSubmit();
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("[QuickAddModal] Failed to create task:", e);
     }
   }

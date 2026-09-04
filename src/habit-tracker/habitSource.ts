@@ -10,7 +10,7 @@ import type { IHabitLog } from "./types";
 
 // --- Cached lookup to avoid N store reads per render ---
 let cachedLogs: IHabitLog[] = [];
-let cachedMap: Map<string, number> = new Map();
+let cachedMap: Map<string, number> = new Map<string, number>();
 let cachedActiveCount = 0;
 let cachedHabitsVersion = 0;
 
@@ -18,7 +18,7 @@ function getLogsMap(): Map<string, number> {
   const current: IHabitLog[] = get(habitLogs);
   if (current !== cachedLogs) {
     cachedLogs = current;
-    cachedMap = new Map();
+    cachedMap = new Map<string, number>();
     for (const log of current) {
       // Count completed habits
       if (log.completed) {

@@ -54,7 +54,7 @@ async function debouncedSave(): Promise<void> {
     if (!pluginInstance) return;
     isSaving = true;
     try {
-      await saveModuleData(pluginInstance.app, "finance", get(financeData) as unknown as Record<string, unknown>);
+      await saveModuleData(pluginInstance.app, "finance", get(financeData));
     } finally {
       isSaving = false;
       storeIsDirty = false;

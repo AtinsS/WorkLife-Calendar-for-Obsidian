@@ -544,7 +544,7 @@ export function setupNoteRenameSync(app: App, plugin: CalendarPlugin): void {
       const frontmatter = cache?.frontmatter;
       if (!frontmatter?.task_id) return;
 
-      const taskId = frontmatter.task_id;
+      const taskId = frontmatter.task_id as string;
       const taskById = allTasks.find((t) => t.id === taskId);
 
       if (taskById && taskById.notePath !== file.path) {
@@ -806,7 +806,7 @@ function applyFrontmatterChanges(
 
   // tags
   if (Array.isArray(frontmatter.tags)) {
-    const validTags = frontmatter.tags.filter((t: unknown) => typeof t === "string");
+    const validTags = frontmatter.tags.filter((t: unknown) => typeof t === "string") as string[];
     if (JSON.stringify(validTags) !== JSON.stringify(task.tags)) {
       changes.tags = validTags;
     }

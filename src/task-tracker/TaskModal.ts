@@ -1,4 +1,6 @@
 import type { App } from "obsidian";
+import { moment } from "obsidian";
+import type { Moment } from "moment";
 import { get } from "svelte/store";
 import { getDateUID } from "obsidian-daily-notes-interface";
 import { CustomModal } from "../ui/CustomModal";
@@ -9,6 +11,10 @@ import { projects, selectedDate } from "./stores";
 import { settings } from "../ui/stores";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { FolderSuggestModal } from "../modals/FolderSuggestModal";
+
+// Obsidian's type defs export moment as `typeof Moment` (the module namespace),
+// but at runtime it's the callable moment function. Cast once here.
+const momentFn = moment as unknown as (inp?: unknown, format?: string, strict?: boolean) => Moment;
 
 export class TaskModal extends CustomModal {
   private task: ITask | null;
@@ -97,7 +103,7 @@ export class TaskModal extends CustomModal {
     } else {
       if (initialDate) {
         this.dateValue = initialDate;
-        const m = window.moment(initialDate, "YYYY-MM-DD", true);
+        const m = momentFn(initialDate, "YYYY-MM-DD", true);
         if (m.isValid()) this.dateUID = getDateUID(m, "day");
       } else {
         this.dateUID = get(selectedDate) || "";
@@ -194,7 +200,7 @@ export class TaskModal extends CustomModal {
     dateInput.addEventListener("change", () => {
       this.dateValue = dateInput.value;
       if (this.dateValue) {
-        const m = window.moment(this.dateValue, "YYYY-MM-DD", true);
+        const m = momentFn(this.dateValue, "YYYY-MM-DD", true);
         if (m.isValid()) this.dateUID = getDateUID(m, "day");
       } else { this.dateUID = ""; }
     });
@@ -281,7 +287,7 @@ export class TaskModal extends CustomModal {
     dlInput.addEventListener("change", () => {
       this.deadlineDateValue = dlInput.value;
       if (this.deadlineDateValue) {
-        const m = window.moment(this.deadlineDateValue, "YYYY-MM-DD", true);
+        const m = momentFn(this.deadlineDateValue, "YYYY-MM-DD", true);
         if (m.isValid()) this.deadlineDateUID = getDateUID(m, "day");
       } else { this.deadlineDateUID = ""; }
     });
@@ -349,7 +355,7 @@ export class TaskModal extends CustomModal {
     untilInput.addEventListener("change", () => {
       this.recurrenceUntilDateValue = untilInput.value;
       if (this.recurrenceUntilDateValue) {
-        const m = window.moment(this.recurrenceUntilDateValue, "YYYY-MM-DD", true);
+        const m = momentFn(this.recurrenceUntilDateValue, "YYYY-MM-DD", true);
         if (m.isValid()) this.recurrenceUntilDateUID = getDateUID(m, "day");
       } else { this.recurrenceUntilDateUID = ""; }
     });
@@ -534,10 +540,10 @@ export class TaskModal extends CustomModal {
 
     let finalDateUID = this.dateUID;
     if (!finalDateUID && this.dateValue) {
-      const m = window.moment(this.dateValue, "YYYY-MM-DD", true);
+      const m = momentFn(this.dateValue, "YYYY-MM-DD", true);
       if (m.isValid()) finalDateUID = getDateUID(m, "day");
     }
-    if (!finalDateUID) finalDateUID = getDateUID(window.moment(), "day");
+    if (!finalDateUID) finalDateUID = getDateUID(momentFn(), "day");
 
     let recurrence: RecurrenceConfig | undefined;
     if (this.recurrenceType !== "none") {

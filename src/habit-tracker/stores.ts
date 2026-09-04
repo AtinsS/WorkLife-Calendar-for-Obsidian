@@ -24,13 +24,13 @@ export const habitLogs = writable<IHabitLog[]>([]);
 
 // --- Cached lookup maps (avoid N store reads per render) ---
 let cachedLogs: IHabitLog[] = [];
-let logsByHabitDate: Map<string, IHabitLog> = new Map();
+let logsByHabitDate: Map<string, IHabitLog> = new Map<string, IHabitLog>();
 
 export function rebuildLogsCache(): void {
   const current = get(habitLogs);
   if (current === cachedLogs) return;
   cachedLogs = current;
-  logsByHabitDate = new Map();
+  logsByHabitDate = new Map<string, IHabitLog>();
   for (const log of current) {
     logsByHabitDate.set(`${log.habitId}::${log.date}`, log);
   }

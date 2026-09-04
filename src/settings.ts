@@ -314,7 +314,7 @@ export function appHasPeriodicNotesPluginLoaded(): boolean {
     };
   };
   const periodicNotes = appWithPlugins.plugins.getPlugin("periodic-notes");
-  return periodicNotes && periodicNotes.settings?.weekly?.enabled;
+  return !!periodicNotes?.settings?.weekly?.enabled;
 }
 
 export class CalendarSettingsTab extends PluginSettingTab {
@@ -418,7 +418,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         dropdown.addOption("en", tRaw("settings.general.languageEn"));
         dropdown.setValue(this.plugin.options.language || "system");
         dropdown.onChange(async (value: "ru" | "en" | "system") => {
-          await await this.plugin.writeOptions({ language: value });
+          await this.plugin.writeOptions({ language: value });
           initLocale(value);
           // Re-render settings to reflect new language
           this.display();
@@ -436,7 +436,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         dropdown.addOption("sunday", tRaw("settings.general.startOfWeekSunday"));
         dropdown.setValue(this.plugin.options.startOfWeek || "system");
         dropdown.onChange(async (value: "monday" | "sunday" | "system") => {
-          await await this.plugin.writeOptions({ startOfWeek: value });
+          await this.plugin.writeOptions({ startOfWeek: value });
         });
       });
 
@@ -459,7 +459,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.dashboardShowTasks !== false);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ dashboardShowTasks: value });
+          await this.plugin.writeOptions({ dashboardShowTasks: value });
         });
       });
     new Setting(dashboard)
@@ -468,7 +468,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.dashboardShowHabits !== false);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ dashboardShowHabits: value });
+          await this.plugin.writeOptions({ dashboardShowHabits: value });
         });
       });
     new Setting(dashboard)
@@ -477,7 +477,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.dashboardShowGoals !== false);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ dashboardShowGoals: value });
+          await this.plugin.writeOptions({ dashboardShowGoals: value });
         });
       });
     new Setting(dashboard).setName(tRaw("settings.dashboard.sectionHello")).setHeading();
@@ -540,7 +540,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           .setPlaceholder(tRaw("settings.general.userNamePlaceholder"))
           .setValue(this.plugin.options.userName || "")
           .onChange(async (value) => {
-            await await this.plugin.writeOptions({ userName: value });
+            await this.plugin.writeOptions({ userName: value });
           });
         text.inputEl.addClass("mcp-input-lg");
       });
@@ -556,7 +556,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.helloShowTasksBtn !== false);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ helloShowTasksBtn: value });
+          await this.plugin.writeOptions({ helloShowTasksBtn: value });
         });
       });
 
@@ -565,7 +565,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.helloShowAnalyticsBtn !== false);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ helloShowAnalyticsBtn: value });
+          await this.plugin.writeOptions({ helloShowAnalyticsBtn: value });
         });
       });
 
@@ -574,7 +574,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.helloShowFinanceBtn !== false);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ helloShowFinanceBtn: value });
+          await this.plugin.writeOptions({ helloShowFinanceBtn: value });
         });
       });
 
@@ -583,7 +583,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.helloShowScheduleBtn !== false);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ helloShowScheduleBtn: value });
+          await this.plugin.writeOptions({ helloShowScheduleBtn: value });
         });
       });
 
@@ -608,7 +608,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.showStatusBar);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ showStatusBar: value });
+          await this.plugin.writeOptions({ showStatusBar: value });
           // Toggle visibility in real-time
           const el = document.querySelector(".mcp-dtw-global");
           if (el) (el as HTMLElement).style.display = value ? "" : "none";
@@ -623,7 +623,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.dtwShowOnAllPages);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ dtwShowOnAllPages: value });
+          await this.plugin.writeOptions({ dtwShowOnAllPages: value });
         });
       });
   }
@@ -719,7 +719,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         .addToggle((toggle) => {
           toggle.setValue(opts[item.key as keyof typeof opts] as boolean);
           toggle.onChange(async (value) => {
-            await await this.plugin.writeOptions({ [item.key]: value });
+            await this.plugin.writeOptions({ [item.key]: value });
           });
         });
     }
@@ -734,7 +734,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addToggle((toggle) => {
         toggle.setValue(opts.weatherEnabled);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ weatherEnabled: value });
+          await this.plugin.writeOptions({ weatherEnabled: value });
         });
       });
 
@@ -748,7 +748,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         dropdown.addOption("visual-crossing", tRaw("settings.weather.providerVisualCrossing"));
         dropdown.setValue(opts.weatherProvider || "open-meteo");
         dropdown.onChange(async (value) => {
-          await await this.plugin.writeOptions({ weatherProvider: value });
+          await this.plugin.writeOptions({ weatherProvider: value });
           this.display(); // refresh to show/hide API key field
         });
       });
@@ -785,7 +785,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
             .setPlaceholder(tRaw("settings.weather.apiKeyPlaceholder"))
             .setValue(opts.weatherApiKey || "")
             .onChange(async (value) => {
-              await await this.plugin.writeOptions({ weatherApiKey: value });
+              await this.plugin.writeOptions({ weatherApiKey: value });
             });
           text.inputEl.type = "password";
           text.inputEl.addClass("mcp-input-xl");
@@ -802,7 +802,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             const num = parseFloat(value);
             if (!isNaN(num) && num >= -90 && num <= 90) {
-              await await this.plugin.writeOptions({ weatherLatitude: num });
+              await this.plugin.writeOptions({ weatherLatitude: num });
             }
           });
         text.inputEl.type = "number";
@@ -822,7 +822,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             const num = parseFloat(value);
             if (!isNaN(num) && num >= -180 && num <= 180) {
-              await await this.plugin.writeOptions({ weatherLongitude: num });
+              await this.plugin.writeOptions({ weatherLongitude: num });
             }
           });
         text.inputEl.type = "number";
@@ -838,42 +838,46 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
     const testBtn = btnRow.createEl("button", { text: tRaw("settings.weather.checkConnection") });
     testBtn.addClass("mcp-btn");
-    testBtn.addEventListener("click", async () => {
-      testBtn.disabled = true;
-      testBtn.textContent = tRaw("settings.weather.checking");
-      testBtn.removeClass("mcp-color-success", "mcp-color-danger");
-      const current = this.plugin.options;
-      const lat = current.weatherLatitude ?? 55.75;
-      const lon = current.weatherLongitude ?? 37.62;
-      const prov = (current.weatherProvider || "open-meteo") as WeatherProvider;
-      const key = current.weatherApiKey;
-      const today = new Date().toISOString().slice(0, 10);
-      try {
-        const days = await fetchWeekWeather(lat, lon, today, today, prov, key, { skipCache: true, throwOnError: true });
-        if (days.length > 0) {
-          testBtn.textContent = `✓ ${days[0].icon} ${days[0].tempMin}..${days[0].tempMax}° ${days[0].label}`;
-          testBtn.addClass("mcp-color-success");
-        } else {
-          testBtn.textContent = tRaw("settings.weather.noData");
+    testBtn.addEventListener("click", () => {
+      void (async () => {
+        testBtn.disabled = true;
+        testBtn.textContent = tRaw("settings.weather.checking");
+        testBtn.removeClass("mcp-color-success", "mcp-color-danger");
+        const current = this.plugin.options;
+        const lat = current.weatherLatitude ?? 55.75;
+        const lon = current.weatherLongitude ?? 37.62;
+        const prov = (current.weatherProvider || "open-meteo") as WeatherProvider;
+        const key = current.weatherApiKey;
+        const today = new Date().toISOString().slice(0, 10);
+        try {
+          const days = await fetchWeekWeather(lat, lon, today, today, prov, key, { skipCache: true, throwOnError: true });
+          if (days.length > 0) {
+            testBtn.textContent = `✓ ${days[0].icon} ${days[0].tempMin}..${days[0].tempMax}° ${days[0].label}`;
+            testBtn.addClass("mcp-color-success");
+          } else {
+            testBtn.textContent = tRaw("settings.weather.noData");
+            testBtn.addClass("mcp-color-danger");
+          }
+        } catch (e: unknown) {
+          testBtn.textContent = `✗ ${e instanceof Error ? e.message : tRaw("settings.weather.connectionError")}`;
           testBtn.addClass("mcp-color-danger");
         }
-      } catch (e: unknown) {
-        testBtn.textContent = `✗ ${e instanceof Error ? e.message : tRaw("settings.weather.connectionError")}`;
-        testBtn.addClass("mcp-color-danger");
-      }
-      window.setTimeout(() => {
-        testBtn.disabled = false;
-        testBtn.removeClass("mcp-color-success", "mcp-color-danger");
-        testBtn.textContent = tRaw("settings.weather.checkConnection");
-      }, 5000);
+        window.setTimeout(() => {
+          testBtn.disabled = false;
+          testBtn.removeClass("mcp-color-success", "mcp-color-danger");
+          testBtn.textContent = tRaw("settings.weather.checkConnection");
+        }, 5000);
+      })();
     });
 
     const confirmBtn = btnRow.createEl("button", { text: tRaw("settings.weather.applyProvider") });
     confirmBtn.addClass("mcp-btn", "mcp-btn-primary");
-    confirmBtn.addEventListener("click", async () => {
-      await await this.plugin.writeOptions({ weatherProvider: provider });
-      confirmBtn.textContent = tRaw("settings.weather.applied");
-      window.setTimeout(() => { confirmBtn.textContent = tRaw("settings.weather.applyProvider"); }, 2000);
+    confirmBtn.addEventListener("click", () => {
+      void (async () => {
+        await this.plugin.writeOptions({ weatherProvider: provider });
+        confirmBtn.textContent = tRaw("settings.weather.applied");
+        window.setTimeout(() => { confirmBtn.textContent = tRaw("settings.weather.applyProvider"); }, 2000);
+      })();
     });
 
     // Weather animation previews
@@ -967,7 +971,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .setDesc(tRaw("settings.appearance.accentColorDesc"))
       .addColorPicker((picker) => {
         picker.setValue(currentColor).onChange(async (value) => {
-          await await this.plugin.writeOptions({ accentColor: value });
+          await this.plugin.writeOptions({ accentColor: value });
           applyAccentColor(value);
         });
       });
@@ -979,7 +983,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         .setTooltip(tRaw("settings.appearance.resetColors"))
         .onClick(async () => {
           const defaultColor = "#5f99e1";
-          await await this.plugin.writeOptions({ accentColor: defaultColor });
+          await this.plugin.writeOptions({ accentColor: defaultColor });
           applyAccentColor(defaultColor);
           this.display();
         }),
@@ -995,7 +999,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .setDesc(tRaw("settings.appearance.glassBgColorDesc"))
       .addColorPicker((picker) => {
         picker.setValue(currentColor).onChange(async (value) => {
-          await await this.plugin.writeOptions({ glassBgColor: value });
+          await this.plugin.writeOptions({ glassBgColor: value });
           applyGlassBgColor(value, this.plugin.options.glassOpacity);
         });
       });
@@ -1006,7 +1010,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         .setTooltip(tRaw("settings.appearance.resetColors"))
         .onClick(async () => {
           const defaultColor = "#1e2332";
-          await await this.plugin.writeOptions({
+          await this.plugin.writeOptions({
             glassBgColor: defaultColor,
             glassOpacity: 55,
           });
@@ -1024,7 +1028,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           .setValue(currentOpacity)
           .setDynamicTooltip()
           .onChange(async (value) => {
-            await await this.plugin.writeOptions({ glassOpacity: value });
+            await this.plugin.writeOptions({ glassOpacity: value });
             applyGlassBgColor(
               this.plugin.options.glassBgColor || "#1e2332",
               value,
@@ -1166,7 +1170,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           .setButtonText(tRaw("settings.appearance.resetAllColors"))
           .setWarning()
           .onClick(async () => {
-            await await this.plugin.writeOptions({
+            await this.plugin.writeOptions({
               bgColor: "#0E0F13",
               surfaceColor: "#171A21",
               surface2Color: "#1E222B",
@@ -1295,9 +1299,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
         dropdown.setValue(current);
         dropdown.onChange(async (value) => {
           if (value === "__custom") {
-            const modal = new FolderSuggestModal(this.app, async (folder) => {
-              await this.plugin.writeOptions({ tasksFolderPath: folder });
-              this.display();
+            const modal = new FolderSuggestModal(this.app, (folder) => {
+              void this.plugin.writeOptions({ tasksFolderPath: folder }).then(() => this.display());
             });
             modal.open();
           } else {
@@ -1318,7 +1321,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             const num = parseInt(value);
             if (!isNaN(num) && num >= 10) {
-              await await this.plugin.writeOptions({ autoCleanupThreshold: num });
+              await this.plugin.writeOptions({ autoCleanupThreshold: num });
             }
           });
         text.inputEl.type = "number";
@@ -1339,7 +1342,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           .onChange(async (value) => {
             const num = parseInt(value);
             if (!isNaN(num) && num >= 10) {
-              await await this.plugin.writeOptions({ timeLogCleanupThreshold: num });
+              await this.plugin.writeOptions({ timeLogCleanupThreshold: num });
             }
           });
         text.inputEl.type = "number";
@@ -1436,7 +1439,7 @@ priority: medium
           .setPlaceholder("ghp_...")
           .setValue(this.plugin.options.githubToken || "")
           .onChange(async (value) => {
-            await await this.plugin.writeOptions({ githubToken: value });
+            await this.plugin.writeOptions({ githubToken: value });
           });
         text.inputEl.type = "password";
         text.inputEl.addClass("mcp-input-xl");
@@ -1493,7 +1496,7 @@ priority: medium
         toggle.setValue(!!this.plugin.options.gistAutoSync);
         toggle.onChange(async (value) => {
           const { setAutoSync } = await import("./services/GistSyncService");
-          await await this.plugin.writeOptions({ gistAutoSync: value });
+          await this.plugin.writeOptions({ gistAutoSync: value });
           setAutoSync(value);
           if (value) {
             // Show status
@@ -1532,7 +1535,7 @@ priority: medium
       .addToggle((toggle) => {
         toggle.setValue(this.plugin.options.notificationsEnabled);
         toggle.onChange(async (value) => {
-          await await this.plugin.writeOptions({ notificationsEnabled: value });
+          await this.plugin.writeOptions({ notificationsEnabled: value });
           this.plugin.notificationService?.restart();
         });
       });
@@ -1605,10 +1608,10 @@ priority: medium
         toggle.onChange(async (value) => {
           if (value && !this.plugin.options.ntfyTopic) {
             const uuid = crypto.randomUUID();
-            await await this.plugin.writeOptions({ ntfyEnabled: value, ntfyTopic: uuid });
+            await this.plugin.writeOptions({ ntfyEnabled: value, ntfyTopic: uuid });
             this.ntfyTopicText?.setValue(uuid);
           } else {
-            await await this.plugin.writeOptions({ ntfyEnabled: value });
+            await this.plugin.writeOptions({ ntfyEnabled: value });
           }
           this.plugin.notificationService?.restart();
         });
@@ -1623,7 +1626,7 @@ priority: medium
           .setPlaceholder("a7f9b2c4-8e1d-4f3a-9c5b-2d6e8f0a1b3c")
           .setValue(this.plugin.options.ntfyTopic)
           .onChange(async (value) => {
-            await await this.plugin.writeOptions({ ntfyTopic: value });
+            await this.plugin.writeOptions({ ntfyTopic: value });
           });
         text.inputEl.addClass("mcp-input-lg");
       });
@@ -1653,9 +1656,11 @@ priority: medium
       refreshBtn.addClass("mod-cta");
       refreshBtn.addEventListener("click", () => void render());
       const clearBtn = actions.createEl("button", { text: tRaw("settings.notifications.diagnosticsClear") });
-      clearBtn.addEventListener("click", async () => {
-        await clearNotificationHistory(this.app);
-        await render();
+      clearBtn.addEventListener("click", () => {
+        void (async () => {
+          await clearNotificationHistory(this.app);
+          await render();
+        })();
       });
 
       const grid = panel.createDiv({ cls: "mcp-notif-grid" });
@@ -1768,7 +1773,7 @@ priority: medium
           .setPlaceholder("#ffffff")
           .setValue(this.plugin.options.navBtnColor || "")
           .onChange(async (value) => {
-            await await this.plugin.writeOptions({ navBtnColor: value });
+            await this.plugin.writeOptions({ navBtnColor: value });
           });
         text.inputEl.addClass("mcp-input-md");
       });
@@ -1781,7 +1786,7 @@ priority: medium
           .setPlaceholder("#333333")
           .setValue(this.plugin.options.navBtnBg || "")
           .onChange(async (value) => {
-            await await this.plugin.writeOptions({ navBtnBg: value });
+            await this.plugin.writeOptions({ navBtnBg: value });
           });
         text.inputEl.addClass("mcp-input-md");
       });
@@ -1794,7 +1799,7 @@ priority: medium
           .setPlaceholder("12px")
           .setValue(this.plugin.options.navBtnRadius || "")
           .onChange(async (value) => {
-            await await this.plugin.writeOptions({ navBtnRadius: value });
+            await this.plugin.writeOptions({ navBtnRadius: value });
           });
         text.inputEl.addClass("mcp-input-md");
       });
@@ -1807,7 +1812,7 @@ priority: medium
           .setPlaceholder("13px")
           .setValue(this.plugin.options.navBtnSize || "")
           .onChange(async (value) => {
-            await await this.plugin.writeOptions({ navBtnSize: value });
+            await this.plugin.writeOptions({ navBtnSize: value });
           });
         text.inputEl.addClass("mcp-input-md");
       });
@@ -1820,7 +1825,7 @@ priority: medium
           .setPlaceholder("#5f99e1")
           .setValue(this.plugin.options.navAccentColor || "")
           .onChange(async (value) => {
-            await await this.plugin.writeOptions({ navAccentColor: value });
+            await this.plugin.writeOptions({ navAccentColor: value });
           });
         text.inputEl.addClass("mcp-input-md");
       });

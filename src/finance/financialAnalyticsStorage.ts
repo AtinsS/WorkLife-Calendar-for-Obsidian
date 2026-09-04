@@ -14,6 +14,7 @@ export interface ManualIncomeSource {
 export interface IFinancialAnalyticsData {
   manualIncomeSources: ManualIncomeSource[];
   incomeCategories: string[];
+  [key: string]: unknown;
 }
 
 export const financialAnalyticsData = writable<IFinancialAnalyticsData>({
@@ -73,7 +74,7 @@ async function debouncedSave(): Promise<void> {
     if (!pluginInstance) return;
     isSaving = true;
     try {
-      await saveModuleData(pluginInstance.app, "financialAnalytics", get(financialAnalyticsData) as unknown as Record<string, unknown>);
+      await saveModuleData(pluginInstance.app, "financialAnalytics", get(financialAnalyticsData));
     } finally {
       isSaving = false;
       storeIsDirty = false;
@@ -89,7 +90,7 @@ export async function immediateAnalyticsSave(): Promise<void> {
   }
   isSaving = true;
   try {
-    await saveModuleData(pluginInstance.app, "financialAnalytics", get(financialAnalyticsData) as unknown as Record<string, unknown>);
+    await saveModuleData(pluginInstance.app, "financialAnalytics", get(financialAnalyticsData));
   } finally {
     isSaving = false;
     storeIsDirty = false;

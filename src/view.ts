@@ -41,18 +41,6 @@ export default class CalendarView extends ItemView {
     super(leaf);
     this.plugin = plugin;
 
-    this.selectDateForDay = this.selectDateForDay.bind(this);
-    this.selectDateForWeek = this.selectDateForWeek.bind(this);
-    this.onNoteSettingsUpdate = this.onNoteSettingsUpdate.bind(this);
-    this.onFileCreated = this.onFileCreated.bind(this);
-    this.onFileDeleted = this.onFileDeleted.bind(this);
-    this.onFileModified = this.onFileModified.bind(this);
-    this.onFileOpen = this.onFileOpen.bind(this);
-    this.onHoverDay = this.onHoverDay.bind(this);
-    this.onHoverWeek = this.onHoverWeek.bind(this);
-    this.onContextMenuDay = this.onContextMenuDay.bind(this);
-    this.onContextMenuWeek = this.onContextMenuWeek.bind(this);
-
     this.registerEvent(
       (this.app.workspace as unknown as { on: (name: string, cb: () => void) => import("obsidian").EventRef })
         .on("periodic-notes:settings-updated", this.onNoteSettingsUpdate),
@@ -104,64 +92,64 @@ export default class CalendarView extends ItemView {
 
   private activeTooltip: HTMLElement | null = null;
 
-  onHoverDay(date: Moment, targetEl: EventTarget, isMetaPressed: boolean): void {
+  onHoverDay = (date: Moment, targetEl: EventTarget, isMetaPressed: boolean): void => {
     if (isMetaPressed) {
       const { format } = getDailyNoteSettings();
       const note = getDailyNote(date, get(dailyNotes));
       this.app.workspace.trigger("link-hover", this, targetEl, date.format(format), note?.path);
     }
-  }
+  };
 
   private removeTooltip(): void {
     if (this.activeTooltip) { this.activeTooltip.remove(); this.activeTooltip = null; }
   }
 
-  onHoverWeek(date: Moment, targetEl: EventTarget, isMetaPressed: boolean): void {
+  onHoverWeek = (date: Moment, targetEl: EventTarget, isMetaPressed: boolean): void => {
     if (!isMetaPressed) return;
     const note = getWeeklyNote(date, get(weeklyNotes));
     const { format } = getWeeklyNoteSettings();
     this.app.workspace.trigger("link-hover", this, targetEl, date.format(format), note?.path);
-  }
+  };
 
-  private onContextMenuDay(date: Moment, event: MouseEvent): void {
+  private onContextMenuDay = (date: Moment, event: MouseEvent): void => {
     const note = getDailyNote(date, get(dailyNotes));
     const onQuickAdd = () => {
       new QuickAddModal(this.app, date).open();
     };
     showNoteContextMenu(this.app, note || null, { x: event.pageX, y: event.pageY }, onQuickAdd);
-  }
+  };
 
-  private onContextMenuWeek(date: Moment, event: MouseEvent): void {
+  private onContextMenuWeek = (date: Moment, event: MouseEvent): void => {
     const note = getWeeklyNote(date, get(weeklyNotes));
     if (!note) return;
     showNoteContextMenu(this.app, note, { x: event.pageX, y: event.pageY });
-  }
+  };
 
-  private onNoteSettingsUpdate(): void {
+  private onNoteSettingsUpdate = (): void => {
     dailyNotes.reindex();
     weeklyNotes.reindex();
-  }
+  };
 
-  private onFileDeleted(file: TFile): void {
+  private onFileDeleted = (file: TFile): void => {
     if (getDateFromFile(file, "day")) dailyNotes.reindex();
     if (getDateFromFile(file, "week")) weeklyNotes.reindex();
     this.updateActiveFile();
-  }
+  };
 
-  private onFileModified(_file: TFile): void {
+  private onFileModified = (_file: TFile): void => {
     // Calendar reactivity handles display update
-  }
+  };
 
-  private onFileCreated(file: TFile): void {
+  private onFileCreated = (file: TFile): void => {
     if (this.app.workspace.layoutReady) {
       if (getDateFromFile(file, "day")) dailyNotes.reindex();
       if (getDateFromFile(file, "week")) weeklyNotes.reindex();
     }
-  }
+  };
 
-  public onFileOpen(_file: TFile): void {
+  public onFileOpen = (_file: TFile): void => {
     if (this.app.workspace.layoutReady) this.updateActiveFile();
-  }
+  };
 
   private updateActiveFile(): void {
     const leaf = this.app.workspace.activeLeaf;
@@ -184,13 +172,13 @@ export default class CalendarView extends ItemView {
     }
   }
 
-  selectDateForWeek(date: Moment): void {
+  selectDateForWeek = (date: Moment): void => {
     const dateUID = getDateUID(date, "week");
     selectedDate.set(dateUID);
     activeFile.setUID(dateUID);
-  }
+  };
 
-  selectDateForDay(date: Moment): void {
+  selectDateForDay = (date: Moment): void => {
     const dateUID = getDateUID(date, "day");
     const current = get(selectedDate);
     if (current === dateUID) {
@@ -200,5 +188,5 @@ export default class CalendarView extends ItemView {
       selectedDate.set(dateUID);
       activeFile.setUID(dateUID);
     }
-  }
+  };
 }
