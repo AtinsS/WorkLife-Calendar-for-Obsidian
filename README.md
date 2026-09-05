@@ -1,6 +1,6 @@
 # WorkLife Calendar for Obsidian
 
-> **All-in-one:** a smart calendar, task and habit tracker, time tracker, and financial planner, all connected into a single ecosystem within Obsidian.
+> **All-in-One:** a smart calendar, task and habit tracker, time tracking, and financial planner, all connected within a single ecosystem inside Obsidian.
 
 <div align="center">
 
@@ -15,26 +15,26 @@
 
 ![alt text](animate.gif)
 
-[**Russian README**](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/blob/master/README.RU.md)
+[**Русский README**](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/blob/master/README.RU.md)
 
-## 💡 Why this plugin exists
+## 💡 Why This Plugin Exists
 
-Many workflows share the same problem: tasks live in one place, the calendar in another, time tracking in a third, and finances and reports are compiled manually in spreadsheets. As a result, the same data has to be entered multiple times.
+Many workflows share the same problem: tasks live in one place, the calendar in another, time tracking in a third, and finances and reports are manually compiled in spreadsheets. This means you have to enter the same data multiple times.
 
-**This plugin solves exactly that pain point.** It doesn't just add another calendar or tracker. It connects planning, execution, and analysis into a single system:
-- A single task updates the calendar.
-- The calendar drives time tracking.
-- Time spent calculates income.
+**This plugin solves exactly that pain.** It doesn't just add another calendar or tracker. It connects planning, execution, and analysis in one system:
+- One task affects the calendar.
+- The calendar affects time tracking.
+- Time affects income calculation.
 - Income generates automatic analytics.
-- **Mobile experience:** work with tasks from your phone in Obsidian without the usual friction.
+- **Mobile experience:** work with tasks from your phone in Obsidian without extra hassle.
 
 ---
 
-## 🚀 Who is this for
+## 🚀 Who Is This For
 
-- **Freelancers and developers** who need to calculate work costs based on hourly rates.
+- **Freelancers and developers** who need to calculate work costs based on their rate.
 - **Designers and consultants** managing multiple projects simultaneously.
-- **Students and researchers** who need to link deadlines, habits, and productivity.
+- **Students and researchers** who need to connect deadlines, habits, and productivity.
 - **Automation enthusiasts** who want the system to work for them (notifications, reports).
 
 ---
@@ -42,11 +42,11 @@ Many workflows share the same problem: tasks live in one place, the calendar in 
 ## ⚙️ Main Workflow
 
 ```text
-Project 
+Project
   ↓
-Task (with time estimate and hourly rate)
+Task (with time estimate and rate)
   ↓
-Calendar / Schedule (slot planning)
+Calendar / Schedule (planning time slots)
   ↓
 Time Tracking (actual vs planned)
   ↓
@@ -65,7 +65,7 @@ Analytics (charts and reports)
 3. Paste the link: `https://github.com/AtinsS/obsidian-calendar-plugin-remastered`
 4. Click **Add Plugin**.
 
-### Manual Installation
+### Manually
 1. Download the archive or clone the repository.
 2. Copy `main.js`, `manifest.json`, and `styles.css`.
 3. Place them in the `.obsidian/plugins/calendar-plugin-remastered/` folder (create it if it doesn't exist).
@@ -75,93 +75,95 @@ Analytics (charts and reports)
 
 ## ☕ Support
 
-If this plugin saves you time and helps with your work, you can support its development:
+If this plugin saves you time and helps you in your work, you can support its development:
 - ⭐ Star the repository.
 - [☕ Buy the author a coffee and a pastry](https://boosty.to/atins/donate).
 
 ---
 
 <details>
-<summary><h3>✨ Detailed Features (click to expand)</h3></summary>
+<summary><h3>✨ Detailed Features (expand)</h3></summary>
 
 ### 📅 Calendar and Schedule
-- Full view (day / week / month) based on the **FullCalendar** library with drag & drop support.
+- Full-featured view (day / week / month) based on the **FullCalendar** library with drag & drop support.
 - Visual indicators for tasks and habits directly in the calendar grid.
-- Create tasks with a click and change times by dragging.
-- **Weather** for each day of the week (Open-Meteo API, no keys required) for the visible date range.
+- Create tasks with a click and change time by dragging.
+- **Weather** for each day of the week (Open-Meteo API, no API keys required) for the visible date range.
 - Adaptive mobile schedule for small screens.
 
 ### ✅ Tasks and Time Management
 - **4 statuses:** *To Do* → *In Progress* → *Paused* → *Done*.
-- **Quick task creation** — `Ctrl+Alt+N` from anywhere in Obsidian opens a smart input dialog. Supports natural language parsing with color-highlighted preview:
-  - Time: `14:00 buy milk`, `14-15 meeting`, `from 16:00 to 18:00 meeting`
-  - Date: `tomorrow buy milk`, `friday report`, `25.07 meeting`, `+3 task`
+- **Quick task addition** — `Ctrl+Alt+N` from anywhere in Obsidian opens a smart input window. Supports natural language parsing with color highlighting:
+  - Time: `14:00 buy milk`, `14-15 meeting`, `from 16:00 to 18:00 event`
+  - Date: `tomorrow buy milk`, `Friday report`, `25.07 meeting`, `+3 task`
   - Priority: `! urgent`, `~ medium`, `- low`
-  - Date and time work at any position: `tomorrow at 14:00 buy milk` or `buy milk tomorrow at 14:00`
-  - Press `Enter` to open the full task editor with pre-filled data, or use the `⋯` button
-- **Kanban Board** — visual task management with 4 columns (To Do / In Progress / Paused / Done):
+  - Date and time work in any position: `tomorrow at 14:00 buy milk` or `buy milk tomorrow at 14:00`
+  - `Enter` opens the extended editor with pre-filled data, or use the `⋯` button
+- **Kanban board** — visual task management with 4 columns (To Do / In Progress / Paused / Done):
   - Drag & drop tasks between columns to change status
   - Create tasks directly in the "To Do" column
-  - Rich task cards with project color, time, deadline, priority, work badge, recurrence, note link, and live timer
-  - Date filters: Today / All / Specific date
+  - Informative cards with project color, time, deadline, priority, work task badge, recurrence, note link, and live timer
+  - Filters by date: Today / All / Specific date / Project
   - Right-click context menu for editing and deleting
-- **Recurring tasks:** daily / weekly / monthly with customizable intervals.
-- **Projects:** task grouping with color coding.
-- **Timer:** built-in time tracking with auto-resume on Obsidian restart. Live timer on Kanban cards with pause indication.
-- **Checklists:** create a checklist for each task.
-- **Deadlines and estimates:** compare planned and actual time, notifications for approaching deadlines.
-- **Two-way sync** with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) and [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugins via standard `.md` files.
+- **Recurring tasks:** daily / weekly / monthly with configurable intervals.
+- **Projects:** group tasks with color coding.
+- **Timer:** built-in time tracking with auto-resume when Obsidian restarts. Live timer on Kanban cards with pause indication.
+- **Checklists:** each task can have its own checklist.
+- **Deadlines and estimates:** compare planned vs actual time, notifications about approaching deadlines.
+- **Two-way synchronization** with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) and [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugins via regular `.md` files.
 
 ### 🔄 Habit Tracker
 - Flexible frequency (days of the week, day of the month).
 - Quantitative goals for each habit.
-- Streak counting and visual indicators on the calendar.
-- **Display modes** — choose where habits appear: in the task panel (default), as a separate tab, or hidden. Configure in Settings → General → "Habits mode".
-- **Full CRUD** — create, edit, delete habits from the habit panel and from the dashboard.
+- Streak tracking and visual indicators on the calendar.
+- **Display modes** — choose where to show habits: in the task panel (default), as a separate tab, or hide them. Setting: Settings → General → "Habits mode".
+- **Full CRUD** — create, edit, and delete habits from the habits panel and from the dashboard.
 
-### 💰 Finances and Analytics
-- **Income:** automatic calculation based on hourly rates from work tasks or manual entry.
-- **Budget:** expense categories with icons and distribution rules.
-- **Savings:** goals with completion percentages.
-- **Analytics:** bar and pie charts by project, income/expense dynamics by month, planned vs. actual comparisons.
+### 💰 Finance and Analytics
+- **Income:** automatic calculation based on the rate from work tasks or manual entry.
+- **Budget:** expense categories with icons and allocation rules.
+- **Savings:** goals with completion percentage.
+- **Analytics:** bar and pie charts by project, income/expense trends by month, planned vs actual comparison.
 
 ### 🎨 Appearance and UI
 - Customizable accent color.
-- Glassmorphism panels with customizable background and transparency.
-- **Info panel** under the tabs (date, time, weather, tasks) with display settings.
-- **Dashboard** for quick access to notes, with inline task and habit management (create, edit, delete).
+- Glassmorphism panels with configurable background and transparency.
+- **Information panel** under tabs (date, time, weather, tasks) with display settings.
+- **Dashboard** for quick access to notes, with task and habit management (create, edit, delete).
 
 ### 🌍 Localization and Language
-- **Two languages:** Russian and English. Switch in the plugin settings.
+- **Two languages:** Russian and English. Switch in plugin settings.
 - **System language** — automatic OS language detection.
-- **First day of the week** — customize the start of the week (Monday / Sunday / by language). Affects the calendar, schedule, recurring tasks, and habits creation.
+- **Week start** — configurable first day of the week (Monday / Sunday / based on language). Affects the calendar, schedule, recurring task creation, and habits.
 - All strings are translated: interface, settings, notifications, weather, analytics.
+
+### ⛅ Weather View
+- **Weather tab** — opens from the sidebar when you select a day.
+- **Weather in the weekly calendar view** — makes weekly planning easier.
+- **Provider selection** — In settings, you can connect the provider you prefer (available: Open-Meteo, OpenWeatherMap, WeatherApi, Visual Crossing).
 
 </details>
 
 <details>
-<summary><h3>🔗 Sync and Integrations (click to expand)</h3></summary>
+<summary><h3>🔗 Sync and Integrations (expand)</h3></summary>
 
 ### New Data Storage Format
-The plugin can store data in JSON format in the `calendar-data/` folder at the root of your vault. When "Sync to vault root" is enabled, it becomes the primary data storage format, ensuring fast loading and data sync via:
+The plugin can store data in JSON format in the `calendar-data/` folder at the root of your vault. When you enable "Sync to vault root," this becomes the primary data storage format, ensuring fast loading and data synchronization via:
 - **WebDAV** (Yandex.Disk, OneDrive, etc.)
 - **Obsidian Sync** / **Remotely Save**
 - **iCloud** / **Google Drive**
 
-> [!NOTE]
-> Optional sync with `.md` files (via the "Tasks plugin sync" setting) is intended for compatibility with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) and [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugins.
+> [!WARNING] Financial Data
+> If you track finances in the plugin and use cloud sync, income and expense data will be stored in plain text in the cloud. We recommend using abstract project names or configuring the `calendar-data/` folder to be excluded from sync.
 
-> [!WARNING] Financial data
-> If you track finances in the plugin and use cloud sync, income and expense data will be stored in plain text in the cloud. It is recommended to use abstract project names or exclude the `calendar-data/` folder from syncing.
-
-### External Calendars (Google Calendar, Apple Calendar)
+### External Calendars (Requires Git sync)
 1. Create a [GitHub Personal Access Token](https://github.com/settings/tokens) (classic) with the `gist` scope.
 2. Paste the token into the plugin settings and click **"Sync"**.
 3. The plugin will create a Gist with an `.ics` file and provide a link.
-4. Add this link to your calendar via the "Subscribe from URL" feature.
+4. Add this link to your calendar via the "Subscribe via URL" function.
 
-### Tasks Plugin Format Integration (Optional)
-When the "Tasks plugin sync" setting is enabled, the plugin creates `.md` files for tasks so they are visible in the Tasks and Dataview plugins. This is an **additional** feature — primary storage remains in JSON. Example of a generated file:
+### Integration with the Tasks Format (optional)
+When the "Tasks plugin sync" setting is enabled, the plugin creates `.md` files for tasks so they are visible in the Tasks and Dataview plugins. This is an **additional** feature — the primary storage remains JSON. Example generated file:
 ```markdown
 ---
 task_id: abc123
@@ -174,46 +176,49 @@ priority: medium
 ```
 *(Supported statuses: `- [ ]` todo, `- [/]` progress, `- [-]` paused, `- [x]` done)*
 
+> [!NOTE]
+> Optional synchronization with `.md` files (via the "Tasks plugin sync" setting) is intended for compatibility with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) and [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugins.
+
 </details>
 
 <details>
-<summary><h3>🔔 Notifications (click to expand)</h3></summary>
+<summary><h3>🔔 Notifications (expand)</h3></summary>
 
-The plugin has a built-in notification system so you don't miss important events.
+The plugin has a built-in notification system so you don't miss anything important.
 
-| Type | When it triggers |
+| Type | When triggered |
 | :--- | :--- |
-| **Local (browser)** | N minutes before start, when overdue, when time limit is exceeded, on the deadline day. |
-| **To smartphone (ntfy.sh)** | Duplicate notifications to your phone. Works even when Obsidian is closed. |
+| **Local (browser)** | N minutes before the start, when overdue, when time limit is exceeded, on the deadline day. |
+| **To smartphone (ntfy.sh)** | Duplicates notifications to your phone. Works even when Obsidian is closed. |
 
 ### Setting up ntfy.sh
 
-A simple way to get notifications on your phone:
+An easy way to get notifications on your phone:
 1. Install the [ntfy.sh](https://ntfy.sh/) app on your phone.
-2. Enable **ntfy.sh** in the plugin settings and set a topic.
+2. In the plugin settings, enable **ntfy.sh** and set a topic.
 3. Subscribe to this topic in the app.
 
 > [!CAUTION] Security
-> Use a unique topic (e.g., a generated UUID like `a7f9b2c4-8e1d-4f3a-9c5b-2d6e8f0a1b3c`) so no one else can subscribe to your notifications. The plugin only sends triggers ("Overdue: Task Name"), not financial data or full texts.
+> Use a unique topic (e.g., a generated UUID like `a7f9b2c4-8e1d-4f3a-9c5b-2d6e8f0a1b3c`) so no one else can subscribe to your notifications. The plugin only sends triggers ("Overdue: Task name"), not financial data or full text.
 
 </details>
 
 <details>
-<summary><h3>🧭 UI Widgets in Notes (click to expand)</h3></summary>
+<summary><h3>🧭 UI Widgets in Notes (expand)</h3></summary>
 
-Insert a code block into any note to create a quick navigation panel for the plugin's sections:
+Insert a code block into any note to create a quick navigation panel for plugin sections:
 
 ````markdown
 ```calendar-nav
 schedule:Schedule
 tasks:Tasks
-finance:Finance
+finance:Finances
 analytics:Analytics
 ```
 ````
 Available keys: `schedule`, `tasks`, `finance`, `analytics`.
 
-**Style Customization** (first line starts with `%`):
+**Style customization** (first line starts with `%`):
 ````markdown
 ```calendar-nav
 %color:#fff;bg:#333;radius:20px;size:14px;accent:#5f99e1
@@ -223,27 +228,32 @@ tasks:Tasks
 ````
 Style parameters: `color` (text), `bg` (background), `radius` (border radius), `size` (font size), `accent` (hover color).
 
+### Dashboard and Greeting
+
+Click "Add Dashboard" or "Add Greeting" to create a new dashboard or a greeting on the page.
+![alt text](image.png)
+
 </details>
 
 ---
 
 ## 🐛 Issues and Bug Reports
 
-Found a bug or have a feature request? Please open an issue on GitHub:
+Found a bug or have a feature suggestion? Open an issue on GitHub:
 
-**[Open an Issue](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/issues)**
+**[Open Issue](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/issues)**
 
 When reporting a bug, please include:
 - Obsidian version
 - Plugin version
 - Steps to reproduce
-- Expected vs actual behavior
+- Expected and actual behavior
 - Console errors (if any): *Ctrl+Shift+I → Console tab*
 
 ---
 
 <div align="center">
-  <sub>Developed with attention to detail for the Obsidian community</sub><br>
+  <sub>Crafted with attention to detail for the Obsidian community</sub><br>
   <sub>Author: <a href="https://github.com/AtinsS">@AtinsS</a></sub><br>
   <sub>License: <a href="https://opensource.org/licenses/MIT">MIT</a></sub>
 </div>
