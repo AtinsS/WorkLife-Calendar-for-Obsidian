@@ -16,7 +16,7 @@ import {
 import { FileView, TFile, ItemView, WorkspaceLeaf } from "obsidian";
 import { get } from "svelte/store";
 
-import { TRIGGER_ON_OPEN, VIEW_TYPE_CALENDAR } from "src/constants";
+import { TRIGGER_ON_OPEN, VIEW_TYPE_CALENDAR, VIEW_TYPE_TASKS, VIEW_TYPE_MOBILE_TASKS } from "src/constants";
 import type { ISettings } from "src/settings";
 import type CalendarPlugin from "src/main";
 
@@ -81,6 +81,7 @@ export default class CalendarView extends ItemView {
         onHoverWeek: this.onHoverWeek,
         onContextMenuDay: this.onContextMenuDay,
         onContextMenuWeek: this.onContextMenuWeek,
+        onWeatherDayClick: this.openWeatherDetail,
         sources,
       },
     });
@@ -187,6 +188,29 @@ export default class CalendarView extends ItemView {
     } else {
       selectedDate.set(dateUID);
       activeFile.setUID(dateUID);
+      this.openTasksView();
+    }
+  };
+
+  private openTasksView(): void {
+    const { workspace } = this.app;
+    const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+    const viewType = isMobile ? VIEW_TYPE_MOBILE_TASKS : VIEW_TYPE_TASKS;
+    const existing = workspace.getLeavesOfType(viewType);
+    if (existing.length) {
+      workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = workspace.getLeaf("tab");
+    if (leaf) {
+      leaf.setViewState({ type: viewType, active: true });
+      workspace.revealLeaf(leaf);
+    }
+  }
+
+  openWeatherDetail = (date: string): void => {
+    if (this.plugin) {
+      void this.plugin.activateWeatherDetailView(date);
     }
   };
 }

@@ -384,14 +384,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0;
+    flex-wrap: wrap;
+    gap: 2px 0;
     padding: 6px 16px;
     width: 100%;
     box-sizing: border-box;
     font-size: 13px;
     color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
   }
 
   .dtw-item {
@@ -400,7 +399,11 @@
     gap: 5px;
     padding: 0 10px;
     height: 100%;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .dtw-icon {
@@ -429,10 +432,26 @@
   @media (max-width: 600px) {
     .dtw-bar {
       font-size: 11px;
-      padding: 0 6px;
+      padding: 4px 6px;
+      gap: 1px 0;
+      justify-content: flex-start;
     }
     .dtw-item {
       padding: 0 6px;
+      gap: 3px;
+    }
+    .dtw-sep {
+      height: 12px;
+    }
+  }
+
+  @media (max-width: 400px) {
+    .dtw-bar {
+      font-size: 10px;
+      padding: 3px 4px;
+    }
+    .dtw-item {
+      padding: 0 4px;
     }
   }
 

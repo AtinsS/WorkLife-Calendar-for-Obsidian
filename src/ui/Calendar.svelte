@@ -118,6 +118,7 @@
   export let onContextMenuDay: (date: Moment, event: MouseEvent) => boolean;
   export let onContextMenuWeek: (date: Moment, event: MouseEvent) => boolean;
   export let onMonthChange: (monthKey: string) => void = () => {};
+  export let onWeatherDayClick: (date: string) => void = () => {};
 
   let lastMonthKey = "";
 
@@ -275,6 +276,9 @@
     <div class="cal-weather">
       <div class="cal-weather-title">
         <button class="cal-weather-nav" on:click={() => shiftWeatherWeek(-1)} aria-label={$t("calendar.weatherPrevWeek")}>‹</button>
+        {#if weatherWeekOffset !== 0}
+          <button class="cal-weather-today" on:click={() => { weatherWeekOffset = 0; }} title={$t("schedule.today")}>{$t("schedule.today")}</button>
+        {/if}
         <span class="cal-weather-title-text">{weekStart.format("D.MM")} – {weekEnd.format("D.MM")}</span>
         <button class="cal-weather-nav" on:click={() => shiftWeatherWeek(1)} aria-label={$t("calendar.weatherNextWeek")}>›</button>
       </div>
@@ -282,7 +286,10 @@
         {#each weekWeather as day (day.date)}
           {@const isToday = day.date === today.format("YYYY-MM-DD")}
           {@const m = window.moment(day.date, "YYYY-MM-DD")}
-          <div class="cal-weather-row" class:today={isToday}>
+          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+          <div class="cal-weather-row" class:today={isToday} role="button" tabindex="0"
+            on:click={() => onWeatherDayClick(day.date)}
+            on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') onWeatherDayClick(day.date); }}>
             <span class="cal-weather-day">{m.format("dd")}</span>
             <span class="cal-weather-num">{m.format("D.MM")}</span>
             <span class="cal-weather-icon">{day.icon}</span>
@@ -342,6 +349,26 @@
     background: var(--background-modifier-hover);
   }
 
+  .cal-weather-today {
+    background: none;
+    border: 1px solid var(--background-modifier-border, rgba(255,255,255,0.08));
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+
+  .cal-weather-today:hover {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+    border-color: var(--interactive-accent);
+  }
+
   .cal-weather-row {
     display: flex;
     align-items: center;
@@ -351,6 +378,7 @@
     font-size: 13px;
     color: var(--text-muted);
     transition: background 0.1s ease;
+    cursor: pointer;
   }
 
   .cal-weather-row:hover {

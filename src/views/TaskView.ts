@@ -95,7 +95,7 @@ export default class TaskView extends ItemView {
       this.projectSidebar.empty();
 
       const allBtn = this.projectSidebar.createDiv({ cls: "task-view-sidebar-btn" });
-      allBtn.createDiv({ cls: "task-view-sidebar-icon", text: "📋" });
+      allBtn.createDiv({ cls: "task-view-sidebar-icon", text: "📂" });
       allBtn.createDiv({ cls: "task-view-sidebar-name", text: tRaw("tasks.tabs.all") });
       if (get(taskFilter).projectId === null) allBtn.addClass("active");
       allBtn.addEventListener("click", () => taskFilter.update((f) => ({ ...f, projectId: null })));

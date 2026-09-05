@@ -5,7 +5,7 @@ import { get } from "svelte/store";
 import { tRaw, locale } from "../i18n";
 import { addTask } from "./stores";
 
-const wm = window.moment as (format?: string) => Moment;
+const wm = window.moment as (inp?: unknown, format?: string, strict?: boolean) => Moment;
 
 interface ParsedSegment {
   type: "priority" | "date" | "time" | "title";

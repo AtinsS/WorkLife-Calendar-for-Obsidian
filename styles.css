@@ -4156,11 +4156,6 @@ svg.dot.filled {
    ============================================ */
 @media (max-width: 480px) {
 
-  /* Hide DateTimeWeather bar on phones */
-  .dtw-bar {
-    display: none !important;
-  }
-
   /* Calendar — more air between cells */
   #calendar-container .calendar {
     border-spacing: 5px;
@@ -8224,6 +8219,11 @@ svg.dot.filled {
    KANBAN BOARD
    ═══════════════════════════════════════════════════════════════ */
 
+.weather-detail-container {
+  height: 100%;
+  overflow: hidden;
+}
+
 .kanban-view-container {
   height: 100%;
   overflow: hidden;
@@ -8270,6 +8270,65 @@ svg.dot.filled {
   height: 0;
   opacity: 0;
   pointer-events: none;
+}
+
+.kanban-project-picker {
+  position: relative;
+}
+
+.kanban-project-btn {
+  gap: 6px;
+}
+
+.kanban-project-arrow {
+  font-size: 10px;
+  transition: transform 0.15s;
+  margin-left: 2px;
+}
+
+.kanban-project-arrow.rotated {
+  transform: rotate(180deg);
+}
+
+.kanban-project-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 100;
+  min-width: 160px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--background-primary, #1e1e2e);
+  border: 1px solid var(--background-modifier-border, rgba(255,255,255,0.08));
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  padding: 4px;
+}
+
+.kanban-project-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+  text-align: left;
+}
+
+.kanban-project-item:hover {
+  background: var(--background-modifier-hover, rgba(255,255,255,0.04));
+  color: var(--text-normal);
+}
+
+.kanban-project-item.active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
 }
 
 .kanban-board {

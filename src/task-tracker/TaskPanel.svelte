@@ -317,7 +317,7 @@
             <span style="color: {proj?.color || 'var(--mcp-accent)'}">{proj?.icon || '📁'}</span>
             <span>{proj?.name || $t("tasks.modal.project")}</span>
           {:else}
-            <span>📋</span>
+            <span>📂</span>
             <span>{$t("tasks.tabs.all")}</span>
           {/if}
           <span class="project-picker-arrow" class:rotated={showProjectPicker}>▾</span>
@@ -327,7 +327,7 @@
           <div class="task-tracker-mob-project-dropdown" on:click|stopPropagation on:keydown|stopPropagation>
             <button class="project-dropdown-item" class:active={$taskFilter.projectId === null}
               on:click={() => { taskFilter.update(f => ({ ...f, projectId: null })); showProjectPicker = false; }}>
-              <span>📋</span> {$t("tasks.tabs.all")}
+              <span>📂</span> {$t("tasks.tabs.all")}
             </button>
             {#each $projects.filter(p => !p.archived) as project (project.id)}
               <button class="project-dropdown-item" class:active={$taskFilter.projectId === project.id}
@@ -355,6 +355,7 @@
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { openProjectSettings(); closeMenu(); }}>{$t("tasks.panel.menuProjects")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { showTimeLogs = true; closeMenu(); }}>{$t("tasks.panel.menuTimeLogs")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { clearCompletedTasks(); closeMenu(); }}>{$t("tasks.panel.menuCleanDone")}</button>
+            <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { handleClearRecurring(); closeMenu(); }}>{$t("tasks.panel.menuCleanRecurring")}</button>
           </div>
         {/if}
       </div>

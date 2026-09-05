@@ -42,9 +42,32 @@
   let filterMode: FilterMode = "today";
   let filterDateStr = momentFn().format("YYYY-MM-DD");
 
+  // Project filter
+  let projectFilterId: string | null = null;
+  let showProjectPicker = false;
+
   function setFilter(mode: FilterMode) {
     filterMode = mode;
     if (mode === "today") filterDateStr = momentFn().format("YYYY-MM-DD");
+  }
+
+  function toggleProjectPicker() {
+    showProjectPicker = !showProjectPicker;
+  }
+
+  function selectProject(id: string | null) {
+    projectFilterId = id;
+    showProjectPicker = false;
+  }
+
+  // Close project picker on outside click
+  function handleProjectPickerOutsideClick(e: MouseEvent) {
+    if (showProjectPicker) {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".kanban-project-picker")) {
+        showProjectPicker = false;
+      }
+    }
   }
 
   // Reactive filter UID — use getDateUID to match actual task dateUID format
@@ -54,6 +77,7 @@
   $: todoTasks = $tasks
     .filter((t) => {
       if (t.status !== "todo" || t.completed) return false;
+      if (projectFilterId && t.projectId !== projectFilterId) return false;
       if (filterMode === "all") return true;
       return t.dateUID === filterDateUID;
     })
@@ -67,6 +91,7 @@
   $: progressTasks = $tasks
     .filter((t) => {
       if (t.status !== "progress" || t.completed) return false;
+      if (projectFilterId && t.projectId !== projectFilterId) return false;
       if (filterMode === "all") return true;
       return t.dateUID === filterDateUID;
     })
@@ -80,6 +105,7 @@
   $: pausedTasks = $tasks
     .filter((t) => {
       if (t.status !== "paused" || t.completed) return false;
+      if (projectFilterId && t.projectId !== projectFilterId) return false;
       if (filterMode === "all") return true;
       return t.dateUID === filterDateUID;
     })
@@ -93,6 +119,7 @@
   $: doneTasks = $tasks
     .filter((t) => {
       if (t.status !== "done" && !t.completed) return false;
+      if (projectFilterId && t.projectId !== projectFilterId) return false;
       if (filterMode === "all") return true;
       return t.dateUID === filterDateUID;
     })
@@ -264,7 +291,8 @@
   }
 </script>
 
-<div class="kanban-filters">
+<!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+<div class="kanban-filters" on:click|stopPropagation={handleProjectPickerOutsideClick} on:keydown|stopPropagation>
   <button class="kanban-filter-btn" class:active={filterMode === "today"} on:click={() => setFilter("today")}>
     📅 {$t("schedule.today")}
   </button>
@@ -277,6 +305,34 @@
   <input type="date" bind:this={dateInputRef} class="kanban-date-hidden" value={filterDateStr}
     on:change={(e) => { filterDateStr = e.currentTarget.value; filterMode = "date"; }}
   />
+  <div class="kanban-project-picker">
+    <button class="kanban-filter-btn kanban-project-btn" class:active={projectFilterId !== null} on:click|stopPropagation={toggleProjectPicker}>
+      {#if projectFilterId}
+        {@const proj = $projects.find(p => p.id === projectFilterId)}
+        <span style="color: {proj?.color || 'inherit'}">{proj?.icon || '📁'}</span>
+        <span>{proj?.name || $t("tasks.modal.project")}</span>
+      {:else}
+        <span>📂</span>
+        <span>{$t("tasks.tabs.all")}</span>
+      {/if}
+      <span class="kanban-project-arrow" class:rotated={showProjectPicker}>▾</span>
+    </button>
+    {#if showProjectPicker}
+      <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+      <div class="kanban-project-dropdown" on:click|stopPropagation on:keydown|stopPropagation>
+        <button class="kanban-project-item" class:active={projectFilterId === null}
+          on:click={() => selectProject(null)}>
+          <span>📂</span> {$t("tasks.tabs.all")}
+        </button>
+        {#each $projects.filter(p => !p.archived) as project (project.id)}
+          <button class="kanban-project-item" class:active={projectFilterId === project.id}
+            on:click={() => selectProject(project.id)}>
+            <span style="color: {project.color}">{project.icon || '📁'}</span> {project.name}
+          </button>
+        {/each}
+      </div>
+    {/if}
+  </div>
 </div>
 
 <div class="kanban-board">

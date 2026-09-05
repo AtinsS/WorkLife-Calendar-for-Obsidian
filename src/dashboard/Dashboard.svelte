@@ -49,7 +49,7 @@
 
   // Widget settings
   $: showTasksWidget = $settings.dashboardShowTasks !== false;
-  $: showHabitsWidget = $settings.dashboardShowHabits !== false;
+  $: showHabitsWidget = $settings.dashboardShowHabits !== false && ($settings.habitTrackerMode || ($settings.showHabitTracker === false ? "hidden" : "panel")) !== "hidden";
   $: showGoalsWidget = $settings.dashboardShowGoals !== false;
 
   // Widget expand state

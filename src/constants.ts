@@ -10,5 +10,6 @@ export const VIEW_TYPE_FINANCE = "calendar-finance";
 export const VIEW_TYPE_FINANCIAL_ANALYTICS = "calendar-financial-analytics";
 export const VIEW_TYPE_KANBAN = "calendar-kanban";
 export const VIEW_TYPE_HABIT_PANEL = "calendar-habit-panel";
+export const VIEW_TYPE_WEATHER_DETAIL = "calendar-weather-detail";
 
 export const TRIGGER_ON_OPEN = "calendar:open";

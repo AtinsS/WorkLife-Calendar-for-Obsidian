@@ -19,6 +19,7 @@ import {
   VIEW_TYPE_FINANCIAL_ANALYTICS,
   VIEW_TYPE_KANBAN,
   VIEW_TYPE_HABIT_PANEL,
+  VIEW_TYPE_WEATHER_DETAIL,
 } from "./constants";
 import { settings } from "./ui/stores";
 import { app as appStore } from "./stores/appStore";
@@ -40,6 +41,7 @@ import FinanceView from "./views/FinanceView";
 import FinancialAnalyticsView from "./views/FinancialAnalyticsView";
 import KanbanView from "./views/KanbanView";
 import HabitPanelView from "./views/HabitPanelView";
+import WeatherDetailView from "./views/WeatherDetailView";
 import { initTaskStores, reloadTaskStores, immediateSave as immediateTaskSave } from "./task-tracker/stores";
 import { cleanupTimers } from "./task-tracker/TimerManager";
 import {
@@ -119,6 +121,9 @@ export default class CalendarPlugin extends Plugin {
       .forEach((leaf) => leaf.detach());
     this.app.workspace
       .getLeavesOfType(VIEW_TYPE_FINANCIAL_ANALYTICS)
+      .forEach((leaf) => leaf.detach());
+    this.app.workspace
+      .getLeavesOfType(VIEW_TYPE_WEATHER_DETAIL)
       .forEach((leaf) => leaf.detach());
 
     registeredMarkdownCodeBlocks.clear();
@@ -236,6 +241,11 @@ export default class CalendarPlugin extends Plugin {
     safeRegisterView(
       VIEW_TYPE_HABIT_PANEL,
       (leaf: WorkspaceLeaf) => new HabitPanelView(leaf, this)
+    );
+
+    safeRegisterView(
+      VIEW_TYPE_WEATHER_DETAIL,
+      (leaf: WorkspaceLeaf) => new WeatherDetailView(leaf, this)
     );
 
     this.addCommand({
@@ -678,6 +688,26 @@ export default class CalendarPlugin extends Plugin {
 
   async activateHabitPanelView(): Promise<void> {
     return this.activateView(VIEW_TYPE_HABIT_PANEL);
+  }
+
+  async activateWeatherDetailView(date?: string): Promise<void> {
+    const { workspace } = this.app;
+    const existing = workspace.getLeavesOfType(VIEW_TYPE_WEATHER_DETAIL);
+    if (existing.length) {
+      workspace.revealLeaf(existing[0]);
+      const view = existing[0].view as WeatherDetailView;
+      if (date) view.setDate(date);
+      return;
+    }
+    const leaf = workspace.getLeaf("tab");
+    if (leaf) {
+      await leaf.setViewState({ type: VIEW_TYPE_WEATHER_DETAIL, active: true });
+      workspace.revealLeaf(leaf);
+      if (date) {
+        const view = leaf.view as WeatherDetailView;
+        view.setDate(date);
+      }
+    }
   }
 
   /**
