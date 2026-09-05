@@ -231,7 +231,7 @@ Style parameters: `color` (text), `bg` (background), `radius` (border radius), `
 ### Dashboard and Greeting
 
 Click "Add Dashboard" or "Add Greeting" to create a new dashboard or a greeting on the page.
-![alt text](image.png)
+![alt text](image-1.png)
 
 </details>
 
