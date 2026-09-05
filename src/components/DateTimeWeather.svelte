@@ -429,29 +429,10 @@
     background: var(--background-modifier-hover);
   }
 
-  @media (max-width: 600px) {
+  @media (max-width: 768px) {
+    :global(.dtw-bar),
     .dtw-bar {
-      font-size: 11px;
-      padding: 4px 6px;
-      gap: 1px 0;
-      justify-content: flex-start;
-    }
-    .dtw-item {
-      padding: 0 6px;
-      gap: 3px;
-    }
-    .dtw-sep {
-      height: 12px;
-    }
-  }
-
-  @media (max-width: 400px) {
-    .dtw-bar {
-      font-size: 10px;
-      padding: 3px 4px;
-    }
-    .dtw-item {
-      padding: 0 4px;
+      display: none;
     }
   }
 

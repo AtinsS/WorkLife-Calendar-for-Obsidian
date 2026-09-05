@@ -534,8 +534,12 @@ export default class CalendarPlugin extends Plugin {
     );
   }
 
+  private isMobile(): boolean {
+    return typeof window !== "undefined" && window.innerWidth <= 768;
+  }
+
   private injectDateTimeWeather(): void {
-    if (!this.options.showStatusBar) {
+    if (!this.options.showStatusBar || this.isMobile()) {
       this.removeDateTimeWeather();
       return;
     }
@@ -550,7 +554,7 @@ export default class CalendarPlugin extends Plugin {
   }
 
   private moveDateTimeWeatherToActiveView(): void {
-    if (!this.options.showStatusBar) {
+    if (!this.options.showStatusBar || this.isMobile()) {
       this.removeDateTimeWeather();
       return;
     }

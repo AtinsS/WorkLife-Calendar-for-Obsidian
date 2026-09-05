@@ -1,7 +1,7 @@
 <script lang="ts">
   import { settings } from "../ui/stores";
   import { fetchDayDetail, type DayWeatherDetail, getWeatherAttribution } from "../services/weatherService";
-  import { t } from "../i18n";
+  import { t, tRaw } from "../i18n";
 
   export let date = "";
 
@@ -49,7 +49,7 @@
     if (!dateStr) return "";
     try {
       const m = window.moment(dateStr, "YYYY-MM-DD", true);
-      if (m.isValid()) return m.format("D MMMM") + " в 00:00";
+      if (m.isValid()) return m.format("D MMMM") + " " + tRaw("weather.updatedAt");
     } catch { /* ignore */ }
     return dateStr;
   }
@@ -217,12 +217,12 @@
           <table class="wd-table">
             <thead>
               <tr>
-                <th class="wd-th-time">Время</th>
-                <th class="wd-th-icon">Погода</th>
-                <th class="wd-th-temp">Температура</th>
-                <th class="wd-th-feels">Ощущается</th>
-                <th class="wd-th-wind">Ветер</th>
-                <th class="wd-th-hum">Влажность</th>
+                <th class="wd-th-time">{$t("weather.time")}</th>
+                <th class="wd-th-icon">{$t("weather.weather")}</th>
+                <th class="wd-th-temp">{$t("weather.temperature")}</th>
+                <th class="wd-th-feels">{$t("weather.feelsLike")}</th>
+                <th class="wd-th-wind">{$t("weather.wind")}</th>
+                <th class="wd-th-hum">{$t("weather.humidity")}</th>
               </tr>
             </thead>
             <tbody>
