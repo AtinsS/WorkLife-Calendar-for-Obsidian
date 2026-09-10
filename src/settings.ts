@@ -90,6 +90,9 @@ export interface ISettings {
   glassBgColor?: string;
   glassOpacity?: number;
 
+  // Overdue task carry-over
+  carryOverOverdue?: boolean;
+
   // Color settings
   bgColor?: string;
   surfaceColor?: string;
@@ -193,6 +196,8 @@ export const defaultSettings = Object.freeze({
   accentColor: "#5f99e1",
   glassBgColor: "#1e2332",
   glassOpacity: 55,
+
+  carryOverOverdue: true,
 
   // Color defaults
   bgColor: "#0E0F13",
@@ -449,6 +454,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addDtwShowOnAllPagesSetting(general);
     this.addHabitTrackerModeSetting(general);
     this.addWorkTaskSettings(general);
+    this.addCarryOverOverdueSetting(general);
 
     // Dashboard tab
     const dashboard = tabContainers["dashboard"];
@@ -1408,6 +1414,18 @@ priority: medium
         text.inputEl.type = "number";
         text.inputEl.min = "0";
         text.inputEl.addClass("mcp-input-md");
+      });
+  }
+
+  addCarryOverOverdueSetting(container: HTMLElement): void {
+    new Setting(container)
+      .setName(tRaw("settings.general.carryOverOverdue"))
+      .setDesc(tRaw("settings.general.carryOverOverdueDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(!!this.plugin.options.carryOverOverdue);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ carryOverOverdue: value });
+        });
       });
   }
 

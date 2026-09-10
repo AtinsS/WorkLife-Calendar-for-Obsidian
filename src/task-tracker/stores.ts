@@ -112,6 +112,54 @@ export function immediateSave(): void {
   void saveTaskData(pluginInstance, data);
 }
 
+let lastCarryOverDate: string | null = null;
+
+export function carryOverOverdueTasks(): void {
+  const now = momentFn();
+  const todayStr = now.format("YYYY-MM-DD");
+
+  // Only run once per day
+  if (lastCarryOverDate === todayStr) return;
+  lastCarryOverDate = todayStr;
+
+  const todayUID = getDateUID(now, "day");
+  const allTasks = get(tasks);
+  let changed = false;
+
+  // Build set of titles already on today to avoid duplicates (e.g. recurring)
+  const todayTitles = new Set(
+    allTasks.filter((t) => t.dateUID === todayUID).map((t) => t.title)
+  );
+
+  const updated = allTasks.map((task) => {
+    // Only carry over "todo" tasks (not done, progress, or paused)
+    if (task.status !== "todo") return task;
+    // Skip if already on today
+    if (task.dateUID === todayUID) return task;
+
+    // Parse the task date
+    const match = task.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    if (!match) return task;
+
+    const taskDate = momentFn(match[1], "YYYY-MM-DD");
+    if (!taskDate.isValid()) return task;
+
+    // Only carry over if the task date is before today
+    if (taskDate.isSameOrAfter(now, "day")) return task;
+
+    // Skip if a task with the same title already exists on today (recurring instance)
+    if (todayTitles.has(task.title)) return task;
+
+    changed = true;
+    return { ...task, dateUID: todayUID, carriedOverFrom: task.dateUID, updatedAt: Date.now() };
+  });
+
+  if (changed) {
+    tasks.set(updated);
+    debouncedSave();
+  }
+}
+
 export async function initTaskStores(plugin: CalendarPlugin): Promise<void> {
   pluginInstance = plugin;
 
@@ -137,6 +185,9 @@ export async function initTaskStores(plugin: CalendarPlugin): Promise<void> {
       resumeTimer(task.id, task.timerStartedAt);
     }
 
+    // Carry over overdue tasks
+    carryOverOverdueTasks();
+
     // Генерируем повторяющиеся задачи до конца месяца
     window.setTimeout(() => generateAllMonthlyRecurringTasks(), 100);
   }
@@ -150,6 +201,15 @@ export async function initTaskStores(plugin: CalendarPlugin): Promise<void> {
       void doLoad();
     }
   }, 2000);
+
+  // Check for day change every 60s and carry over if enabled
+  window.setInterval(() => {
+    if (!loaded) return;
+    const currentSettings = get(settings);
+    if (currentSettings.carryOverOverdue) {
+      carryOverOverdueTasks();
+    }
+  }, 60_000);
 }
 
 export function reloadTaskStores(plugin: CalendarPlugin): void {
@@ -291,6 +351,7 @@ function stopTaskTimerAndLog(id: string, status: TaskStatus): void {
               completed: status === "done",
               totalWorkTime: (t.totalWorkTime || 0) + log.duration,
               timerStartedAt: undefined,
+              carriedOverFrom: status === "done" ? undefined : t.carriedOverFrom,
               updatedAt: Date.now(),
             }
           : t
@@ -300,7 +361,7 @@ function stopTaskTimerAndLog(id: string, status: TaskStatus): void {
     tasks.update((current) =>
       current.map((t) =>
         t.id === id
-          ? { ...t, status, completed: status === "done", timerStartedAt: undefined, updatedAt: Date.now() }
+          ? { ...t, status, completed: status === "done", timerStartedAt: undefined, carriedOverFrom: status === "done" ? undefined : t.carriedOverFrom, updatedAt: Date.now() }
           : t
       )
     );
@@ -358,7 +419,7 @@ function setTaskStatus(id: string, status: TaskStatus): void {
   tasks.update((current) =>
     current.map((t) =>
       t.id === id
-        ? { ...t, status, completed: status === "done", updatedAt: Date.now() }
+        ? { ...t, status, completed: status === "done", carriedOverFrom: status === "done" ? undefined : t.carriedOverFrom, updatedAt: Date.now() }
         : t
     )
   );
@@ -716,8 +777,19 @@ export function clearAllRecurringTasks(): { parentCount: number; instanceCount: 
 
 export function calculateTaskEarnings(task: ITask): number {
   if (!task.isWorkTask || !task.rate || task.status !== "done") return 0;
-  if (task.paymentType === "hour" && task.totalWorkTime) {
-    const totalHours = task.totalWorkTime / 3600000;
+  if (task.paymentType === "hour") {
+    // Priority: totalWorkTime (actual) > estimatedTime (declared) > timeLogs fallback
+    let effectiveMs = task.totalWorkTime || 0;
+    if (effectiveMs <= 0 && task.estimatedTime && task.estimatedTime > 0) {
+      effectiveMs = task.estimatedTime * 60000;
+    }
+    if (effectiveMs <= 0) {
+      const allLogs = get(timeLogs);
+      effectiveMs = allLogs.filter(l => l.taskId === task.id).reduce((s, l) => s + l.duration, 0);
+    }
+    if (effectiveMs <= 0) return 0;
+
+    const totalHours = effectiveMs / 3600000;
     const overtimeStart = task.overtimeStart || 0;
     const overtimeMultiplier = task.overtimeMultiplier || 1;
 
@@ -770,7 +842,7 @@ export function getMonthlyEarningsForYear(year: number): { month: number; amount
 export function calculateExpectedTaskEarnings(task: ITask, avgTimeMs?: number): number {
   if (!task.isWorkTask || !task.rate) return 0;
   if (task.paymentType === "hour") {
-    const timeMs = task.estimatedTime || avgTimeMs || 0;
+    const timeMs = (task.estimatedTime && task.estimatedTime > 0 ? task.estimatedTime * 60000 : null) || avgTimeMs || 0;
     const hours = timeMs / 3600000;
     return Math.round(task.rate * hours);
   }

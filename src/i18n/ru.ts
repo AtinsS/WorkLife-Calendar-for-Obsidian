@@ -63,6 +63,7 @@ export const ru = {
     tasksToday: "Задачи на сегодня",
     tasksLabel: "Задачи",
     inProgress: "В работе",
+    overdue: "Просрочено",
     habits: "Привычки",
     habitsToday: "Привычки на сегодня",
     monthGoals: "Цели на месяц",
@@ -147,6 +148,8 @@ export const ru = {
       defaultRateDesc: "Ставка для новых рабочих задач (в рублях)",
       paymentTypeHour: "Оплата в час",
       paymentTypeDay: "Оплата в день",
+      carryOverOverdue: "Перенос просроченных задач",
+      carryOverOverdueDesc: "Автоматически переносить незавершённые задачи на следующий день",
       formatNote: "Формат заметки:",
       formatStatuses: "Статусы: - [ ] todo, - [/] progress, - [-] paused, - [x] done",
       formatEmoji: "Эмодзи: 📅 дата, 🛫 время, ⏰ дедлайн, 🔁 повторение, ⏫/⬇️ приоритет",
@@ -418,15 +421,16 @@ export const ru = {
 
     quickAdd: {
       menuItem: "⚡ Быстро добавить задачу",
-      placeholder: "Название задачи...",
-      hints: "Подсказки:",
-      hintTime: "время перед текстом",
-      hintRange: "временной диапазон",
+      placeholder: "Задача... (@Проект 14:00 !завтра)",
+      hints: "Пример:",
+      hintTime: "время",
+      hintRange: "диапазон",
       hintPriority: "! высокий, ~ средний, - низкий",
       hintDate: "дата: завтра, пт, 25.07",
+      hintProject: "проект",
       hintExampleTime: "14:00 текст",
       hintExampleRange: "14-15 текст / 14:00-15:00 текст",
-      hintExamplePriority: "! текст",
+      hintExamplePriority: "!текст",
     },
 
     tabs: {

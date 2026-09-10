@@ -87,6 +87,13 @@
   $: hasEstimate = !!task.estimatedTime;
   $: hasActual = !!(task.totalWorkTime && task.totalWorkTime > 0);
   $: estimateOver = hasEstimate && hasActual && task.totalWorkTime > task.estimatedTime;
+  $: isCarriedOver = !!task.carriedOverFrom && task.status !== "done";
+  $: carriedOverLabel = (() => {
+    if (!task.carriedOverFrom) return "";
+    const m = task.carriedOverFrom.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    if (!m) return "";
+    return new Date(m[1] + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+  })();
 
   function quickStatus(status: TaskStatus) {
     updateTaskStatus(task.id, status);
@@ -208,7 +215,7 @@
   }
 </script>
 
-<div class="task-item" class:completed={task.status === "done"} data-status={task.status} draggable="true" role="listitem" aria-label={task.title} style="--task-color: {task.projectId ? ($projects.find(p => p.id === task.projectId)?.color || 'var(--mcp-accent)') : 'var(--mcp-accent)'}" on:dragstart>
+<div class="task-item" class:completed={task.status === "done"} class:carried-over={isCarriedOver} data-status={task.status} draggable="true" role="listitem" aria-label={task.title} style="--task-color: {task.projectId ? ($projects.find(p => p.id === task.projectId)?.color || 'var(--mcp-accent)') : 'var(--mcp-accent)'}" on:dragstart>
   <div class="task-item-row-main">
     <button class="task-status-btn status-{task.status}" disabled={task.status === "done"} on:click|stopPropagation={() => { if (task.status !== "done") quickStatus("done"); }}>
       {#if task.status === "todo"}
@@ -263,6 +270,10 @@
 
     {#if task.isWorkTask}
       <span class="task-work-badge">{$t("tasks.item.workBadge")}</span>
+    {/if}
+
+    {#if isCarriedOver}
+      <span class="task-carried-over-badge">⚠ {carriedOverLabel}</span>
     {/if}
 
     {#if task.recurrence}

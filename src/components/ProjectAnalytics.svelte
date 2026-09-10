@@ -1,10 +1,10 @@
 <script lang="ts">
-  import type { ITask, IProject, TimeLog } from "../task-tracker/types";
-  import { projects, timeLogs } from "../task-tracker/stores";
+  import type { ITask, IProject } from "../task-tracker/types";
+  import { tasks, projects, timeLogs } from "../task-tracker/stores";
   import { formatDuration } from "../task-tracker/TimerManager";
   import { t } from "../i18n";
 
-  export let tasks: ITask[] = [];
+  export let filter: ((t: ITask) => boolean) | undefined = undefined;
 
   interface ProjectData {
     projectId: string | null;
@@ -15,16 +15,18 @@
     earnings: number;
   }
 
-  $: projectStats = buildProjectStats($projects, tasks, $timeLogs);
+  $: filteredTasks = filter ? $tasks.filter(filter) : $tasks;
+  $: projectStats = buildProjectStats($projects, filteredTasks, $timeLogs);
 
   function buildProjectStats(
     allProjects: IProject[],
     monthTasks: ITask[],
-    allTimeLogs: TimeLog[],
+    allTimeLogs: { taskId: string; duration: number }[],
   ): ProjectData[] {
     const projectMap = new Map<string, ProjectData>();
     const noProjectKey = "__none__";
 
+    // Fallback: sum time logs per task (in case totalWorkTime wasn't set on the task)
     const timeByTask = new Map<string, number>();
     for (const log of allTimeLogs) {
       timeByTask.set(log.taskId, (timeByTask.get(log.taskId) || 0) + log.duration);
@@ -56,11 +58,30 @@
       }
       const entry = projectMap.get(pKey);
       entry.taskCount++;
-      const taskMs = task.totalWorkTime || timeByTask.get(task.id) || 0;
+
+      // Time: actual (timer on task) > estimated (declared) > timer logs fallback
+      let taskMs = 0;
+      if (task.totalWorkTime && task.totalWorkTime > 0) {
+        taskMs = task.totalWorkTime;
+      } else if (task.estimatedTime && task.estimatedTime > 0) {
+        taskMs = task.estimatedTime * 60000;
+      } else {
+        const logMs = timeByTask.get(task.id) || 0;
+        if (logMs > 0) taskMs = logMs;
+      }
       entry.totalMs += taskMs;
+
       if (task.isWorkTask && task.rate && task.status === "done") {
-        if (task.paymentType === "hour" && task.totalWorkTime) {
-          const totalHours = task.totalWorkTime / 3600000;
+        let effectiveMs = 0;
+        if (task.totalWorkTime && task.totalWorkTime > 0) {
+          effectiveMs = task.totalWorkTime;
+        } else if (task.estimatedTime && task.estimatedTime > 0) {
+          effectiveMs = task.estimatedTime * 60000;
+        } else {
+          effectiveMs = timeByTask.get(task.id) || 0;
+        }
+        if (task.paymentType === "hour" && effectiveMs > 0) {
+          const totalHours = effectiveMs / 3600000;
           const overtimeStart = task.overtimeStart || 0;
           const overtimeMultiplier = task.overtimeMultiplier || 1;
           if (overtimeStart > 0 && overtimeMultiplier > 1 && totalHours > overtimeStart) {

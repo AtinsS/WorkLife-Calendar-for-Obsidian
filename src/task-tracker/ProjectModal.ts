@@ -46,7 +46,7 @@ function renderIconPicker(
   const inputWrap = customRow.createDiv("pm-icon-input-wrap");
   const input = inputWrap.createEl("input", {
     cls: "pm-icon-custom-input",
-    attr: { type: "text", placeholder: "📁", maxlength: "1", value: currentIcon },
+    attr: { type: "text", placeholder: "📁", maxlength: "4", value: currentIcon },
   });
   const applyBtn = inputWrap.createEl("button", { text: "✓", cls: "pm-icon-apply-btn" });
 

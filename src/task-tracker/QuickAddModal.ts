@@ -3,24 +3,9 @@ import type { Moment } from "moment";
 import { getDateUID } from "obsidian-daily-notes-interface";
 import { get } from "svelte/store";
 import { tRaw, locale } from "../i18n";
-import { addTask } from "./stores";
+import { addTask, projects } from "./stores";
 
 const wm = window.moment as (inp?: unknown, format?: string, strict?: boolean) => Moment;
-
-interface ParsedSegment {
-  type: "priority" | "date" | "time" | "title";
-  text: string;
-}
-
-interface ParsedResult {
-  title: string;
-  scheduledTime: string | null;
-  endTime: string | null;
-  priority: "low" | "medium" | "high" | null;
-  date: Moment | null;
-  dateLabel: string | null;
-  segments: ParsedSegment[];
-}
 
 // Date keyword maps
 const RU_DAYS: Record<string, number> = {
@@ -66,7 +51,7 @@ function normalizeTime(raw: string): string {
 }
 
 interface ParsedSegment {
-  type: "priority" | "date" | "time" | "title";
+  type: "priority" | "date" | "time" | "project" | "title";
   text: string;
   start: number;
   end: number;
@@ -79,6 +64,7 @@ interface ParsedResult {
   priority: "low" | "medium" | "high" | null;
   date: Moment | null;
   dateLabel: string | null;
+  projectName: string | null;
   segments: ParsedSegment[];
 }
 
@@ -92,6 +78,7 @@ function parseQuickInput(raw: string): ParsedResult {
   let priority: "low" | "medium" | "high" | null = null;
   let date: Moment | null = null;
   let dateLabel: string | null = null;
+  let projectName: string | null = null;
 
   // --- 1. Find priority at start ---
   const prioRe = /^(!{1,2}|~|-)\s*/;
@@ -205,6 +192,16 @@ function parseQuickInput(raw: string): ParsedResult {
     }
   }
 
+  // --- 3.5. Find @Project token ---
+  // Single word after @ — prefix matching handles multi-word project names
+  const projRe = /(?:^|\s)@(\S+)/g;
+  const projM = projRe.exec(text);
+  if (projM) {
+    projectName = projM[1].trim();
+    const start = projM.index + (projM[0].length - projM[1].length - 1);
+    found.push({ type: "project", text: projM[0].trim(), start, end: projM.index + projM[0].length });
+  }
+
   // --- 4. Sort found tokens by position and build segments ---
   found.sort((a, b) => a.start - b.start);
 
@@ -231,7 +228,7 @@ function parseQuickInput(raw: string): ParsedResult {
   const titleParts = segments.filter((s) => s.type === "title").map((s) => s.text.trim()).filter(Boolean);
   const title = titleParts.join(" ");
 
-  return { title, scheduledTime, endTime, priority, date, dateLabel, segments };
+  return { title, scheduledTime, endTime, priority, date, dateLabel, projectName, segments };
 }
 
 function formatTime(time: string): string {
@@ -295,8 +292,18 @@ export class QuickAddModal extends Modal {
     hint3.createSpan({ text: ` ${tRaw("tasks.quickAdd.hintPriority")}` });
 
     const hint4 = hints.createSpan();
-    hint4.createEl("kbd", { text: "завтра" });
+    const hintDateKbd = get(locale) === "en" ? "tomorrow" : "завтра";
+    hint4.createEl("kbd", { text: hintDateKbd });
     hint4.createSpan({ text: ` ${tRaw("tasks.quickAdd.hintDate")}` });
+
+    const hint5 = hints.createSpan();
+    hint5.createEl("kbd", { text: "@Work" });
+    hint5.createSpan({ text: ` ${tRaw("tasks.quickAdd.hintProject")}` });
+
+    // Example line
+    const exampleLine = bottomBar.createDiv({ cls: "quick-add-example" });
+    exampleLine.createSpan({ text: tRaw("tasks.quickAdd.hints") });
+    exampleLine.createEl("code", { text: `@Work ${tRaw("tasks.quickAdd.hintExamplePriority")} ${tRaw("tasks.quickAdd.hintExampleTime")}` });
 
     // Shortcuts (right side)
     const shortcuts = bottomBar.createDiv({ cls: "quick-add-shortcuts" });
@@ -337,6 +344,7 @@ export class QuickAddModal extends Modal {
         const cls = seg.type === "priority" ? "qa-hl qa-hl-priority"
           : seg.type === "date" ? "qa-hl qa-hl-date"
           : seg.type === "time" ? "qa-hl qa-hl-time"
+          : seg.type === "project" ? "qa-hl qa-hl-project"
           : "qa-title";
         const s = preview.createEl("span", { cls });
         s.textContent = seg.text;
@@ -369,13 +377,23 @@ export class QuickAddModal extends Modal {
     if (parsed.scheduledTime) scheduledTime = formatTime(parsed.scheduledTime);
     if (parsed.endTime) endTime = formatTime(parsed.endTime);
 
+    // Look up project by name
+    let projectId: string | null = null;
+    if (parsed.projectName) {
+      const allProjects = get(projects);
+      const search = parsed.projectName.toLowerCase();
+      const match = allProjects.find((p) => p.name.toLowerCase() === search)
+        || allProjects.find((p) => p.name.toLowerCase().startsWith(search));
+      if (match) projectId = match.id;
+    }
+
     try {
       addTask({
         title: parsed.title,
         dateUID,
         status: "todo",
         completed: false,
-        projectId: null,
+        projectId,
         notePath: null,
         priority: parsed.priority || "medium",
         tags: [],
@@ -403,6 +421,16 @@ export class QuickAddModal extends Modal {
     if (parsed.scheduledTime) scheduledTime = formatTime(parsed.scheduledTime);
     if (parsed.endTime) endTime = formatTime(parsed.endTime);
 
+    // Look up project by name
+    let projectId: string | null = null;
+    if (parsed.projectName) {
+      const allProjects = get(projects);
+      const search = parsed.projectName.toLowerCase();
+      const match = allProjects.find((p) => p.name.toLowerCase() === search)
+        || allProjects.find((p) => p.name.toLowerCase().startsWith(search));
+      if (match) projectId = match.id;
+    }
+
     this.close();
 
     void import("./TaskModal").then(({ TaskModal }) => {
@@ -410,7 +438,7 @@ export class QuickAddModal extends Modal {
         addTask({
           title: taskData.title || parsed.title || "",
           description: taskData.description || "",
-          projectId: taskData.projectId || null,
+          projectId: taskData.projectId || projectId || null,
           notePath: taskData.notePath || null,
           boundNotePath: taskData.boundNotePath || null,
           dateUID: taskData.dateUID || dateUID,

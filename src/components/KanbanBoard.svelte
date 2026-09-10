@@ -4,7 +4,7 @@
   import type { App } from "obsidian";
   import { get } from "svelte/store";
   import { getDateUID } from "obsidian-daily-notes-interface";
-  import { tasks, projects, updateTaskStatus, updateTask, removeTask, addTask } from "../task-tracker/stores";
+  import { tasks, projects, updateTaskStatus, updateTask, removeTask, addTask, carryOverOverdueTasks } from "../task-tracker/stores";
   import { activeTimers, formatDuration } from "../task-tracker/TimerManager";
   import type { ITask, TaskStatus, IProject } from "../task-tracker/types";
   import { t } from "../i18n";
@@ -159,6 +159,7 @@
   }
 
   onMount(() => {
+    carryOverOverdueTasks();
     refreshTimers();
     timerInterval = window.setInterval(refreshTimers, 1000);
   });

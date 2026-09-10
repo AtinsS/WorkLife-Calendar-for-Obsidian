@@ -26,6 +26,8 @@
 
   let todayTaskList: { title: string; status: string }[] = [];
   let inProgressTaskList: { title: string; status: string }[] = [];
+  let overdueCount = 0;
+  let overdueTaskList: { title: string; status: string }[] = [];
 
   let todayHabitList: { id: string; title: string; icon: string; color: string; completed: boolean; count: number; targetCount: number }[] = [];
   let habitDoneCount = 0;
@@ -174,6 +176,9 @@
     inProgressTaskList = all
       .filter((t) => t.status === "progress")
       .map((t) => ({ title: t.title, status: t.status }));
+    const overdue = all.filter((t) => t.carriedOverFrom && t.status !== "done");
+    overdueCount = overdue.length;
+    overdueTaskList = overdue.map((t) => ({ title: t.title, status: t.status }));
   }
 
   function updateMonthGoal() {
@@ -316,6 +321,25 @@
       <span>{$t("dtw.tasksLabel")}: {completedToday} / {totalToday}</span>
     </span>
   {/if}
+  {#if overdueCount > 0}
+    <span class="dtw-sep"></span>
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+    <span
+      class="dtw-item dtw-hoverable dtw-overdue"
+      role="button"
+      tabindex="0"
+      on:click={() => switchToTasks()}
+      on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchToTasks(); }}
+      on:mouseenter={(e) => {
+        if (overdueTaskList.length > 0)
+          showTooltip(e.currentTarget, $t("dtw.overdue"), overdueTaskList.map(t => ({ status: "progress", name: t.title })));
+      }}
+      on:mouseleave={removeTooltip}
+    >
+      <span class="dtw-icon">⚠️</span>
+      <span>{overdueCount}</span>
+    </span>
+  {/if}
   {#if inProgressCount > 0}
     <span class="dtw-sep"></span>
     <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
@@ -427,6 +451,15 @@
 
   .dtw-hoverable:hover {
     background: var(--background-modifier-hover);
+  }
+
+  .dtw-overdue {
+    color: var(--mcp-danger, rgba(220, 100, 100, 0.9));
+    font-weight: 600;
+  }
+
+  .dtw-overdue:hover {
+    background: rgba(220, 100, 100, 0.1);
   }
 
   @media (max-width: 768px) {

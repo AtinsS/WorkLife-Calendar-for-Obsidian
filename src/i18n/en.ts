@@ -63,6 +63,7 @@ export const en = {
     tasksToday: "Today's tasks",
     tasksLabel: "Tasks",
     inProgress: "In progress",
+    overdue: "Overdue",
     habits: "Habits",
     habitsToday: "Today's habits",
     monthGoals: "Monthly goals",
@@ -147,6 +148,8 @@ export const en = {
       defaultRateDesc: "Rate for new work tasks (in local currency)",
       paymentTypeHour: "Hourly",
       paymentTypeDay: "Daily",
+      carryOverOverdue: "Carry over overdue tasks",
+      carryOverOverdueDesc: "Automatically move incomplete tasks to the next day",
       formatNote: "Note format:",
       formatStatuses: "Statuses: - [ ] todo, - [/] progress, - [-] paused, - [x] done",
       formatEmoji: "Emoji: 📅 date, 🛫 time, ⏰ deadline, 🔁 recurrence, ⏫/⬇️ priority",
@@ -418,15 +421,16 @@ export const en = {
 
     quickAdd: {
       menuItem: "⚡ Quick add task",
-      placeholder: "Task title...",
-      hints: "Hints:",
-      hintTime: "time before text",
-      hintRange: "time range",
+      placeholder: "Task... (@Project 14:00 !tomorrow)",
+      hints: "Example:",
+      hintTime: "time",
+      hintRange: "range",
       hintPriority: "! high, ~ medium, - low",
       hintDate: "date: tomorrow, fri, 07/25",
+      hintProject: "project",
       hintExampleTime: "14:00 buy milk",
       hintExampleRange: "14-15 buy milk / 14:00-15:00 buy milk",
-      hintExamplePriority: "! buy milk",
+      hintExamplePriority: "!task",
     },
 
     tabs: {

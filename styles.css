@@ -34,7 +34,7 @@
 
   /* Text */
   --mcp-text: #E8ECF0;
-  --mcp-text-muted: ##b7b8bb;
+  --mcp-text-muted: #b7b8bb;
   --mcp-text-faint: #3A3F4B;
   --text-on-accent: #fff;
 
@@ -3301,7 +3301,7 @@ svg.dot.filled {
 }
 
 .pm-icon-custom-input {
-  width: 48px;
+  width: 72px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
@@ -4843,7 +4843,7 @@ svg.dot.filled {
   font-size: 22px;
   padding: 10px;
   height: 44px;
-  width: 44px;
+  width: 60px;
 }
 
 .pm-icon-apply-btn {
@@ -6505,6 +6505,27 @@ svg.dot.filled {
   font-weight: 600;
 }
 
+/* --- Carried-over (overdue) task highlight --- */
+
+.task-item.carried-over {
+  border-left: 3px solid var(--mcp-danger, rgba(220, 100, 100, 0.9));
+  background: linear-gradient(90deg, rgba(220, 100, 100, 0.06), transparent 60%);
+}
+
+.task-carried-over-badge {
+  font-size: 10px;
+  color: var(--mcp-danger, rgba(220, 100, 100, 0.9));
+  background: rgba(220, 100, 100, 0.1);
+  border: 1px solid rgba(220, 100, 100, 0.2);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-weight: 600;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* --- Checklist --- */
 
 .checklist-toggle {
@@ -7995,6 +8016,24 @@ svg.dot.filled {
   gap: 12px;
 }
 
+.quick-add-example {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+
+.quick-add-example code {
+  font-size: 10px;
+  padding: 1px 5px;
+  background: var(--background-modifier-border);
+  border-radius: 3px;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
 .quick-add-shortcuts {
   display: flex;
   gap: 8px;
@@ -8195,6 +8234,11 @@ svg.dot.filled {
 .qa-hl-time {
   color: #4fc3f7;
   background: rgba(79, 195, 247, 0.12);
+}
+
+.qa-hl-project {
+  color: #ffab40;
+  background: rgba(255, 171, 64, 0.12);
 }
 
 .qa-adv-btn {

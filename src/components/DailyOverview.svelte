@@ -204,7 +204,6 @@
 
     <section class="do-panel">
       <div class="do-panel-head">
-        <h3>{$t("dailyOverview.overdueSection")}</h3>
         <span>{overdueTasks.length}</span>
       </div>
       {#if overdueTasks.length === 0}

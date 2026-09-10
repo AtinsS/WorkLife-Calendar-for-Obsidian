@@ -5,7 +5,6 @@
     habitLogs,
     getWeeklyStats,
     getHabitStats,
-    getDayOfWeekProductivity,
   } from "../habit-tracker/stores";
   import HabitCard from "./HabitCard.svelte";
   import BarChart from "./BarChart.svelte";
@@ -39,9 +38,12 @@
   let weeklyStats = getWeeklyStats(12);
 
   // Period selector for "Время и проекты"
+  function fmtLocal(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
   const now = new Date();
-  let periodStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6).toISOString().split("T")[0];
-  let periodEnd = now.toISOString().split("T")[0];
+  let periodStart = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+  let periodEnd = fmtLocal(now);
 
   $: {
     $habitLogs; // re-compute when logs change
@@ -50,23 +52,13 @@
 
   $: activeHabits = $habits.filter((h) => !h.archived);
 
-  // Day-of-week productivity stats
-  $: {
-    $habitLogs;
-    dayOfWeekStats = getDayOfWeekProductivity();
-    maxProductivity = Math.max(...dayOfWeekStats.map((d) => d.productivityRate), 1);
-  }
-  let dayOfWeekStats: { dayIndex: number; dayName: string; completions: number; totalDays: number; productivityRate: number }[] = [];
-  let maxProductivity = 1;
-
   // Calculate weekly earnings
   $: weeklyEarnings = weeklyStats.map((week) => {
     const weekStart = week.weekStart;
     const weekMoment = window.moment(weekStart, "YYYY-MM-DD");
     const weekEnd = weekMoment.clone().endOf("week");
     let earnings = 0;
-    const allTasksList = get(tasks);
-    for (const task of allTasksList) {
+    for (const task of $tasks) {
       if (!task.isWorkTask || !task.rate || task.status !== "done") continue;
       const match = task.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
       if (!match) continue;
@@ -100,8 +92,42 @@
     return log.date >= periodStart && log.date <= periodEnd;
   });
   $: totalTimeMs = filteredTimeLogs.reduce((sum, log) => sum + log.duration, 0);
+  // Combined: time logs + declared time from tasks without logs
+  $: combinedTimeMs = (() => {
+    const logTaskIds = new Set(filteredTimeLogs.map(l => l.taskId));
+    const taskOnlyMs = tasksWithTime.reduce((sum, t) => {
+      if (logTaskIds.has(t.id)) return sum;
+      if (t.totalWorkTime && t.totalWorkTime > 0) return sum + t.totalWorkTime;
+      if (t.estimatedTime && t.estimatedTime > 0) return sum + t.estimatedTime * 60000;
+      return sum;
+    }, 0);
+    return totalTimeMs + taskOnlyMs;
+  })();
   $: uniqueDays = new Set(filteredTimeLogs.map((log) => log.date)).size;
   $: avgPerDay = uniqueDays > 0 ? totalTimeMs / uniqueDays : 0;
+
+  // Tasks with time data in period (for showing the section even without time logs)
+  $: tasksWithTime = $tasks.filter((t) => {
+    const match = t.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    if (!match || match[1] < periodStart || match[1] > periodEnd) return false;
+    return t.status === "done" || (t.totalWorkTime && t.totalWorkTime > 0) || (t.estimatedTime && t.estimatedTime > 0);
+  });
+
+  // Declared time from tasks without logs, grouped by date (for the chart)
+  $: extraTimeByDate = (() => {
+    const logTaskIds = new Set(filteredTimeLogs.map(l => l.taskId));
+    const result = new Map<string, number>();
+    tasksWithTime.forEach((t) => {
+      if (logTaskIds.has(t.id)) return;
+      let ms = 0;
+      if (t.totalWorkTime && t.totalWorkTime > 0) ms = t.totalWorkTime;
+      else if (t.estimatedTime && t.estimatedTime > 0) ms = t.estimatedTime * 60000;
+      if (ms <= 0) return;
+      const m = t.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+      if (m) result.set(m[1], (result.get(m[1]) || 0) + ms);
+    });
+    return result;
+  })();
 
   // Weekly deltas for trend indicators
   $: weeklyDelta = (() => {
@@ -116,15 +142,18 @@
     };
   })();
 
-  // Donut chart data — time by project for done tasks (filtered by period)
+  // Donut chart data — time by project (time logs + declared time from completed tasks)
   $: donutSegments = (() => {
-    const allDoneTasks = get(tasks).filter((t) => t.status === "done");
-    const allProjects = get(projects);
+    const allProjectTasks = $tasks;
+    const allProjects = $projects;
     const projectMap = new Map<string, { ms: number; color: string; name: string }>();
     const noKey = "__none__";
 
+    // Time from logs
+    const tasksWithLogs = new Set<string>();
     for (const log of filteredTimeLogs) {
-      const task = allDoneTasks.find((t) => t.id === log.taskId);
+      tasksWithLogs.add(log.taskId);
+      const task = allProjectTasks.find((t) => t.id === log.taskId);
       const pKey = task?.projectId || noKey;
       if (!projectMap.has(pKey)) {
         const proj = task?.projectId ? allProjects.find((p) => p.id === task.projectId) : null;
@@ -135,6 +164,26 @@
         });
       }
       projectMap.get(pKey).ms += log.duration;
+    }
+
+    // Declared time from tasks without logs (done tasks or tasks with time data)
+    for (const task of tasksWithTime) {
+      if (tasksWithLogs.has(task.id)) continue;
+      let taskMs = 0;
+      if (task.totalWorkTime && task.totalWorkTime > 0) taskMs = task.totalWorkTime;
+      else if (task.estimatedTime && task.estimatedTime > 0) taskMs = task.estimatedTime * 60000;
+      if (taskMs <= 0) continue;
+
+      const pKey = task.projectId || noKey;
+      if (!projectMap.has(pKey)) {
+        const proj = task.projectId ? allProjects.find((p) => p.id === task.projectId) : null;
+        projectMap.set(pKey, {
+          ms: 0,
+          color: proj?.color || "#647177",
+          name: proj?.name || $t("projectAnalytics.noProject"),
+        });
+      }
+      projectMap.get(pKey).ms += taskMs;
     }
 
     return Array.from(projectMap.values())
@@ -251,35 +300,6 @@
         {/each}
       </div>
     </div>
-
-    <!-- Day of week productivity -->
-    <div class="habit-analytics-section">
-      <h3>{$t("habitAnalytics.weekdayProductivity")}</h3>
-      <div class="day-chart">
-        {#each dayOfWeekStats as day}
-          <div class="day-bar-wrapper">
-            <div class="day-bar-info">
-              <span class="day-bar-rate">{day.productivityRate}%</span>
-            </div>
-            <div
-              class="day-bar"
-              class:productive={day.productivityRate >= 50}
-              class:neutral={day.productivityRate >= 20 && day.productivityRate < 50}
-              class:lazy={day.productivityRate < 20}
-              style="height: {day.productivityRate > 0 ? Math.max((day.productivityRate / maxProductivity) * 100, 6) : 0}%"
-              title="{day.dayName}: {day.completions} {$t("components.completions")} {day.totalDays} {$t("components.streakDays")}, {day.productivityRate}%"
-            ></div>
-            <span class="day-bar-label">{day.dayName}</span>
-            <span class="day-bar-count">{day.completions}</span>
-          </div>
-        {/each}
-      </div>
-      <div class="day-legend">
-        <span class="legend-item"><span class="legend-dot productive"></span> {$t("habitAnalytics.legendProductive")}</span>
-        <span class="legend-item"><span class="legend-dot neutral"></span> {$t("habitAnalytics.legendMedium")}</span>
-        <span class="legend-item"><span class="legend-dot lazy"></span> {$t("habitAnalytics.legendProcrastination")}</span>
-      </div>
-    </div>
   {/if}
 
   <!-- Time & Projects — unified section -->
@@ -292,13 +312,13 @@
         <input type="date" bind:value={periodEnd} class="period-input" />
       </div>
     </div>
-    {#if filteredTimeLogs.length === 0}
+    {#if filteredTimeLogs.length === 0 && tasksWithTime.length === 0}
       <div class="time-logs-empty">{$t("habitAnalytics.noTimeLogs")}</div>
     {:else}
       <!-- Stats cards -->
       <div class="time-logs-stats">
         <div class="time-stat">
-          <span class="time-stat-value">{formatDuration(totalTimeMs)}</span>
+          <span class="time-stat-value">{formatDuration(combinedTimeMs)}</span>
           <span class="time-stat-label">{$t("habitAnalytics.totalTime")}</span>
         </div>
         <div class="time-stat">
@@ -313,7 +333,7 @@
 
       <!-- Area chart -->
       <div class="time-logs-chart">
-        <BarChart logs={filteredTimeLogs} mode="area" />
+        <BarChart logs={filteredTimeLogs} {extraTimeByDate} mode="area" />
       </div>
 
       <!-- Two columns: Donut + Project table -->
@@ -322,16 +342,17 @@
           <h4>{$t("habitAnalytics.timeDistribution")}</h4>
           <DonutChart
             segments={donutSegments}
-            centerValue={formatDuration(totalTimeMs)}
+            centerValue={formatDuration(combinedTimeMs)}
             centerLabel="100%"
           />
         </div>
         <div class="time-project-table">
           <h4>{$t("habitAnalytics.projects")}</h4>
-          <ProjectAnalytics tasks={get(tasks).filter((t) => t.status === "done" && (() => {
+          <ProjectAnalytics filter={(t) => {
             const match = t.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
-            return match && match[1] >= periodStart && match[1] <= periodEnd;
-          })())} />
+            if (!match || match[1] < periodStart || match[1] > periodEnd) return false;
+            return t.status === "done" || (t.totalWorkTime && t.totalWorkTime > 0) || (t.estimatedTime && t.estimatedTime > 0);
+          }} />
         </div>
       </div>
     {/if}
@@ -637,113 +658,6 @@
     color: var(--text-muted);
     margin: -8px 0 16px;
     font-weight: 400;
-  }
-
-  /* Day of week chart */
-  .day-chart {
-    display: flex;
-    align-items: flex-end;
-    gap: 8px;
-    height: 160px;
-    padding: 16px 8px 0;
-    border-radius: var(--mcp-radius-sm);
-    background: var(--mcp-glass-highlight);
-  }
-
-  .day-bar-wrapper {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    height: 100%;
-    justify-content: flex-end;
-  }
-
-  .day-bar-info {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-bottom: 4px;
-    min-height: 20px;
-  }
-
-  .day-bar-rate {
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-accent);
-    white-space: nowrap;
-  }
-
-  .day-bar {
-    width: 100%;
-    max-width: 40px;
-    border-radius: 4px 4px 0 0;
-    min-height: 0;
-    transition: height 0.3s ease, opacity 0.2s ease;
-  }
-
-  .day-bar.productive {
-    background: linear-gradient(180deg, var(--mcp-success, rgba(34, 197, 94, 0.9)), color-mix(in srgb, var(--mcp-success, rgba(34, 197, 94, 0.5)) 60%, transparent));
-  }
-
-  .day-bar.neutral {
-    background: linear-gradient(180deg, var(--mcp-warning, rgba(220, 190, 130, 0.9)), color-mix(in srgb, var(--mcp-warning, rgba(220, 190, 130, 0.5)) 60%, transparent));
-  }
-
-  .day-bar.lazy {
-    background: linear-gradient(180deg, var(--mcp-danger, rgba(220, 150, 150, 0.9)), color-mix(in srgb, var(--mcp-danger, rgba(220, 150, 150, 0.5)) 60%, transparent));
-  }
-
-  .day-bar:hover {
-    opacity: 0.85;
-  }
-
-  .day-bar-label {
-    font-size: 11px;
-    color: var(--text-muted);
-    margin-top: 6px;
-    white-space: nowrap;
-    font-weight: 600;
-  }
-
-  .day-bar-count {
-    font-size: 9px;
-    color: var(--text-muted);
-    margin-top: 2px;
-    font-weight: 400;
-  }
-
-  .day-legend {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    margin-top: 12px;
-    font-size: 11px;
-    color: var(--text-muted);
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .legend-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-  }
-
-  .legend-dot.productive {
-    background: var(--mcp-success, rgba(34, 197, 94, 0.9));
-  }
-
-  .legend-dot.neutral {
-    background: var(--mcp-warning, rgba(220, 190, 130, 0.9));
-  }
-
-  .legend-dot.lazy {
-    background: var(--mcp-danger, rgba(220, 150, 150, 0.9));
   }
 
   /* Time Logs */

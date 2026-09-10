@@ -5,6 +5,7 @@
   import { t, locale } from "../i18n";
 
   export let logs: TimeLog[] = [];
+  export let extraTimeByDate: Map<string, number> = new Map();
   export let mode: "bar" | "area" = "bar";
 
   let canvas: HTMLCanvasElement;
@@ -17,10 +18,13 @@
     totalMs: number;
   }
 
-  function aggregateByDay(logs: TimeLog[], currentLocale: string): DayData[] {
+  function aggregateByDay(logs: TimeLog[], extra: Map<string, number>, currentLocale: string): DayData[] {
     const map = new Map<string, number>();
     for (const log of logs) {
       map.set(log.date, (map.get(log.date) || 0) + log.duration);
+    }
+    for (const [date, ms] of extra) {
+      map.set(date, (map.get(date) || 0) + ms);
     }
 
     const result: DayData[] = [];
@@ -38,7 +42,7 @@
     return result;
   }
 
-  $: dayData = aggregateByDay(logs, $locale);
+  $: dayData = aggregateByDay(logs, extraTimeByDate, $locale);
   $: maxMs = dayData.length > 0 ? Math.max(...dayData.map((d) => d.totalMs)) : 0;
 
   let dpr = 1;

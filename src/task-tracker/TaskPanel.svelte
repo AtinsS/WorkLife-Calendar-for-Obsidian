@@ -9,6 +9,7 @@
     tasks, projects, selectedDate, activeTab, taskFilter,
     addTask, updateTask, updateTaskStatus, removeTask,
     createNextRecurringInstance, clearAllRecurringTasks, resetTaskTimer,
+    carryOverOverdueTasks,
   } from "./stores";
   import { createNoteTask, deleteNoteTask, shouldSyncTaskToNote, syncTaskToNote } from "./noteTasks";
   import { settings } from "../ui/stores";
@@ -33,6 +34,8 @@
       mqlHandler = (e: MediaQueryListEvent) => { isMobile = e.matches; };
       mqlMobile.addEventListener("change", mqlHandler);
     }
+    // Carry over overdue tasks whenever the panel opens
+    carryOverOverdueTasks();
   });
 
   onDestroy(() => {
@@ -124,6 +127,11 @@
       if (a.status === "done" && b.status === "done") return (b.updatedAt || 0) - (a.updatedAt || 0);
       if (a.status === "done") return 1;
       if (b.status === "done") return -1;
+      // Carried-over (overdue) tasks first
+      const aOverdue = !!a.carriedOverFrom;
+      const bOverdue = !!b.carriedOverFrom;
+      if (aOverdue && !bOverdue) return -1;
+      if (!aOverdue && bOverdue) return 1;
       const aTime = a.scheduledTime || "";
       const bTime = b.scheduledTime || "";
       if (aTime && bTime) return aTime.localeCompare(bTime);
@@ -136,17 +144,19 @@
 
   function sortTasksChronologically(taskList: ITask[]): ITask[] {
     return [...taskList].sort((a, b) => {
-      // Выполненные задачи — в конец
       if (a.status === "done" && b.status === "done") return (b.updatedAt || 0) - (a.updatedAt || 0);
       if (a.status === "done") return 1;
       if (b.status === "done") return -1;
-      // Сортировка по scheduledTime: от раннего к позднему
+      // Carried-over (overdue) tasks first
+      const aOverdue = !!a.carriedOverFrom;
+      const bOverdue = !!b.carriedOverFrom;
+      if (aOverdue && !bOverdue) return -1;
+      if (!aOverdue && bOverdue) return 1;
       const aTime = a.scheduledTime || "";
       const bTime = b.scheduledTime || "";
       if (aTime && bTime) return aTime.localeCompare(bTime);
       if (aTime) return -1;
       if (bTime) return 1;
-      // Без времени — по sortOrder и дате создания
       if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
       return (a.createdAt || 0) - (b.createdAt || 0);
     });
@@ -156,15 +166,17 @@
 
   function sortTasksByPriority(taskList: ITask[]): ITask[] {
     return [...taskList].sort((a, b) => {
-      // Выполненные задачи — в конец
       if (a.status === "done" && b.status === "done") return (b.updatedAt || 0) - (a.updatedAt || 0);
       if (a.status === "done") return 1;
       if (b.status === "done") return -1;
-      // Сначала по приоритету: high → medium → low
+      // Carried-over (overdue) tasks first — above all priorities
+      const aOverdue = !!a.carriedOverFrom;
+      const bOverdue = !!b.carriedOverFrom;
+      if (aOverdue && !bOverdue) return -1;
+      if (!aOverdue && bOverdue) return 1;
       const aPri = PRIORITY_ORDER[a.priority] ?? 3;
       const bPri = PRIORITY_ORDER[b.priority] ?? 3;
       if (aPri !== bPri) return aPri - bPri;
-      // Одинаковый приоритет — по времени
       const aTime = a.scheduledTime || "";
       const bTime = b.scheduledTime || "";
       if (aTime && bTime) return aTime.localeCompare(bTime);

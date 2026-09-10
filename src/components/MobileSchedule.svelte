@@ -2,7 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import moment from "moment";
   import type { ITask } from "../task-tracker/types";
-  import { tasks, projects, updateTaskStatus, removeTask, updateTask, resetTaskTimer } from "../task-tracker/stores";
+  import { tasks, projects, updateTaskStatus, removeTask, updateTask, resetTaskTimer, carryOverOverdueTasks } from "../task-tracker/stores";
   import { TaskModal } from "../task-tracker/TaskModal";
   import type CalendarPlugin from "../main";
   import { settings } from "../ui/stores";
@@ -336,6 +336,7 @@
 
   // Scroll to current time on mount
   onMount(() => {
+    carryOverOverdueTasks();
     if (!scrollEl) return;
     const now = new Date();
     const h = now.getHours();

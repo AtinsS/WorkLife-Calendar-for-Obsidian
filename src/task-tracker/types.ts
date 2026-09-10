@@ -40,6 +40,7 @@ export interface ITask {
   deadline?: DateUID; // deadline date (format: "day-YYYY-MM-DD")
   deadlineTime?: string; // deadline time (format: "HH:MM")
   isNoteTask?: boolean; // true = задача-заметка (файл создаётся/архивируется)
+  carriedOverFrom?: string; // dateUID откуда была перенесена просроченная задача
 }
 
 export interface IProject {

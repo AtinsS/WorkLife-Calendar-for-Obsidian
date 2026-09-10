@@ -20,6 +20,7 @@
     removeTask,
     addTask,
     resetTaskTimer,
+    carryOverOverdueTasks,
   } from "../task-tracker/stores";
   import {
     createNoteTask,
@@ -320,6 +321,7 @@
   }
 
   onMount(() => {
+    carryOverOverdueTasks();
     initCalendar();
     setupTouchNavigation();
     window.addEventListener("resize", handleResize);
