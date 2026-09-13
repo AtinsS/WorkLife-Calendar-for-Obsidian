@@ -483,6 +483,10 @@ export default class CalendarPlugin extends Plugin {
     if (this.options.notificationsEnabled) {
       void this.notificationService.start();
     }
+    // Schedule ntfy.sh push notifications for upcoming tasks
+    if (this.options.ntfyScheduledEnabled) {
+      this.notificationService.scheduleNtfyPush();
+    }
 
     // Watch for vault sync file changes (modify + create)
     const debouncedSyncReload = () => {

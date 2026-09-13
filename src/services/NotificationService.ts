@@ -295,6 +295,178 @@ export class NotificationService {
     });
   }
 
+  /** Schedule ntfy.sh push notifications for tasks in the next 3 days.
+   *  Each task with scheduledTime gets an X-Delay push so ntfy.sh delivers
+   *  the notification at the right time — even if Obsidian is closed. */
+  scheduleNtfyPush(): void {
+    const opts: ISettings = this.plugin.options;
+    if (!opts.ntfyEnabled || !opts.ntfyScheduledEnabled || !opts.ntfyTopic) return;
+
+    const allTasks = get(tasks);
+    const now = momentFn();
+    const horizon = now.clone().add(3, "days");
+    const reminderMin = opts.reminderMinutesBefore ?? DEFAULT_REMINDER_MINUTES;
+
+    for (const task of allTasks) {
+      if (task.completed || task.status === "done" || task.status === "paused") continue;
+
+      // Task with scheduledTime on a specific date
+      if (task.scheduledTime && task.dateUID) {
+        const scheduled = this.getScheduledMoment(task);
+        if (!scheduled || !scheduled.isValid()) continue;
+        if (scheduled.isBefore(now) || scheduled.isAfter(horizon)) continue;
+
+        const fireAt = scheduled.clone().subtract(reminderMin, "minutes");
+        if (fireAt.isBefore(now)) continue; // already past
+
+        const title = tRaw("taskStore.notificationTitle");
+        const body = tRaw("notifications.reminder", {
+          title: task.title,
+          minutes: String(reminderMin),
+          time: task.scheduledTime || "",
+        });
+
+        this.sendNtfyDelayed(title, body, fireAt.toISOString(), task.id);
+      }
+
+      // Task with deadline today/tomorrow
+      if (task.deadline) {
+        const dlMatch = task.deadline.match(/^day-(\d{4})-(\d{2})-(\d{2})/);
+        if (!dlMatch) continue;
+        const [, y, m, d] = dlMatch;
+        const dlDate = momentFn(`${y}-${m}-${d} 09:00`, "YYYY-MM-DD HH:mm", true);
+        if (!dlDate.isValid()) continue;
+        if (dlDate.isBefore(now) || dlDate.isAfter(horizon)) continue;
+
+        const title = tRaw("taskStore.notificationTitle");
+        const body = tRaw("notifications.deadlineToday", { title: task.title, time: task.deadlineTime || "" });
+
+        this.sendNtfyDelayed(title, body, dlDate.toISOString(), `${task.id}-deadline`);
+      }
+    }
+  }
+
+  private sendNtfyDelayed(title: string, body: string, deliveryIso: string, _dedupeId: string): void {
+    const opts: ISettings = this.plugin.options;
+    if (!opts.ntfyTopic) return;
+
+    // Convert ISO to Unix timestamp in seconds
+    const unixSec = Math.floor(new Date(deliveryIso).getTime() / 1000);
+
+    void requestUrl({
+      url: `https://ntfy.sh/${encodeURIComponent(opts.ntfyTopic)}`,
+      method: "POST",
+      headers: {
+        "X-Delay": String(unixSec),
+        "X-Tags": "worklife",
+      },
+      body,
+    }).then((response) => {
+      const status = response.status >= 200 && response.status < 300 ? "sent" : "failed";
+      if (status === "failed") {
+        console.warn(`[ntfy] scheduled push HTTP ${response.status}:`, response.text);
+      }
+      void recordNotificationEvent(this.plugin.app, {
+        channel: "ntfy",
+        status,
+        title,
+        body,
+        source: "scheduled",
+        topic: opts.ntfyTopic,
+        error: status === "failed" ? `HTTP ${response.status}: ${response.text}` : undefined,
+      });
+    }).catch((e: unknown) => {
+      console.warn("[ntfy] scheduled push failed:", e);
+      void recordNotificationEvent(this.plugin.app, {
+        channel: "ntfy",
+        status: "failed",
+        title,
+        body,
+        source: "scheduled",
+        topic: opts.ntfyTopic,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    });
+  }
+
+  /** Send a test ntfy.sh notification (immediate) */
+  async testNtfyImmediate(): Promise<{ ok: boolean; error?: string }> {
+    const opts: ISettings = this.plugin.options;
+    if (!opts.ntfyTopic) return { ok: false, error: "ntfy topic is empty" };
+    try {
+      const resp = await requestUrl({
+        url: `https://ntfy.sh/${encodeURIComponent(opts.ntfyTopic)}`,
+        method: "POST",
+        headers: { "X-Tags": "test" },
+        body: "WorkLife: test notification",
+      });
+      const ok = resp.status >= 200 && resp.status < 300;
+      await recordNotificationEvent(this.plugin.app, {
+        channel: "ntfy",
+        status: ok ? "sent" : "failed",
+        title: "Test notification",
+        body: "WorkLife: test notification",
+        source: "test",
+        topic: opts.ntfyTopic,
+        error: ok ? undefined : `HTTP ${resp.status}`,
+      });
+      return ok ? { ok: true } : { ok: false, error: `HTTP ${resp.status}` };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await recordNotificationEvent(this.plugin.app, {
+        channel: "ntfy",
+        status: "failed",
+        title: "Test notification",
+        body: "WorkLife: test notification",
+        source: "test",
+        topic: opts.ntfyTopic,
+        error: msg,
+      });
+      return { ok: false, error: msg };
+    }
+  }
+
+  /** Send a test ntfy.sh scheduled notification (1 min from now) */
+  async testNtfyScheduled(): Promise<{ ok: boolean; error?: string }> {
+    const opts: ISettings = this.plugin.options;
+    if (!opts.ntfyTopic) return { ok: false, error: "ntfy topic is empty" };
+    const delaySec = Math.floor(Date.now() / 1000) + 60; // 1 minute from now
+    try {
+      const resp = await requestUrl({
+        url: `https://ntfy.sh/${encodeURIComponent(opts.ntfyTopic)}`,
+        method: "POST",
+        headers: {
+          "X-Delay": String(delaySec),
+          "X-Tags": "test",
+        },
+        body: "WorkLife: scheduled test (1 min)",
+      });
+      const ok = resp.status >= 200 && resp.status < 300;
+      await recordNotificationEvent(this.plugin.app, {
+        channel: "ntfy",
+        status: ok ? "sent" : "failed",
+        title: "Scheduled test",
+        body: "WorkLife: scheduled test (1 min)",
+        source: "test-scheduled",
+        topic: opts.ntfyTopic,
+        error: ok ? undefined : `HTTP ${resp.status}: ${resp.text}`,
+      });
+      return ok ? { ok: true } : { ok: false, error: `HTTP ${resp.status}: ${resp.text}` };
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await recordNotificationEvent(this.plugin.app, {
+        channel: "ntfy",
+        status: "failed",
+        title: "Scheduled test",
+        body: "WorkLife: scheduled test (1 min)",
+        source: "test-scheduled",
+        topic: opts.ntfyTopic,
+        error: msg,
+      });
+      return { ok: false, error: msg };
+    }
+  }
+
   private cleanupFiredKeys(activeTasks: ITask[]): void {
     const activeIds = new Set(activeTasks.map((t) => t.id));
     for (const key of this.firedReminders) {

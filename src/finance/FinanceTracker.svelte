@@ -18,6 +18,7 @@
   } from "../task-tracker/stores";
   import { financialAnalyticsData } from "./financialAnalyticsStorage";
   import { t, tArray, locale } from "../i18n";
+  import { clampAmount } from "../utils/sanitize";
 
   type DistributionIncomeSource = "plan" | "fact" | "manual";
 
@@ -192,7 +193,7 @@
   }
 
   function updateManualIncome(value: string) {
-    manualIncome = parseFloat(value.replace(/[^0-9.,]/g, "")) || 0;
+    manualIncome = clampAmount(parseFloat(value.replace(/[^0-9.,]/g, "")) || 0);
     updateMonthData(monthKey, {
       monthlyIncome: manualIncome,
       incomeSource: "manual",
@@ -476,7 +477,7 @@
           <div class="category-row editing">
             <input type="text" value={cat.icon} on:input={(e) => updateMainCategory(cat.id, { icon: inputVal(e) })} class="cat-edit-icon" maxlength="2" />
             <input type="text" value={cat.name} on:input={(e) => updateMainCategory(cat.id, { name: inputVal(e) })} class="cat-edit-name" />
-            <input type="number" value={cat.amount} on:input={(e) => updateMainCategory(cat.id, { amount: parseFloat(inputVal(e)) || 0 })} min="0" class="cat-edit-amount" />
+            <input type="number" value={cat.amount} on:input={(e) => updateMainCategory(cat.id, { amount: clampAmount(parseFloat(inputVal(e)) || 0) })} min="0" class="cat-edit-amount" />
             <button class="goal-done-btn" on:click={() => editingMainCatId = null}>✓</button>
           </div>
         {:else}
@@ -507,9 +508,9 @@
             <div class="goal-info">
               <div class="goal-edit-row">
                 <input type="text" value={goal.name} on:input={(e) => updateGoal(goal.id, { name: inputVal(e) })} class="goal-edit-name" placeholder="{$t('finance.newGoal')}" />
-                <input type="number" value={goal.currentAmount} on:input={(e) => updateGoal(goal.id, { currentAmount: parseFloat(inputVal(e)) || 0 })} min="0" class="goal-edit-amount" placeholder="{$t('finance.amountPlaceholder')}" />
+                <input type="number" value={goal.currentAmount} on:input={(e) => updateGoal(goal.id, { currentAmount: clampAmount(parseFloat(inputVal(e)) || 0) })} min="0" class="goal-edit-amount" placeholder="{$t('finance.amountPlaceholder')}" />
                 <span class="goal-edit-sep">/</span>
-                <input type="number" value={goal.targetAmount} on:input={(e) => updateGoal(goal.id, { targetAmount: parseFloat(inputVal(e)) || 0 })} min="0" class="goal-edit-amount" placeholder="{$t('finance.goalPlaceholder')}" />
+                <input type="number" value={goal.targetAmount} on:input={(e) => updateGoal(goal.id, { targetAmount: clampAmount(parseFloat(inputVal(e)) || 0) })} min="0" class="goal-edit-amount" placeholder="{$t('finance.goalPlaceholder')}" />
               </div>
             </div>
             <button class="goal-done-btn" on:click={() => editingGoalId = null}>✓</button>
@@ -554,12 +555,12 @@
             <div class="savings-edit-fields">
               <div class="savings-field">
                 <span class="savings-field-label">{$t("finance.amount")}</span>
-                <input type="number" value={cat.amount} on:input={(e) => { const amount = parseFloat(inputVal(e)) || 0; const percent = balance > 0 ? Math.round((amount / balance) * 100) : 0; updateSavingsCategory(cat.id, { amount, percent }); }} min="0" class="savings-field-input" />
+                <input type="number" value={cat.amount} on:input={(e) => { const amount = clampAmount(parseFloat(inputVal(e)) || 0); const percent = balance > 0 ? Math.round((amount / balance) * 100) : 0; updateSavingsCategory(cat.id, { amount, percent }); }} min="0" class="savings-field-input" />
                 <span class="savings-field-unit">{$t("locale.currencySymbol")}</span>
               </div>
               <div class="savings-field">
                 <span class="savings-field-label">{$t("finance.percent")}</span>
-                <input type="number" value={cat.percent} on:input={(e) => { const percent = parseFloat(inputVal(e)) || 0; const amount = Math.round(balance * percent / 100); updateSavingsCategory(cat.id, { amount, percent }); }} min="0" max="100" class="savings-field-input" />
+                <input type="number" value={cat.percent} on:input={(e) => { const percent = Math.max(0, Math.min(100, parseFloat(inputVal(e)) || 0)); const amount = clampAmount(Math.round(balance * percent / 100)); updateSavingsCategory(cat.id, { amount, percent }); }} min="0" max="100" class="savings-field-input" />
                 <span class="savings-field-unit">%</span>
               </div>
             </div>

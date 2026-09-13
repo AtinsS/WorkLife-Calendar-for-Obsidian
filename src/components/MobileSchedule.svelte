@@ -357,6 +357,7 @@
     <button class="ms-view-toggle" on:click={toggleViewMode} aria-label={$t("mobileSchedule.toggleView")}>
       {viewMode === "day" ? "📅" : "📋"}
     </button>
+    <button class="ms-kanban-btn" on:click={() => { if (plugin) { const leaf = plugin.app.workspace.getLeaf("tab"); leaf.setViewState({ type: "calendar-kanban", active: true }); plugin.app.workspace.revealLeaf(leaf); } }} title={$t("kanban.title")}>▦</button>
     <button class="ms-close-btn" on:click={onClose} aria-label={$t("common.close")}>✕</button>
   </div>
 
@@ -620,6 +621,23 @@
   }
 
   .ms-close-btn:hover { background: var(--mcp-accent-dim, rgba(95,153,225,0.12)); }
+
+  .ms-kanban-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    border: 1px solid var(--mcp-glass-border, rgba(255,255,255,0.06));
+    background: var(--mcp-glass-bg, rgba(35,40,55,0.4));
+    color: var(--mcp-text-muted, rgba(200,210,220,0.5));
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .ms-kanban-btn:hover { background: var(--mcp-accent-dim, rgba(95,153,225,0.12)); }
 
   /* Week strip */
   .ms-week-strip {

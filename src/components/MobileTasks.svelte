@@ -3,14 +3,23 @@
   import TaskPanel from "../task-tracker/TaskPanel.svelte";
   import HabitPanel from "../habit-tracker/HabitPanel.svelte";
   import { settings } from "../ui/stores";
+  import { VIEW_TYPE_KANBAN } from "../constants";
 
   export let plugin: CalendarPlugin;
   $: habitMode = $settings.habitTrackerMode || ($settings.showHabitTracker === false ? "hidden" : "panel");
   $: showHabits = habitMode === "panel";
+
+  function switchView(viewType: string) {
+    const target = viewType === "kanban" ? VIEW_TYPE_KANBAN : null;
+    if (!target) return;
+    const leaf = plugin.app.workspace.getLeaf("tab");
+    leaf.setViewState({ type: target, active: true });
+    plugin.app.workspace.revealLeaf(leaf);
+  }
 </script>
 
 <div class="mobile-tasks">
-  <TaskPanel appInstance={plugin.app} />
+  <TaskPanel appInstance={plugin.app} onSwitchView={switchView} />
   {#if showHabits}
     <HabitPanel appInstance={plugin.app} />
   {/if}

@@ -4,6 +4,7 @@ import { getDateUID } from "obsidian-daily-notes-interface";
 import { get } from "svelte/store";
 import { tRaw, locale } from "../i18n";
 import { addTask, projects } from "./stores";
+import { sanitizeTitle } from "../utils/sanitize";
 
 const wm = window.moment as (inp?: unknown, format?: string, strict?: boolean) => Moment;
 
@@ -389,7 +390,7 @@ export class QuickAddModal extends Modal {
 
     try {
       addTask({
-        title: parsed.title,
+        title: sanitizeTitle(parsed.title),
         dateUID,
         status: "todo",
         completed: false,
@@ -436,7 +437,7 @@ export class QuickAddModal extends Modal {
     void import("./TaskModal").then(({ TaskModal }) => {
       new TaskModal(this.app, (taskData) => {
         addTask({
-          title: taskData.title || parsed.title || "",
+          title: sanitizeTitle(taskData.title || parsed.title || ""),
           description: taskData.description || "",
           projectId: taskData.projectId || projectId || null,
           notePath: taskData.notePath || null,

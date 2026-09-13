@@ -5,6 +5,7 @@ import type CalendarPlugin from "src/main";
 import type { ITask, IProject } from "./types";
 import { tasks, projects, updateTask } from "./stores";
 import { settings } from "../ui/stores";
+import { isPathSafe, sanitizePathComponent } from "../utils/sanitize";
 
 let isSyncing = false;
 
@@ -26,20 +27,25 @@ export function shouldSyncTaskToNote(task: ITask): boolean {
 }
 
 function buildNotePath(task: ITask, project: IProject | null, customPath?: string): string {
+  let path: string;
   if (customPath) {
-    return customPath.endsWith(".md") ? customPath : customPath + ".md";
+    path = customPath.endsWith(".md") ? customPath : customPath + ".md";
+  } else {
+    const currentSettings = get(settings);
+    const baseFolder = sanitizePathComponent(currentSettings.tasksFolderPath || "Tasks");
+    const filename = sanitizeFilename(task.title) + ".md";
+    if (project?.folder) {
+      path = `${sanitizePathComponent(project.folder)}/${filename}`;
+    } else {
+      path = `${baseFolder}/${filename}`;
+    }
   }
 
-  const currentSettings = get(settings);
-  const baseFolder = currentSettings.tasksFolderPath || "Tasks";
-  const filename = sanitizeFilename(task.title) + ".md";
-
-  // Если задача привязана к проекту с папкой, используем её
-  if (project?.folder) {
-    return `${project.folder}/${filename}`;
+  // Path traversal guard
+  if (!isPathSafe(path)) {
+    return `Tasks/${sanitizeFilename(task.title)}.md`;
   }
-
-  return `${baseFolder}/${filename}`;
+  return path;
 }
 
 function buildNoteContent(task: ITask, project: IProject | null): string {

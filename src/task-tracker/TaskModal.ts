@@ -11,6 +11,7 @@ import { projects, selectedDate } from "./stores";
 import { settings } from "../ui/stores";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { FolderSuggestModal } from "../modals/FolderSuggestModal";
+import { sanitizeTitle } from "../utils/sanitize";
 
 // Obsidian's type defs export moment as `typeof Moment` (the module namespace),
 // but at runtime it's the callable moment function. Cast once here.
@@ -566,8 +567,8 @@ export class TaskModal extends CustomModal {
     }
 
     const submitData = {
-      title: this.titleInput.trim(),
-      description: this.descriptionInput.trim() || undefined,
+      title: sanitizeTitle(this.titleInput),
+      description: sanitizeTitle(this.descriptionInput).trim() || undefined,
       projectId: this.projectId,
       dateUID: finalDateUID,
       priority: this.priority,

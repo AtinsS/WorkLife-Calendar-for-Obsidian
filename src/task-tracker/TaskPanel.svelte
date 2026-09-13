@@ -22,6 +22,7 @@
 
   export let appInstance: App;
   export let onOpenSchedule: (() => void) | undefined = undefined;
+  export let onSwitchView: ((viewType: string) => void) | undefined = undefined;
 
   let isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
   let mqlMobile: MediaQueryList | null = null;
@@ -363,6 +364,7 @@
         {#if showMenu}
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
           <div class="task-tracker-dropdown" on:click|stopPropagation on:keydown|stopPropagation role="menu" tabindex="-1">
+            <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { onSwitchView?.("kanban"); closeMenu(); }}>▦ {$t("tasks.panel.viewKanban")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { onOpenSchedule?.(); closeMenu(); }}>{$t("tasks.panel.menuSchedule")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { openProjectSettings(); closeMenu(); }}>{$t("tasks.panel.menuProjects")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { showTimeLogs = true; closeMenu(); }}>{$t("tasks.panel.menuTimeLogs")}</button>
@@ -414,7 +416,10 @@
         <button class="task-tracker-btn all-tasks-btn" class:active={!currentDate}
           on:click|stopPropagation={() => { currentDate ? selectedDate.set(null) : goToday(); }}
           title={currentDate ? $t("tasks.panel.allTasks") : $t("tasks.panel.today")}>📋</button>
-        <button class="task-tracker-btn schedule-btn" on:click|stopPropagation={() => onOpenSchedule?.()} title={$t("tasks.panel.menuSchedule")}>📅</button>
+        <div class="task-tracker-view-toggle">
+          <button class="task-tracker-btn view-toggle-btn" on:click|stopPropagation={() => onSwitchView?.("kanban")} title={$t("tasks.panel.viewKanban")}>▦</button>
+          <button class="task-tracker-btn view-toggle-btn" on:click|stopPropagation={() => onSwitchView?.("schedule")} title={$t("tasks.panel.viewSchedule")}>📅</button>
+        </div>
         <button class="task-tracker-btn sort-btn" class:active={sortMode === "priority"}
           on:click|stopPropagation={toggleSortMode}
           title={sortMode === "time" ? $t("tasks.panel.sortByTime") : $t("tasks.panel.sortByPriority")}>

@@ -5,7 +5,7 @@ import type { Moment } from "moment";
 // but at runtime it's the callable moment function. Cast once here.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Obsidian types moment as namespace, runtime is callable
 const momentFn = moment as unknown as (inp?: unknown, format?: string, strict?: boolean) => Moment;
-import { VIEW_TYPE_TASKS, VIEW_TYPE_SCHEDULE, VIEW_TYPE_MOBILE_SCHEDULE } from "../constants";
+import { VIEW_TYPE_TASKS, VIEW_TYPE_SCHEDULE, VIEW_TYPE_MOBILE_SCHEDULE, VIEW_TYPE_KANBAN } from "../constants";
 import TaskPanel from "../task-tracker/TaskPanel.svelte";
 import HabitPanel from "../habit-tracker/HabitPanel.svelte";
 import { get } from "svelte/store";
@@ -72,6 +72,7 @@ export default class TaskView extends ItemView {
       props: {
         appInstance: this.app,
         onOpenSchedule: () => this.openSchedule(),
+        onSwitchView: (viewType: string) => this.switchView(viewType),
       },
     });
 
@@ -148,5 +149,13 @@ export default class TaskView extends ItemView {
       leaf.setViewState({ type: viewType, active: true });
       workspace.revealLeaf(leaf);
     }
+  }
+
+  private switchView(viewType: string): void {
+    const target = viewType === "kanban" ? VIEW_TYPE_KANBAN
+      : viewType === "schedule" ? (window.innerWidth <= 768 ? VIEW_TYPE_MOBILE_SCHEDULE : VIEW_TYPE_SCHEDULE)
+      : null;
+    if (!target) return;
+    this.leaf.setViewState({ type: target, active: true });
   }
 }

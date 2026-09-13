@@ -73,6 +73,7 @@ export interface ISettings {
   // ntfy.sh settings
   ntfyEnabled: boolean;
   ntfyTopic: string;
+  ntfyScheduledEnabled: boolean;
 
   // Work task settings
   defaultPaymentType: "hour" | "day";
@@ -189,6 +190,7 @@ export const defaultSettings = Object.freeze({
 
   ntfyEnabled: false,
   ntfyTopic: "",
+  ntfyScheduledEnabled: false,
 
   defaultPaymentType: "hour" as const,
   defaultRate: 0,
@@ -1649,6 +1651,24 @@ priority: medium
         text.inputEl.addClass("mcp-input-lg");
       });
 
+    new Setting(container)
+      .setName(tRaw("settings.notifications.ntfyScheduled"))
+      .setDesc(tRaw("settings.notifications.ntfyScheduledDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.ntfyScheduledEnabled);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ ntfyScheduledEnabled: value });
+          if (value) {
+            this.plugin.notificationService?.scheduleNtfyPush();
+            // Auto-test scheduled push
+            const result = await this.plugin.notificationService?.testNtfyScheduled();
+            if (!result?.ok) {
+              new Notice(`ntfy.sh scheduled test failed: ${result?.error || "unknown"}`);
+            }
+          }
+        });
+      });
+
     this.addNotificationDiagnostics(container);
   }
 
@@ -1698,6 +1718,51 @@ priority: medium
         `${this.plugin.options.notificationsEnabled ? tRaw("common.enabled") : tRaw("common.disabled")} · ${this.formatNotificationPermission(permission)}`,
         this.plugin.options.notificationsEnabled && permission === "granted" ? "ok" : "warn"
       );
+
+      addMetric(
+        "ntfy.sh",
+        this.plugin.options.ntfyEnabled
+          ? `${tRaw("common.enabled")} · ${this.plugin.options.ntfyTopic || "—"}`
+          : tRaw("common.disabled"),
+        this.plugin.options.ntfyEnabled ? "ok" : "muted"
+      );
+
+      addMetric(
+        tRaw("settings.notifications.ntfyScheduled"),
+        this.plugin.options.ntfyScheduledEnabled ? tRaw("common.enabled") : tRaw("common.disabled"),
+        this.plugin.options.ntfyScheduledEnabled ? "ok" : "muted"
+      );
+
+      // Test buttons
+      if (this.plugin.options.ntfyEnabled && this.plugin.options.ntfyTopic) {
+        const testRow = panel.createDiv({ cls: "mcp-notif-toolbar" });
+        const testActions = testRow.createDiv({ cls: "mcp-notif-actions" });
+
+        const testNowBtn = testActions.createEl("button", { text: tRaw("settings.notifications.testNow") });
+        testNowBtn.addClass("mod-cta");
+        testNowBtn.addEventListener("click", async () => {
+          testNowBtn.disabled = true;
+          testNowBtn.textContent = "...";
+          const result = await this.plugin.notificationService?.testNtfyImmediate();
+          testNowBtn.textContent = result?.ok ? "✓" : `✗ ${result?.error || ""}`;
+          window.setTimeout(() => {
+            testNowBtn.disabled = false;
+            testNowBtn.textContent = tRaw("settings.notifications.testNow");
+          }, 3000);
+        });
+
+        const testLaterBtn = testActions.createEl("button", { text: tRaw("settings.notifications.testScheduled") });
+        testLaterBtn.addEventListener("click", async () => {
+          testLaterBtn.disabled = true;
+          testLaterBtn.textContent = "...";
+          const result = await this.plugin.notificationService?.testNtfyScheduled();
+          testLaterBtn.textContent = result?.ok ? "✓ (1 min)" : `✗ ${result?.error || ""}`;
+          window.setTimeout(() => {
+            testLaterBtn.disabled = false;
+            testLaterBtn.textContent = tRaw("settings.notifications.testScheduled");
+          }, 3000);
+        });
+      }
 
       panel.createEl("div", {
         text: tRaw("settings.notifications.diagnosticsHistory"),
