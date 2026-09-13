@@ -66,7 +66,7 @@ export const ru = {
     overdue: "Просрочено",
     habits: "Привычки",
     habitsToday: "Привычки на сегодня",
-    monthGoals: "Цели на месяц",
+    monthGoals: "Цели накопления",
     goalsLabel: "Цели",
     syncing: "Синхронизация...",
     synced: "Синхронизировано: {time}",
@@ -179,7 +179,7 @@ export const ru = {
       showTasksDesc: "Показывать количество задач и прогресс-бар в дашборде",
       showHabits: "Виджет привычек",
       showHabitsDesc: "Показывать прогресс привычек на сегодня",
-      showGoals: "Виджет целей на месяц",
+      showGoals: "Виджет целей накопления",
       showGoalsDesc: "Показывать цели и прогресс по накоплениям",
       sectionHello: "Кнопки приветствия",
       showTasksBtn: "Кнопка «Задачи»",
@@ -594,7 +594,7 @@ export const ru = {
     expenses: "Основные расходы",
     remainder: "Остаток",
     remaining: "осталось {amount}",
-    monthGoals: "Цели на месяц",
+    monthGoals: "Цели накопления",
     savings: "Куда отложить",
     rules: "Правила распределения",
     dataManagement: "Управление данными",
@@ -672,7 +672,7 @@ export const ru = {
   dashboard: {
     tasks: "Задачи",
     habits: "Привычки",
-    monthGoal: "Цель месяца",
+    monthGoal: "Цель накопления",
     goalsCount: "{count} целей",
     noLinks: "Нет ссылок",
     addCard: "Добавить карточку",
@@ -687,6 +687,11 @@ export const ru = {
     cardNamePlaceholder: "Название карточки",
     linkNamePlaceholder: "Название ссылки",
     pathPlaceholder: "Папка/Заметка",
+    searchNotes: "Поиск по заметкам",
+    searchNotesPlaceholder: "Введите название заметки...",
+    noNotesFound: "Заметки не найдены",
+    savingsGoals: "Цели накопления",
+    archive: "Архив",
   },
 
   // HelloView
@@ -700,6 +705,8 @@ export const ru = {
     navFinance: "Финансы",
     navSchedule: "Расписание",
     navFinAnalytics: "Финансовая аналитика",
+    searchPlaceholder: "Поиск заметки...",
+    noNotesFound: "Заметки не найдены",
   },
 
   // DailyOverview

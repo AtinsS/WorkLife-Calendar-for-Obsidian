@@ -121,8 +121,10 @@ export class ProjectModal extends CustomModal {
     const chevron = header.createEl("span", { text: "▾", cls: "pm-chevron" });
 
     const body = section.createDiv("pm-section-body");
+    body.style.display = "none";
+    chevron.textContent = "▸";
 
-    let isExpanded = true;
+    let isExpanded = false;
     header.addEventListener("click", () => {
       isExpanded = !isExpanded;
       body.style.display = isExpanded ? "" : "none";

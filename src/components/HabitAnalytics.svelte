@@ -262,39 +262,38 @@
     <h1>{$t("habitAnalytics.title")}</h1>
   </div>
 
-  <!-- Summary Cards -->
+  <!-- Habits Module -->
   {#if activeHabits.length > 0}
-    <h2>{$t("habitAnalytics.habits")}</h2>
-    <div class="habit-analytics-summary">
-      <div class="summary-card">
-        <span class="summary-value">{aggregateStats.totalHabits}</span>
-        <span class="summary-label">{$t("habitAnalytics.active")}</span>
-        {#if weeklyDelta.completions > 0}
-          <span class="summary-trend trend-up"
-            >↑ +{weeklyDelta.completions} {$t("dailyOverview.perWeek")}</span
-          >
-        {/if}
+    <div class="habits-module">
+      <div class="habits-module__header">
+        <span class="habits-module__icon">🔥</span>
+        <h2 class="habits-module__title">{$t("habitAnalytics.habits")}</h2>
+        <span class="habits-module__count">{aggregateStats.totalHabits}</span>
       </div>
-      <div class="summary-card">
-        <span class="summary-value">{aggregateStats.totalCompletions}</span>
-        <span class="summary-label">{$t("habitAnalytics.completed")}</span>
-        {#if weeklyDelta.completions > 0}
-          <span class="summary-trend trend-up"
-            >↑ +{weeklyDelta.completions} {$t("dailyOverview.perWeek")}</span
-          >
-        {/if}
-      </div>
-      <div class="summary-card">
-        <span class="summary-value">{aggregateStats.bestStreak}</span>
-        <span class="summary-label">{$t("habitAnalytics.bestStreak")}</span>
-        <span class="summary-trend trend-neutral">{$t("habitAnalytics.daysStreak")}</span>
-      </div>
-    </div>
 
-    <!-- Per-habit cards -->
-    <div class="habit-analytics-section">
-      <h3>{$t("habitAnalytics.habitDetails")}</h3>
-      <div class="habit-cards-grid">
+      <div class="habits-module__summary">
+        <div class="habits-module__stat">
+          <span class="habits-module__stat-value">{aggregateStats.totalHabits}</span>
+          <span class="habits-module__stat-label">{$t("habitAnalytics.active")}</span>
+          {#if weeklyDelta.completions > 0}
+            <span class="habits-module__stat-trend trend-up">↑ +{weeklyDelta.completions}</span>
+          {/if}
+        </div>
+        <div class="habits-module__stat">
+          <span class="habits-module__stat-value">{aggregateStats.totalCompletions}</span>
+          <span class="habits-module__stat-label">{$t("habitAnalytics.completed")}</span>
+          {#if weeklyDelta.completions > 0}
+            <span class="habits-module__stat-trend trend-up">↑ +{weeklyDelta.completions}</span>
+          {/if}
+        </div>
+        <div class="habits-module__stat">
+          <span class="habits-module__stat-value">{aggregateStats.bestStreak}</span>
+          <span class="habits-module__stat-label">{$t("habitAnalytics.bestStreak")}</span>
+          <span class="habits-module__stat-trend trend-neutral">{$t("habitAnalytics.daysStreak")}</span>
+        </div>
+      </div>
+
+      <div class="habits-module__grid">
         {#each activeHabits as habit (habit.id)}
           <HabitCard {habit} />
         {/each}
@@ -302,7 +301,7 @@
     </div>
   {/if}
 
-  <!-- Time & Projects — unified section -->
+  <!-- Time & Projects -->
   <div class="habit-analytics-section">
     <div class="section-header-row">
       <h3>{$t("habitAnalytics.timeAndProjects")}</h3>
@@ -491,54 +490,93 @@
     font-size: 14px;
   }
 
-  /* Summary Cards */
-  .habit-analytics-summary {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
+  /* ═══ HABITS MODULE ═══════════════════════ */
+  .habits-module {
     margin-bottom: 24px;
-  }
-
-  .summary-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 18px 14px;
+    padding: 18px;
     background: var(--mcp-glass-bg);
     backdrop-filter: var(--mcp-blur);
     -webkit-backdrop-filter: var(--mcp-blur);
     border: 1px solid var(--mcp-glass-border);
     border-radius: var(--mcp-radius);
     box-shadow: var(--mcp-shadow);
-    transition: all 0.25s ease;
   }
 
-  .summary-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--mcp-shadow-glow);
+  .habits-module__header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .habits-module__icon {
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .habits-module__title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-normal);
+    flex: 1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    opacity: 0.8;
+  }
+
+  .habits-module__count {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-accent);
+    background: var(--mcp-glass-highlight);
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  .habits-module__summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .habits-module__stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 14px 12px;
+    background: var(--mcp-glass-highlight);
+    border: 1px solid var(--mcp-glass-border);
+    border-radius: var(--mcp-radius-sm);
+    transition: all 0.2s ease;
+  }
+
+  .habits-module__stat:hover {
     border-color: var(--mcp-accent);
+    transform: translateY(-2px);
   }
 
-  .summary-value {
-    font-size: 28px;
+  .habits-module__stat-value {
+    font-size: 22px;
     font-weight: 700;
     color: var(--text-accent);
     letter-spacing: -0.02em;
   }
 
-  .summary-label {
+  .habits-module__stat-label {
     font-size: 10px;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-top: 6px;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
     font-weight: 500;
   }
 
-  .summary-trend {
-    font-size: 11px;
+  .habits-module__stat-trend {
+    font-size: 10px;
     font-weight: 600;
-    margin-top: 6px;
+    margin-top: 4px;
   }
 
   .trend-up {
@@ -551,7 +589,13 @@
     font-size: 10px;
   }
 
-  /* Sections */
+  .habits-module__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+
+  /* ═══ SECTIONS ═══════════════════════════ */
   .habit-analytics-section {
     margin-bottom: 24px;
     padding: 18px;
@@ -644,20 +688,6 @@
     margin-top: 6px;
     white-space: nowrap;
     font-weight: 500;
-  }
-
-  /* Habit Cards Grid */
-  .habit-cards-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 12px;
-  }
-
-  :global(.section-subtitle) {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin: -8px 0 16px;
-    font-weight: 400;
   }
 
   /* Time Logs */
@@ -1003,19 +1033,19 @@
   }
 
   @media (max-width: 768px) {
-    .habit-analytics-summary {
+    .habits-module__summary {
       grid-template-columns: 1fr;
     }
 
-    .habit-cards-grid {
+    .habits-module__grid {
       grid-template-columns: 1fr;
-    }
-
-    :global(.weekly-chart) {
-      height: 90px;
     }
 
     .time-logs-stats {
+      grid-template-columns: 1fr;
+    }
+
+    .time-project-bottom {
       grid-template-columns: 1fr;
     }
 
@@ -1025,25 +1055,6 @@
 
     .earnings-chart {
       height: 90px;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .habit-analytics {
-      padding: 14px 12px;
-    }
-
-    .habit-analytics-header {
-      flex-direction: column;
-      align-items: stretch;
-    }
-
-    .summary-value {
-      font-size: 24px;
-    }
-
-    .earnings-value {
-      font-size: 18px;
     }
   }
 </style>

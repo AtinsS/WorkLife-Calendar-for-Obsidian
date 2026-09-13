@@ -388,6 +388,7 @@ export default class CalendarPlugin extends Plugin {
       new HelloView({
         target: el,
         props: {
+          appInstance: this.app,
           userName: this.options.userName || "",
           onOpenTasks: () => this.activateTaskView(),
           onOpenAnalytics: () => this.activateHabitAnalyticsView(),

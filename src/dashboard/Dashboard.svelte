@@ -20,7 +20,7 @@
   import type { ITask } from "../task-tracker/types";
   import type { IHabit } from "../habit-tracker/types";
   import { getDateUID } from "obsidian-daily-notes-interface";
-  import { getCurrentMonthKey, financeData } from "../finance/storage";
+  import { getCurrentMonthKey, financeData, rolloverGoals, getArchivedGoals, deleteArchivedGoal } from "../finance/storage";
   import { settings } from "../ui/stores";
   import { t } from "../i18n";
 
@@ -127,11 +127,7 @@
     return $habits
       .filter((h) => !h.archived)
       .map((h) => ({ ...h, progress: getHabitProgressOnDate(h.id, todayStr) }))
-      .sort((a, b) => {
-        if (a.progress === 2 && b.progress !== 2) return 1;
-        if (a.progress !== 2 && b.progress === 2) return -1;
-        return a.sortOrder - b.sortOrder;
-      });
+      .sort((a, b) => a.sortOrder - b.sortOrder);
   })();
   $: habitDoneCount = todayHabits.filter((h) => h.progress === 2).length;
   $: habitTotalCount = todayHabits.length;
@@ -145,11 +141,20 @@
   })();
   $: monthGoals = monthData?.monthGoals || [];
 
+  // Archive state
+  let showArchive = false;
+  $: archivedGoals = (() => {
+    void $financeData;
+    return getArchivedGoals();
+  })();
+
+  function removeArchivedGoal(goalId: string) {
+    deleteArchivedGoal(goalId);
+  }
+
   function cycleTaskStatus(task: { id: string; status: string }) {
-    const order = ["todo", "progress", "done"];
-    const idx = order.indexOf(task.status);
-    const next = order[(idx + 1) % order.length];
-    updateTaskStatus(task.id, next as any);
+    const newStatus = task.status === "done" ? "todo" : "done";
+    updateTaskStatus(task.id, newStatus as any);
   }
 
   function statusIcon(s: string): string {
@@ -202,6 +207,11 @@
 
   onMount(async () => {
     data = await loadDashboard(appInstance, filePath);
+    // Rollover goals from previous month
+    const now = new Date();
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
+    rolloverGoals(prevKey, monthKey);
   });
 
   function openEditCard(card: DashboardCard) {
@@ -355,13 +365,14 @@
     {#if showGoalsWidget && monthGoals.length > 0}
       <div class="dash-widget-wrap">
         <button class="dash-widget dash-widget--goals" class:expanded={goalsExpanded} on:click={() => goalsExpanded = !goalsExpanded}>
-          <span class="dash-widget__icon">🎯</span>
-          <span class="dash-widget__label">{$t("dashboard.monthGoal")}</span>
+          <span class="dash-widget__icon">{monthGoals[0]?.icon || '🎯'}</span>
           {#if monthGoals.length === 1}
+            <span class="dash-widget__label">{monthGoals[0].name}</span>
             {@const g = monthGoals[0]}
             <div class="dash-widget__bar"><div class="dash-widget__bar-fill goal-fill" style="width:{g.targetAmount > 0 ? Math.min(100, Math.round(g.currentAmount / g.targetAmount * 100)) : 0}%"></div></div>
             <span class="dash-widget__count">{g.currentAmount.toLocaleString($t("locale.numberLocale"))}/{g.targetAmount.toLocaleString($t("locale.numberLocale"))} {$t("locale.currencySymbol")}</span>
           {:else}
+            <span class="dash-widget__label">{monthGoals[0].name} +{monthGoals.length - 1}</span>
             <span class="dash-widget__count">{$t("dashboard.goalsCount", {count: monthGoals.length})}</span>
             <span class="dash-widget__chevron" class:open={goalsExpanded}>›</span>
           {/if}
@@ -381,6 +392,30 @@
       </div>
     {/if}
   </div>
+
+  <!-- Archive -->
+  {#if archivedGoals.length > 0}
+    <div class="dash-archive">
+      <button class="dash-archive__toggle" on:click={() => showArchive = !showArchive}>
+        <span class="dash-archive__icon">📦</span>
+        <span class="dash-archive__label">{$t("dashboard.archive")} ({archivedGoals.length})</span>
+        <span class="dash-widget__chevron" class:open={showArchive}>›</span>
+      </button>
+      {#if showArchive}
+        <div class="dash-archive__list">
+          {#each archivedGoals as goal (goal.id)}
+            <div class="dash-archive__item">
+              <span class="dash-goal-icon">{goal.icon}</span>
+              <span class="dash-goal-name">{goal.name}</span>
+              <span class="dash-archive__done">✓</span>
+              <span class="dash-goal-amt">{goal.currentAmount.toLocaleString($t("locale.numberLocale"))}/{goal.targetAmount.toLocaleString($t("locale.numberLocale"))} {$t("locale.currencySymbol")}</span>
+              <button class="dash-btn dash-btn--sm dash-btn--danger" on:click|stopPropagation={() => removeArchivedGoal(goal.id)} title={$t("common.delete")}>✕</button>
+            </div>
+          {/each}
+        </div>
+      {/if}
+    </div>
+  {/if}
 
   <div class="dashboard__grid">
     {#each data.cards as card, i (card.id)}
@@ -955,4 +990,28 @@
       min-height: 120px;
     }
   }
+
+  /* Archive */
+  .dash-archive { margin-bottom: 12px; }
+  .dash-archive__toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border: none; border-radius: 8px;
+    background: var(--background-secondary); color: var(--text-muted);
+    font-size: 12px; font-weight: 500; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .dash-archive__toggle:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+  .dash-archive__icon { font-size: 13px; }
+  .dash-archive__list {
+    margin-top: 6px; background: var(--background-secondary);
+    border: 1px solid rgba(255,255,255,0.04); border-radius: 10px;
+    padding: 6px 10px; display: flex; flex-direction: column; gap: 1px;
+    animation: dd-open 0.15s ease;
+  }
+  .dash-archive__item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 6px; border-radius: 6px; font-size: 12.5px;
+  }
+  .dash-archive__item:hover { background: rgba(255,255,255,0.03); }
+  .dash-archive__done { color: var(--mcp-success, rgba(80, 200, 160, 0.85)); font-weight: 700; flex-shrink: 0; }
 </style>

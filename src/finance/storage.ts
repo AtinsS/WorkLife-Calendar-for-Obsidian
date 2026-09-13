@@ -184,3 +184,89 @@ export function deleteMonthsBefore(cutoffKey: string): number {
   void debouncedSave();
   return keys.length;
 }
+
+const ARCHIVE_KEY = "_archive";
+
+export function getArchivedGoals(): MonthGoal[] {
+  const all = get(financeData);
+  return all[ARCHIVE_KEY]?.monthGoals || [];
+}
+
+export function deleteArchivedGoal(goalId: string): void {
+  financeData.update((current) => {
+    const archiveData = current[ARCHIVE_KEY];
+    if (!archiveData) return current;
+    const updated = {
+      ...current,
+      [ARCHIVE_KEY]: {
+        ...archiveData,
+        monthGoals: archiveData.monthGoals.filter((g) => g.id !== goalId),
+        updatedAt: new Date().toISOString(),
+      },
+    };
+    return updated;
+  });
+  void debouncedSave();
+}
+
+export function rolloverGoals(prevMonthKey: string, currentMonthKey: string): void {
+  const all = get(financeData);
+  const prevData = all[prevMonthKey];
+  if (!prevData || !prevData.monthGoals || prevData.monthGoals.length === 0) return;
+
+  const currentData = all[currentMonthKey];
+  const currentGoalIds = new Set((currentData?.monthGoals || []).map((g) => g.id));
+
+  const completed: MonthGoal[] = [];
+  const incomplete: MonthGoal[] = [];
+
+  for (const goal of prevData.monthGoals) {
+    if (currentGoalIds.has(goal.id)) continue; // already in current month
+    if (goal.currentAmount >= goal.targetAmount && goal.targetAmount > 0) {
+      completed.push({ ...goal });
+    } else {
+      incomplete.push({ ...goal });
+    }
+  }
+
+  if (completed.length === 0 && incomplete.length === 0) return;
+
+  financeData.update((current) => {
+    const next = { ...current };
+
+    // Move completed goals to archive
+    if (completed.length > 0) {
+      const existingArchive = next[ARCHIVE_KEY]?.monthGoals || [];
+      next[ARCHIVE_KEY] = {
+        ...(next[ARCHIVE_KEY] || createEmptyMonthData()),
+        monthGoals: [...existingArchive, ...completed],
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Move incomplete goals to current month
+    if (incomplete.length > 0) {
+      const curData = next[currentMonthKey] || createEmptyMonthData();
+      next[currentMonthKey] = {
+        ...curData,
+        monthGoals: [...(curData.monthGoals || []), ...incomplete],
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    // Remove rolled-over goals from previous month
+    const prevGoalsRemaining = (next[prevMonthKey]?.monthGoals || []).filter(
+      (g) => !completed.some((c) => c.id === g.id) && !incomplete.some((i) => i.id === g.id)
+    );
+    if (next[prevMonthKey]) {
+      next[prevMonthKey] = {
+        ...next[prevMonthKey],
+        monthGoals: prevGoalsRemaining,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    return next;
+  });
+  void debouncedSave();
+}

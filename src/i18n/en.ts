@@ -66,7 +66,7 @@ export const en = {
     overdue: "Overdue",
     habits: "Habits",
     habitsToday: "Today's habits",
-    monthGoals: "Monthly goals",
+    monthGoals: "Savings goals",
     goalsLabel: "Goals",
     syncing: "Syncing...",
     synced: "Synced: {time}",
@@ -594,7 +594,7 @@ export const en = {
     expenses: "Main expenses",
     remainder: "Remainder",
     remaining: "{amount} left",
-    monthGoals: "Monthly goals",
+    monthGoals: "Savings goals",
     savings: "Savings",
     rules: "Distribution rules",
     dataManagement: "Data management",
@@ -672,7 +672,7 @@ export const en = {
   dashboard: {
     tasks: "Tasks",
     habits: "Habits",
-    monthGoal: "Monthly goal",
+    monthGoal: "Savings goal",
     goalsCount: "{count} goals",
     noLinks: "No links",
     addCard: "Add card",
@@ -687,6 +687,11 @@ export const en = {
     cardNamePlaceholder: "Card name",
     linkNamePlaceholder: "Link name",
     pathPlaceholder: "Folder/Note",
+    searchNotes: "Search notes",
+    searchNotesPlaceholder: "Enter note name...",
+    noNotesFound: "No notes found",
+    savingsGoals: "Savings goals",
+    archive: "Archive",
   },
 
   // HelloView
@@ -700,6 +705,8 @@ export const en = {
     navFinance: "Finance",
     navSchedule: "Schedule",
     navFinAnalytics: "Financial Analytics",
+    searchPlaceholder: "Search notes...",
+    noNotesFound: "No notes found",
   },
 
   // DailyOverview

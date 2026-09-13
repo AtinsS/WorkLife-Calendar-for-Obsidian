@@ -24,10 +24,10 @@
   let unsubHabitLogs: (() => void) | null = null;
   let monthGoals: { name: string; icon: string; remaining: number; done: boolean }[] = [];
 
-  let todayTaskList: { title: string; status: string }[] = [];
-  let inProgressTaskList: { title: string; status: string }[] = [];
+  let todayTaskList: { title: string; status: string; scheduledTime?: string }[] = [];
+  let inProgressTaskList: { title: string; status: string; scheduledTime?: string }[] = [];
   let overdueCount = 0;
-  let overdueTaskList: { title: string; status: string }[] = [];
+  let overdueTaskList: { title: string; status: string; scheduledTime?: string }[] = [];
 
   let todayHabitList: { id: string; title: string; icon: string; color: string; completed: boolean; count: number; targetCount: number }[] = [];
   let habitDoneCount = 0;
@@ -39,7 +39,7 @@
     // Tasks are already in the main view
   }
 
-  function showTooltip(target: EventTarget | null, title: string, rows: { status: string; name: string }[]) {
+  function showTooltip(target: EventTarget | null, title: string, rows: { status: string; name: string; time?: string }[]) {
     removeTooltip();
     const el = target as HTMLElement;
     if (!el) return;
@@ -66,6 +66,12 @@
       nameSpan.className = `dtw-tooltip-name${nameClass}`;
       nameSpan.textContent = r.name;
       rowDiv.appendChild(nameSpan);
+      if (r.time) {
+        const timeSpan = document.createElement("span");
+        timeSpan.className = "dtw-tooltip-time";
+        timeSpan.textContent = r.time;
+        rowDiv.appendChild(timeSpan);
+      }
       tooltip.appendChild(rowDiv);
     }
 
@@ -168,17 +174,30 @@
   function updateStats() {
     const todayUID = getDateUID(moment(), "day");
     const all = get(tasks);
-    const todayTasks = all.filter((t) => t.dateUID === todayUID);
+    const todayTasks = all
+      .filter((t) => t.dateUID === todayUID)
+      .sort((a, b) => {
+        if (a.scheduledTime && b.scheduledTime) return a.scheduledTime.localeCompare(b.scheduledTime);
+        if (a.scheduledTime) return -1;
+        if (b.scheduledTime) return 1;
+        return 0;
+      });
     totalToday = todayTasks.length;
     completedToday = todayTasks.filter((t) => t.status === "done").length;
     inProgressCount = all.filter((t) => t.status === "progress").length;
-    todayTaskList = todayTasks.map((t) => ({ title: t.title, status: t.status }));
+    todayTaskList = todayTasks.map((t) => ({ title: t.title, status: t.status, scheduledTime: t.scheduledTime }));
     inProgressTaskList = all
       .filter((t) => t.status === "progress")
-      .map((t) => ({ title: t.title, status: t.status }));
+      .sort((a, b) => {
+        if (a.scheduledTime && b.scheduledTime) return a.scheduledTime.localeCompare(b.scheduledTime);
+        if (a.scheduledTime) return -1;
+        if (b.scheduledTime) return 1;
+        return 0;
+      })
+      .map((t) => ({ title: t.title, status: t.status, scheduledTime: t.scheduledTime }));
     const overdue = all.filter((t) => t.carriedOverFrom && t.status !== "done");
     overdueCount = overdue.length;
-    overdueTaskList = overdue.map((t) => ({ title: t.title, status: t.status }));
+    overdueTaskList = overdue.map((t) => ({ title: t.title, status: t.status, scheduledTime: t.scheduledTime }));
   }
 
   function updateMonthGoal() {
@@ -313,7 +332,7 @@
       on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchToTasks(); }}
       on:mouseenter={(e) => {
         if (todayTaskList.length > 0)
-          showTooltip(e.currentTarget, $t("dtw.tasksToday"), todayTaskList.map(t => ({ status: t.status, name: t.title })));
+          showTooltip(e.currentTarget, $t("dtw.tasksToday"), todayTaskList.map(t => ({ status: t.status, name: t.title, time: t.scheduledTime })));
       }}
       on:mouseleave={removeTooltip}
     >
@@ -332,7 +351,7 @@
       on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchToTasks(); }}
       on:mouseenter={(e) => {
         if (overdueTaskList.length > 0)
-          showTooltip(e.currentTarget, $t("dtw.overdue"), overdueTaskList.map(t => ({ status: "progress", name: t.title })));
+          showTooltip(e.currentTarget, $t("dtw.overdue"), overdueTaskList.map(t => ({ status: "progress", name: t.title, time: t.scheduledTime })));
       }}
       on:mouseleave={removeTooltip}
     >
@@ -351,7 +370,7 @@
       on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') switchToTasks(); }}
       on:mouseenter={(e) => {
         if (inProgressTaskList.length > 0)
-          showTooltip(e.currentTarget, $t("dtw.inProgress"), inProgressTaskList.map(t => ({ status: t.status, name: t.title })));
+          showTooltip(e.currentTarget, $t("dtw.inProgress"), inProgressTaskList.map(t => ({ status: t.status, name: t.title, time: t.scheduledTime })));
       }}
       on:mouseleave={removeTooltip}
     >
@@ -492,5 +511,16 @@
     padding: 0 4px;
     color: var(--text-muted);
     transition: color 0.2s;
+  }
+
+  :global(.dtw-tooltip-time) {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-faint);
+    background: rgba(255,255,255,0.04);
+    padding: 1px 5px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-left: 4px;
   }
 </style>

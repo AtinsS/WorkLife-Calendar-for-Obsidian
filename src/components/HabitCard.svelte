@@ -98,18 +98,14 @@
 <style>
   .habit-card {
     border: 1px solid var(--mcp-glass-border);
-    border-radius: var(--mcp-radius);
+    border-radius: var(--mcp-radius-sm);
     padding: 14px;
-    background: var(--mcp-glass-bg);
-    backdrop-filter: var(--mcp-blur);
-    -webkit-backdrop-filter: var(--mcp-blur);
-    box-shadow: var(--mcp-shadow);
-    transition: all 0.25s ease;
+    background: var(--mcp-glass-highlight);
+    transition: all 0.2s ease;
   }
 
   .habit-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--mcp-shadow-glow);
+    transform: translateY(-1px);
     border-color: var(--habit-color, var(--mcp-accent));
   }
 
@@ -180,7 +176,7 @@
   }
 
   .habit-stat-value {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 700;
     color: var(--habit-color, var(--mcp-accent));
     letter-spacing: -0.02em;

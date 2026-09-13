@@ -3041,16 +3041,17 @@ svg.dot.filled {
 
 .wf-project-modal h2 {
   margin: 0 0 4px;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text-normal);
   padding: 0 24px;
+  letter-spacing: -0.02em;
 }
 
 .wf-dialog-subtitle {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.5);
-  margin: 0 0 20px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
   padding: 0 24px;
 }
 
@@ -3059,17 +3060,17 @@ svg.dot.filled {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 20px;
+  padding: 12px 16px;
 }
 
 .pm-section-toggle {
   cursor: pointer;
-  border-radius: 10px;
+  border-radius: var(--mcp-radius-sm);
   transition: background 0.15s;
 }
 
 .pm-section-toggle:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--mcp-glass-highlight);
 }
 
 .pm-section-icon {
@@ -3079,41 +3080,41 @@ svg.dot.filled {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(124, 58, 237, 0.2);
+  background: var(--mcp-accent-dim);
   border-radius: 6px;
-  color: rgba(124, 58, 237, 0.9);
+  color: var(--text-accent);
   font-weight: 700;
 }
 
 .pm-section-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-normal);
 }
 
 .pm-chevron {
   margin-left: auto;
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-faint);
   transition: transform 0.15s;
 }
 
 .pm-section-body {
-  padding: 0 20px 20px;
+  padding: 0 16px 16px;
 }
 
 /* New project form */
 .pm-new-project {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
-  margin: 0 24px 24px;
+  background: var(--mcp-glass-highlight);
+  border: 1px solid var(--mcp-glass-border);
+  border-radius: var(--mcp-radius);
+  margin: 0 24px 20px;
   overflow: hidden;
 }
 
 /* Field */
 .pm-field {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .pm-field:last-child {
@@ -3122,20 +3123,22 @@ svg.dot.filled {
 
 .pm-label {
   display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .pm-input {
   width: 100%;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 10px 14px;
+  background: var(--mcp-surface);
+  border: 1px solid var(--mcp-glass-border);
+  border-radius: var(--mcp-radius-sm);
+  padding: 9px 12px;
   font-size: 14px;
-  color: #fff;
+  color: var(--text-normal);
   font-family: var(--font-interface);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -3143,16 +3146,16 @@ svg.dot.filled {
 }
 
 .pm-input::placeholder {
-  color: rgba(255, 255, 255, 0.25);
+  color: var(--text-faint);
 }
 
 .pm-input:focus {
-  border-color: rgba(124, 58, 237, 0.5);
-  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+  border-color: var(--mcp-accent);
+  box-shadow: 0 0 0 2px var(--mcp-accent-dim);
 }
 
 .pm-input-error {
-  border-color: rgba(239, 68, 68, 0.8) !important;
+  border-color: var(--mcp-danger) !important;
   box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
   animation: pm-shake 0.4s ease;
 }
@@ -3184,16 +3187,16 @@ svg.dot.filled {
 .pm-char-count {
   display: block;
   text-align: right;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.25);
-  margin-top: 6px;
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-top: 4px;
 }
 
 /* Row layout */
 .pm-row {
   display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 
 .pm-row:last-child {
@@ -3216,11 +3219,11 @@ svg.dot.filled {
 }
 
 .pm-color-swatch {
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   cursor: pointer;
-  border: 3px solid transparent;
+  border: 2px solid transparent;
   transition: all 0.15s;
   position: relative;
   background-color: var(--swatch-color);
@@ -3228,13 +3231,11 @@ svg.dot.filled {
 
 .pm-color-swatch:hover {
   transform: scale(1.15);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
 }
 
 .pm-color-swatch.active {
-  border-color: #fff;
+  border-color: var(--text-normal);
   transform: scale(1.1);
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
 }
 
 .pm-color-swatch.active::after {
@@ -3245,7 +3246,7 @@ svg.dot.filled {
   align-items: center;
   justify-content: center;
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
@@ -3258,40 +3259,32 @@ svg.dot.filled {
 }
 
 .pm-icon-btn {
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  border-radius: 8px;
+  font-size: 15px;
+  border-radius: var(--mcp-radius-sm);
   cursor: pointer;
-  border: 2px solid transparent;
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  background: var(--mcp-surface);
   transition: all 0.15s;
 }
 
 .pm-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--mcp-surface-hover);
   transform: scale(1.1);
 }
 
 .pm-icon-btn.active {
-  border-color: rgba(124, 58, 237, 0.6);
-  background: rgba(124, 58, 237, 0.15);
+  border-color: var(--mcp-accent);
+  background: var(--mcp-accent-dim);
 }
 
 /* Custom emoji input */
 .pm-icon-custom-row {
-  margin-bottom: 12px;
-}
-
-.pm-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .pm-icon-input-wrap {
@@ -3301,13 +3294,13 @@ svg.dot.filled {
 }
 
 .pm-icon-custom-input {
-  width: 72px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  padding: 8px;
-  font-size: 20px;
-  color: #fff;
+  width: 64px;
+  background: var(--mcp-surface);
+  border: 1px solid var(--mcp-glass-border);
+  border-radius: var(--mcp-radius-sm);
+  padding: 7px;
+  font-size: 18px;
+  color: var(--text-normal);
   font-family: var(--font-interface);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -3316,22 +3309,22 @@ svg.dot.filled {
 }
 
 .pm-icon-custom-input::placeholder {
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.25);
+  font-size: 16px;
+  color: var(--text-faint);
 }
 
 .pm-icon-custom-input:focus {
-  border-color: rgba(124, 58, 237, 0.5);
-  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+  border-color: var(--mcp-accent);
+  box-shadow: 0 0 0 2px var(--mcp-accent-dim);
 }
 
 .pm-icon-apply-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid rgba(124, 58, 237, 0.4);
-  background: rgba(124, 58, 237, 0.1);
-  color: rgba(124, 58, 237, 0.9);
+  width: 34px;
+  height: 34px;
+  border-radius: var(--mcp-radius-sm);
+  border: 1px solid var(--mcp-glass-border);
+  background: var(--mcp-surface);
+  color: var(--text-accent);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -3343,64 +3336,64 @@ svg.dot.filled {
 }
 
 .pm-icon-apply-btn:hover {
-  background: rgba(124, 58, 237, 0.8);
-  color: #fff;
-  border-color: rgba(124, 58, 237, 0.8);
+  background: var(--mcp-accent);
+  color: var(--text-on-accent, #fff);
+  border-color: var(--mcp-accent);
 }
 
 /* Recently used section */
 .pm-icon-recent {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .pm-icon-recent .pm-label {
-  color: rgba(255, 255, 255, 0.35);
-  font-size: 11px;
+  color: var(--text-faint);
+  font-size: 10px;
 }
 
 /* Preview */
 .pm-preview {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .pm-preview-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--mcp-surface);
+  border: 1px solid var(--mcp-glass-border);
+  border-radius: var(--mcp-radius-sm);
 }
 
 .pm-preview-dot {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
   background-color: var(--dot-color);
 }
 
 .pm-preview-icon {
-  font-size: 18px;
+  font-size: 16px;
   flex-shrink: 0;
 }
 
 .pm-preview-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-normal);
 }
 
 /* Create button */
 .pm-create-btn {
   width: 100%;
-  padding: 12px 20px;
-  background: rgba(124, 58, 237, 0.85);
+  padding: 10px 20px;
+  background: var(--mcp-accent);
   border: none;
-  border-radius: 10px;
-  color: #fff;
-  font-size: 14px;
+  border-radius: var(--mcp-radius-sm);
+  color: var(--text-on-accent, #fff);
+  font-size: 13px;
   font-weight: 600;
   font-family: var(--font-interface);
   cursor: pointer;
@@ -3412,8 +3405,8 @@ svg.dot.filled {
 }
 
 .pm-create-btn:hover {
-  background: rgba(124, 58, 237, 1);
-  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.35);
+  opacity: 0.9;
+  box-shadow: 0 4px 16px var(--mcp-accent-dim);
   transform: translateY(-1px);
 }
 
@@ -3428,22 +3421,22 @@ svg.dot.filled {
 
 .pm-empty {
   text-align: center;
-  padding: 24px;
-  color: rgba(255, 255, 255, 0.3);
+  padding: 20px;
+  color: var(--text-faint);
   font-size: 13px;
 }
 
 .pm-project-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .pm-footer-tip {
   text-align: center;
-  padding: 16px 24px;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.35);
+  padding: 14px 24px;
+  font-size: 11px;
+  color: var(--text-faint);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3451,7 +3444,7 @@ svg.dot.filled {
 }
 
 .pm-footer-tip-icon {
-  font-size: 14px;
+  font-size: 13px;
   opacity: 0.6;
 }
 
@@ -3460,16 +3453,16 @@ svg.dot.filled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-left: 3px solid var(--project-color, rgba(255, 255, 255, 0.1));
+  padding: 9px 12px;
+  border-radius: var(--mcp-radius-sm);
+  background: var(--mcp-glass-highlight);
+  border: 1px solid var(--mcp-glass-border);
+  border-left: 3px solid var(--project-color, var(--mcp-glass-border));
   transition: all 0.15s;
 }
 
 .pm-project-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--mcp-surface-hover);
 }
 
 .pm-project-left {
@@ -3481,15 +3474,15 @@ svg.dot.filled {
 }
 
 .pm-project-dot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
   background-color: var(--dot-color);
 }
 
 .pm-project-icon {
-  font-size: 16px;
+  font-size: 15px;
   flex-shrink: 0;
 }
 
@@ -3501,9 +3494,9 @@ svg.dot.filled {
 }
 
 .pm-project-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--text-normal);
 }
 
 .pm-project-stats {
@@ -3512,20 +3505,20 @@ svg.dot.filled {
 }
 
 .pm-stat {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
   border-radius: 6px;
 }
 
 .pm-stat-active {
-  color: rgba(124, 58, 237, 0.9);
-  background: rgba(124, 58, 237, 0.15);
+  color: var(--text-accent);
+  background: var(--mcp-accent-dim);
 }
 
 .pm-stat-done {
-  color: rgba(34, 197, 94, 0.9);
-  background: rgba(34, 197, 94, 0.15);
+  color: var(--mcp-success);
+  background: rgba(34, 197, 94, 0.12);
 }
 
 /* Action buttons */
@@ -3536,14 +3529,14 @@ svg.dot.filled {
 }
 
 .pm-action-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.5);
+  width: 30px;
+  height: 30px;
+  border-radius: var(--mcp-radius-sm);
+  border: 1px solid var(--mcp-glass-border);
+  background: var(--mcp-surface);
+  color: var(--text-muted);
   cursor: pointer;
-  font-size: 14px;
+  font-size: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3555,14 +3548,14 @@ svg.dot.filled {
 }
 
 .pm-edit-btn:hover {
-  color: rgba(124, 58, 237, 0.9);
-  background: rgba(124, 58, 237, 0.15);
-  border-color: rgba(124, 58, 237, 0.3);
+  color: var(--text-accent);
+  background: var(--mcp-accent-dim);
+  border-color: var(--mcp-accent);
 }
 
 .pm-delete-btn:hover {
-  color: rgba(239, 68, 68, 0.9);
-  background: rgba(239, 68, 68, 0.15);
+  color: var(--mcp-danger);
+  background: rgba(239, 68, 68, 0.1);
   border-color: rgba(239, 68, 68, 0.3);
 }
 
@@ -3571,18 +3564,18 @@ svg.dot.filled {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  margin-top: 24px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--mcp-glass-border);
 }
 
 .pm-cancel-btn {
-  padding: 10px 20px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 14px;
+  padding: 9px 18px;
+  background: var(--mcp-surface);
+  border: 1px solid var(--mcp-glass-border);
+  border-radius: var(--mcp-radius-sm);
+  color: var(--text-muted);
+  font-size: 13px;
   font-weight: 500;
   font-family: var(--font-interface);
   cursor: pointer;
@@ -3590,17 +3583,17 @@ svg.dot.filled {
 }
 
 .pm-cancel-btn:hover {
-  color: rgba(255, 255, 255, 0.8);
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-normal);
+  background: var(--mcp-surface-hover);
 }
 
 .pm-save-btn {
-  padding: 10px 24px;
-  background: rgba(124, 58, 237, 0.85);
+  padding: 9px 22px;
+  background: var(--mcp-accent);
   border: none;
-  border-radius: 8px;
-  color: #fff;
-  font-size: 14px;
+  border-radius: var(--mcp-radius-sm);
+  color: var(--text-on-accent, #fff);
+  font-size: 13px;
   font-weight: 600;
   font-family: var(--font-interface);
   cursor: pointer;
@@ -3608,8 +3601,8 @@ svg.dot.filled {
 }
 
 .pm-save-btn:hover {
-  background: rgba(124, 58, 237, 1);
-  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.35);
+  opacity: 0.9;
+  box-shadow: 0 4px 16px var(--mcp-accent-dim);
   transform: translateY(-1px);
 }
 
@@ -7080,6 +7073,56 @@ svg.dot.filled {
 .dtw-tooltip-name.done-name {
   text-decoration: line-through;
   opacity: 0.5;
+}
+
+/* ============================================
+   HELLO VIEW — Search Portal Dropdown
+   ============================================ */
+
+.hello-search-portal {
+  position: fixed;
+  background: var(--background-primary, #1a1d24);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+  z-index: 10000;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04);
+}
+
+.hello-search-portal__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text-normal, #e8ecf0);
+  font-size: 13px;
+  width: 100%;
+  transition: background 0.15s;
+}
+
+.hello-search-portal__item:hover {
+  background: var(--background-modifier-hover);
+}
+
+.hello-search-portal__name {
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.hello-search-portal__path {
+  font-size: 11px;
+  color: var(--text-faint, #4b5563);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ============================================

@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import moment from "moment";
+  import type { App } from "obsidian";
   import { settings } from "../ui/stores";
   import { fetchWeekWeather, type DayWeather } from "../services/weatherService";
   import { t, tArray } from "../i18n";
 
+  export let appInstance: App;
   export let onOpenTasks: (() => void) | undefined = undefined;
   export let onOpenAnalytics: (() => void) | undefined = undefined;
   export let onOpenFinance: (() => void) | undefined = undefined;
@@ -15,16 +17,95 @@
   let weatherTimer: ReturnType<typeof setInterval> | null = null;
   let weather: DayWeather | null = null;
 
+  // Note search
+  let noteSearchQuery = "";
+  let noteSearchResults: { path: string; name: string }[] = [];
+  let searchInputEl: HTMLInputElement | null = null;
+  let searchDropdown: HTMLDivElement | null = null;
+
+  function searchNotes() {
+    const q = noteSearchQuery.trim().toLowerCase();
+    if (!q) {
+      noteSearchResults = [];
+      removeSearchDropdown();
+      return;
+    }
+    const files = appInstance.vault.getMarkdownFiles();
+    noteSearchResults = files
+      .filter((f) => {
+        const name = f.basename.toLowerCase();
+        const path = f.path.toLowerCase();
+        return name.includes(q) || path.includes(q);
+      })
+      .slice(0, 15)
+      .map((f) => ({ path: f.path, name: f.basename }));
+    renderSearchDropdown();
+  }
+
+  function removeSearchDropdown() {
+    if (searchDropdown) {
+      searchDropdown.remove();
+      searchDropdown = null;
+    }
+  }
+
+  function renderSearchDropdown() {
+    removeSearchDropdown();
+    if (!searchInputEl || noteSearchResults.length === 0) return;
+
+    const dropdown = document.createElement("div");
+    dropdown.className = "hello-search-portal";
+
+    for (const r of noteSearchResults) {
+      const btn = document.createElement("button");
+      btn.className = "hello-search-portal__item";
+      btn.innerHTML = `<span class="hello-search-portal__name">${r.name}</span><span class="hello-search-portal__path">${r.path}</span>`;
+      btn.addEventListener("click", () => {
+        openNote(r.path);
+        removeSearchDropdown();
+        noteSearchQuery = "";
+        noteSearchResults = [];
+      });
+      dropdown.appendChild(btn);
+    }
+
+    document.body.appendChild(dropdown);
+    searchDropdown = dropdown;
+
+    const rect = searchInputEl.getBoundingClientRect();
+    const ddWidth = Math.min(rect.width, 420);
+    let left = rect.left + rect.width / 2 - ddWidth / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - ddWidth - 8));
+    dropdown.style.left = `${left}px`;
+    dropdown.style.top = `${rect.bottom + 4}px`;
+    dropdown.style.width = `${ddWidth}px`;
+  }
+
+  function openNote(path: string) {
+    appInstance.workspace.openLinkText(path, "", true);
+  }
+
   onMount(() => {
     clockTimer = setInterval(() => { now = moment(); }, 60_000);
     loadWeather();
     // Refresh weather every 30 minutes
     weatherTimer = setInterval(() => { loadWeather(); }, 30 * 60_000);
+    // Close search dropdown on outside click
+    document.addEventListener("mousedown", onDocumentClick);
   });
+
+  function onDocumentClick(e: MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (searchDropdown && !searchDropdown.contains(target) && target !== searchInputEl) {
+      removeSearchDropdown();
+    }
+  }
 
   onDestroy(() => {
     if (clockTimer) clearInterval(clockTimer);
     if (weatherTimer) clearInterval(weatherTimer);
+    removeSearchDropdown();
+    document.removeEventListener("mousedown", onDocumentClick);
   });
 
   async function loadWeather() {
@@ -126,6 +207,19 @@
     {#if weather}
       <p class="hello-weather-label">{weather.icon} {weather.label} {weather.tempMin}…{weather.tempMax}°C</p>
     {/if}
+  </div>
+
+  <!-- Note search -->
+  <div class="hello-search">
+    <svg class="hello-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <input
+      class="hello-search__input"
+      type="text"
+      placeholder={$t("hello.searchPlaceholder")}
+      bind:value={noteSearchQuery}
+      bind:this={searchInputEl}
+      on:input={searchNotes}
+    />
   </div>
 
   <!-- Nav -->
@@ -419,5 +513,40 @@
     .hello-nav { gap: 12px; }
     .hello-nav-btn { padding: 12px 24px; font-size: 14px; }
     .hello-nav-icon { font-size: 18px; }
+  }
+
+  /* ═══ NOTE SEARCH ═══════════════════════ */
+  .hello-search {
+    max-width: 420px;
+    margin: 0 auto 24px;
+    position: relative;
+  }
+  .hello-search__icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-faint, #4b5563);
+    pointer-events: none;
+  }
+  .hello-search__input {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-normal, #e8ecf0);
+    font-size: 13px;
+    padding: 10px 14px 10px 38px;
+    border-radius: 10px;
+    outline: none;
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .hello-search__input:focus {
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .hello-search__input::placeholder {
+    color: var(--text-faint, #4b5563);
   }
 </style>
