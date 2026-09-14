@@ -37,6 +37,8 @@ export const defaultNotificationSettings: NotificationSettings = {
   notifyDeadlines: true,
 };
 
+const NTFY_DEDUP_KEY = "worklife-ntfy-scheduled";
+
 export class NotificationService {
   private plugin: CalendarPlugin;
   private timer: number | null = null;
@@ -47,6 +49,30 @@ export class NotificationService {
 
   constructor(plugin: CalendarPlugin) {
     this.plugin = plugin;
+  }
+
+  /** Load the ntfy scheduled-notification dedup map from localStorage.
+   *  Keys are task IDs (or "id-deadline"), values are Unix delivery timestamps. */
+  private loadNtfySchedule(): Record<string, number> {
+    try {
+      const raw = localStorage.getItem(NTFY_DEDUP_KEY);
+      if (!raw) return {};
+      return JSON.parse(raw) as Record<string, number>;
+    } catch {
+      return {};
+    }
+  }
+
+  /** Persist the dedup map, pruning entries whose delivery time is already past. */
+  private saveNtfySchedule(map: Record<string, number>): void {
+    const now = Math.floor(Date.now() / 1000);
+    const pruned: Record<string, number> = {};
+    for (const [k, v] of Object.entries(map)) {
+      if (v > now) pruned[k] = v;
+    }
+    try {
+      localStorage.setItem(NTFY_DEDUP_KEY, JSON.stringify(pruned));
+    } catch { /* quota exceeded — ignore */ }
   }
 
   async start(): Promise<void> {
@@ -297,7 +323,9 @@ export class NotificationService {
 
   /** Schedule ntfy.sh push notifications for tasks in the next 3 days.
    *  Each task with scheduledTime gets an X-Delay push so ntfy.sh delivers
-   *  the notification at the right time — even if Obsidian is closed. */
+   *  the notification at the right time — even if Obsidian is closed.
+   *  Deduplicates against previously scheduled notifications so reopening
+   *  Obsidian doesn't create duplicate pushes. */
   scheduleNtfyPush(): void {
     const opts: ISettings = this.plugin.options;
     if (!opts.ntfyEnabled || !opts.ntfyScheduledEnabled || !opts.ntfyTopic) return;
@@ -307,17 +335,23 @@ export class NotificationService {
     const horizon = now.clone().add(3, "days");
     const reminderMin = opts.reminderMinutesBefore ?? DEFAULT_REMINDER_MINUTES;
 
+    const scheduled = this.loadNtfySchedule();
+    let changed = false;
+
     for (const task of allTasks) {
       if (task.completed || task.status === "done" || task.status === "paused") continue;
 
       // Task with scheduledTime on a specific date
       if (task.scheduledTime && task.dateUID) {
-        const scheduled = this.getScheduledMoment(task);
-        if (!scheduled || !scheduled.isValid()) continue;
-        if (scheduled.isBefore(now) || scheduled.isAfter(horizon)) continue;
+        const scheduledMoment = this.getScheduledMoment(task);
+        if (!scheduledMoment || !scheduledMoment.isValid()) continue;
+        if (scheduledMoment.isBefore(now) || scheduledMoment.isAfter(horizon)) continue;
 
-        const fireAt = scheduled.clone().subtract(reminderMin, "minutes");
+        const fireAt = scheduledMoment.clone().subtract(reminderMin, "minutes");
         if (fireAt.isBefore(now)) continue; // already past
+
+        const fireUnix = Math.floor(fireAt.valueOf() / 1000);
+        if (scheduled[task.id] === fireUnix) continue; // already scheduled at this time
 
         const title = tRaw("taskStore.notificationTitle");
         const body = tRaw("notifications.reminder", {
@@ -327,6 +361,8 @@ export class NotificationService {
         });
 
         this.sendNtfyDelayed(title, body, fireAt.toISOString(), task.id);
+        scheduled[task.id] = fireUnix;
+        changed = true;
       }
 
       // Task with deadline today/tomorrow
@@ -338,12 +374,20 @@ export class NotificationService {
         if (!dlDate.isValid()) continue;
         if (dlDate.isBefore(now) || dlDate.isAfter(horizon)) continue;
 
+        const dedupeKey = `${task.id}-deadline`;
+        const dlUnix = Math.floor(dlDate.valueOf() / 1000);
+        if (scheduled[dedupeKey] === dlUnix) continue;
+
         const title = tRaw("taskStore.notificationTitle");
         const body = tRaw("notifications.deadlineToday", { title: task.title, time: task.deadlineTime || "" });
 
-        this.sendNtfyDelayed(title, body, dlDate.toISOString(), `${task.id}-deadline`);
+        this.sendNtfyDelayed(title, body, dlDate.toISOString(), dedupeKey);
+        scheduled[dedupeKey] = dlUnix;
+        changed = true;
       }
     }
+
+    if (changed) this.saveNtfySchedule(scheduled);
   }
 
   private sendNtfyDelayed(title: string, body: string, deliveryIso: string, _dedupeId: string): void {

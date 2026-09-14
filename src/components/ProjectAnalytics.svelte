@@ -204,4 +204,18 @@
     color: var(--mcp-text-faint);
     font-size: 11px;
   }
+
+  @media (max-width: 768px) {
+    .project-table-header,
+    .project-table-row {
+      grid-template-columns: 1fr 65px 60px 45px;
+      gap: 4px;
+      font-size: 11px;
+    }
+    .pt-col-name {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
+    }
+  }
 </style>
