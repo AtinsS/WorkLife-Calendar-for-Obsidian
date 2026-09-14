@@ -15,7 +15,7 @@
 
 ![alt text](animate.gif)
 
-[**English README**](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/blob/master/README.md)
+[**Русский README**](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/blob/master/README.RU.md)
 
 ## 💡 Why this plugin exists
 
