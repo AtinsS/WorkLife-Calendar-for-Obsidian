@@ -1,4 +1,5 @@
 import { App, PluginSettingTab, Setting, TFolder, Notice, TextComponent } from "obsidian";
+import type { SettingDefinitionItem } from "obsidian";
 import { appHasDailyNotesPluginLoaded } from "obsidian-daily-notes-interface";
 import type { ILocaleOverride } from "obsidian-calendar-ui";
 import { get } from "svelte/store";
@@ -332,6 +333,10 @@ export class CalendarSettingsTab extends PluginSettingTab {
   constructor(app: App, plugin: CalendarPlugin) {
     super(app, plugin);
     this.plugin = plugin;
+  }
+
+  getSettingDefinitions(): SettingDefinitionItem[] {
+    return [];
   }
 
   display(): void {
@@ -1829,7 +1834,8 @@ priority: medium
   }
 
   addNavPanelInstructions(container: HTMLElement): void {
-    const wrapper = container.createDiv({ cls: "mcp-nav-instructions" });
+    const frag = document.createDocumentFragment();
+    const wrapper = frag.createDiv({ cls: "mcp-nav-instructions" });
 
     wrapper.createEl("p", { text: tRaw("settings.appearance.navInstructions1") });
 
@@ -1848,7 +1854,7 @@ priority: medium
 
     new Setting(container)
       .setName(tRaw("settings.appearance.navInstructionsTitle"))
-      .setDesc(wrapper as unknown as DocumentFragment);
+      .setDesc(frag);
   }
 
   addNavBtnStyleSettings(container: HTMLElement): void {

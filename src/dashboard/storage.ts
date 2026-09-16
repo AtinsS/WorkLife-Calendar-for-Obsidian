@@ -127,7 +127,7 @@ export async function loadDashboard(app: App, filePath?: string): Promise<Dashbo
           return cachedData;
         }
       }
-    } catch (_e: unknown) {
+    } catch {
       // file doesn't exist
     }
   }

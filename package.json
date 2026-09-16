@@ -1,6 +1,6 @@
 {
   "name": "worklife-calendar",
-  "version": "2.17.31",
+  "version": "2.17.32",
   "description": "Calendar, task tracker, habit tracker, and financial planner for Obsidian",
   "author": "AtinsS",
   "main": "main.js",
@@ -26,6 +26,8 @@
     "tslib": "2.1.0"
   },
   "devDependencies": {
+    "@codemirror/state": "^6.7.5",
+    "@codemirror/view": "^6.43.12",
     "@rollup/plugin-commonjs": "18.0.0",
     "@rollup/plugin-node-resolve": "11.2.1",
     "@rollup/plugin-typescript": "^11.1.6",
@@ -34,7 +36,7 @@
     "@types/moment": "2.13.0",
     "@typescript-eslint/eslint-plugin": "4.20.0",
     "@typescript-eslint/parser": "4.20.0",
-    "eslint": "7.23.0",
+    "eslint": "^7.23.0",
     "jest": "26.6.3",
     "moment": "2.29.1",
     "rollup": "2.44.0",
