@@ -111,20 +111,20 @@ export class HabitModal extends CustomModal {
     // Days of week — для frequency=weekly
     // Visual order depends on startOfWeek setting
     this.customDaysSetting = new Setting(this.contentEl).setName(tRaw("habits.modal.weekdays"));
-    const rawLabels = tArrayRaw("common.weekdays.short");
-    const sow = get(settings).startOfWeek || "system";
+    const rawLabels: string[] = tArrayRaw("common.weekdays.short");
+    const sow: string = get(settings).startOfWeek || "system";
     let dayIndices: number[];
     if (sow === "monday") dayIndices = [1, 2, 3, 4, 5, 6, 0];
     else if (sow === "sunday") dayIndices = [0, 1, 2, 3, 4, 5, 6];
     else dayIndices = get(locale) === "en" ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
-    const dayLabels = sow === "sunday" || (sow === "system" && get(locale) === "en")
+    const dayLabels: string[] = sow === "sunday" || (sow === "system" && get(locale) === "en")
       ? [...rawLabels.slice(-1), ...rawLabels.slice(0, -1)]
       : rawLabels;
     const daysContainer = this.customDaysSetting.settingEl.createDiv({
       cls: "task-tracker-recurrence-days",
     });
     for (let i = 0; i < 7; i++) {
-      const momentIdx = dayIndices[i];
+      const momentIdx: number = dayIndices[i];
       const dayBtn = daysContainer.createEl("button", {
         text: dayLabels[i],
         cls: "task-tracker-recurrence-day-btn",
@@ -154,7 +154,7 @@ export class HabitModal extends CustomModal {
           .setPlaceholder(tRaw("habits.modal.monthDayPlaceholder"))
           .setValue(String(this.monthlyDayInput))
           .onChange((value) => {
-            const v = parseInt(value) || 1;
+            const v: number = parseInt(value) || 1;
             this.monthlyDayInput = Math.max(1, Math.min(31, v));
           });
         text.inputEl.type = "number";

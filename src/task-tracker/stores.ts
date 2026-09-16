@@ -138,7 +138,7 @@ export function carryOverOverdueTasks(): void {
     if (task.dateUID === todayUID) return task;
 
     // Parse the task date
-    const match = task.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    const match = /^day-(\d{4}-\d{2}-\d{2})/.exec(task.dateUID);
     if (!match) return task;
 
     const taskDate = momentFn(match[1], "YYYY-MM-DD");
@@ -249,7 +249,7 @@ export function addTask(
   const currentSettings = get(settings);
   const appInstance = pluginInstance?.app;
   if (currentSettings.syncAllTasksToNotes && appInstance) {
-    void import("./noteTasks").then(({ ensureNoteForTask }) => {
+    void import("./noteTasks").then(({ ensureNoteForTask }: typeof import("./noteTasks")) => {
       void ensureNoteForTask(task, appInstance).catch((e: unknown) =>
         console.error("[Calendar Plugin] Failed to create note for task:", e)
       );
@@ -279,7 +279,7 @@ export function updateTask(id: string, changes: Partial<ITask>): void {
     const task = allTasks.find((t) => t.id === id);
     const appForSync = pluginInstance?.app;
     if (task?.notePath && appForSync) {
-      void import("./noteTasks").then(({ syncTaskToFrontmatter }) => {
+      void import("./noteTasks").then(({ syncTaskToFrontmatter }: typeof import("./noteTasks")) => {
         void syncTaskToFrontmatter(task, appForSync).catch((e: unknown) =>
           console.error("[Calendar Plugin] Failed to sync task to note:", e)
         );
@@ -448,7 +448,7 @@ export function updateTaskStatus(id: string, status: TaskStatus): void {
   // Sync status change to note if task has a notePath
   const appForStatusSync = pluginInstance?.app;
   if (task?.notePath && appForStatusSync) {
-    void import("./noteTasks").then(({ syncTaskToFrontmatter }) => {
+    void import("./noteTasks").then(({ syncTaskToFrontmatter }: typeof import("./noteTasks")) => {
       const updatedTasks = get(tasks);
       const updatedTask = updatedTasks.find((t) => t.id === id);
       if (updatedTask) {
@@ -501,9 +501,7 @@ export function createNextRecurringInstance(taskId: string): void {
   const task = allTasks.find((t) => t.id === taskId);
   if (!task || !task.recurrence) return;
 
-  const dateMatch = task.dateUID.match(
-    /^day-(\d{4}-\d{2}-\d{2})/
-  );
+  const dateMatch = /^day-(\d{4}-\d{2}-\d{2})/.exec(task.dateUID);
   if (!dateMatch) return;
 
   const currentDate = momentFn(dateMatch[1], "YYYY-MM-DD");
@@ -598,7 +596,7 @@ export function generateMonthlyRecurringTasks(taskId: string): void {
   const task = allTasks.find((t) => t.id === taskId);
   if (!task || !task.recurrence) return;
 
-  const dateMatch = task.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+  const dateMatch = /^day-(\d{4}-\d{2}-\d{2})/.exec(task.dateUID);
   if (!dateMatch) return;
 
   const startDate = momentFn(dateMatch[1], "YYYY-MM-DD");
@@ -812,7 +810,7 @@ export function getEarningsForMonth(year: number, month: number): number {
   return allTasks
     .filter((t) => {
       if (!t.isWorkTask || !t.rate || t.status !== "done") return false;
-      const match = t.dateUID.match(/^day-(\d{4})-(\d{2})/);
+      const match = /^day-(\d{4})-(\d{2})/.exec(t.dateUID);
       if (!match) return false;
       return parseInt(match[1]) === year && parseInt(match[2]) === month;
     })
@@ -824,7 +822,7 @@ export function getEarningsForYear(year: number): number {
   return allTasks
     .filter((t) => {
       if (!t.isWorkTask || !t.rate || t.status !== "done") return false;
-      const match = t.dateUID.match(/^day-(\d{4})/);
+      const match = /^day-(\d{4})/.exec(t.dateUID);
       if (!match) return false;
       return parseInt(match[1]) === year;
     })
@@ -856,7 +854,7 @@ export function getExpectedEarningsForMonth(year: number, month: number): number
   const allTasks = get(tasks);
   const monthTasks = allTasks.filter((t) => {
     if (!t.isWorkTask || !t.rate) return false;
-    const match = t.dateUID.match(/^day-(\d{4})-(\d{2})/);
+    const match = /^day-(\d{4})-(\d{2})/.exec(t.dateUID);
     if (!match) return false;
     return parseInt(match[1]) === year && parseInt(match[2]) === month;
   });

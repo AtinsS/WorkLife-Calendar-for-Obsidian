@@ -15,7 +15,7 @@ function createDailyNotesStore() {
   return {
     reindex: () => {
       try {
-        const dailyNotes = getAllDailyNotes();
+        const dailyNotes: Record<string, TFile> = getAllDailyNotes();
         store.set(dailyNotes);
         hasError = false;
       } catch (err: unknown) {
@@ -37,7 +37,7 @@ function createWeeklyNotesStore() {
   return {
     reindex: () => {
       try {
-        const weeklyNotes = getAllWeeklyNotes();
+        const weeklyNotes: Record<string, TFile> = getAllWeeklyNotes();
         store.set(weeklyNotes);
         hasError = false;
       } catch (err: unknown) {

@@ -3103,6 +3103,10 @@ svg.dot.filled {
   padding: 0 16px 16px;
 }
 
+.pm-section-collapsed {
+  display: none;
+}
+
 /* New project form */
 .pm-new-project {
   background: var(--mcp-glass-highlight);

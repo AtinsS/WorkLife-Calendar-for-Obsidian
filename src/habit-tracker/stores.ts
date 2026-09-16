@@ -27,7 +27,7 @@ let cachedLogs: IHabitLog[] = [];
 let logsByHabitDate: Map<string, IHabitLog> = new Map<string, IHabitLog>();
 
 export function rebuildLogsCache(): void {
-  const current = get(habitLogs);
+  const current: IHabitLog[] = get(habitLogs);
   if (current === cachedLogs) return;
   cachedLogs = current;
   logsByHabitDate = new Map<string, IHabitLog>();
@@ -37,7 +37,7 @@ export function rebuildLogsCache(): void {
 }
 
 function cleanupOldHabitLogs(): void {
-  const maxEntries = get(settings).habitLogCleanupThreshold || 1000;
+  const maxEntries: number = get(settings).habitLogCleanupThreshold || 1000;
   habitLogs.update((current) => {
     if (current.length <= maxEntries) return current;
     const sorted = [...current].sort(
@@ -120,21 +120,21 @@ export function addHabit(
     id: generateId(),
     createdAt: Date.now(),
   };
-  habits.update((current) => [...current, habit]);
+  habits.update((current: IHabit[]) => [...current, habit]);
   debouncedSave();
   return habit;
 }
 
 export function updateHabit(id: string, changes: Partial<IHabit>): void {
-  habits.update((current) =>
+  habits.update((current: IHabit[]) =>
     current.map((h) => (h.id === id ? { ...h, ...changes } : h))
   );
   debouncedSave();
 }
 
 export function removeHabit(id: string): void {
-  habits.update((current) => current.filter((h) => h.id !== id));
-  habitLogs.update((current) => {
+  habits.update((current: IHabit[]) => current.filter((h) => h.id !== id));
+  habitLogs.update((current: IHabitLog[]) => {
     const next = current.filter((l) => l.habitId !== id);
     return next;
   });
@@ -162,18 +162,18 @@ export function toggleHabitCompletion(
         count: 2,
         completedAt: Date.now(),
       };
-      habitLogs.update((current) => [...current, log]);
+      habitLogs.update((current: IHabitLog[]) => [...current, log]);
       cleanupOldHabitLogs();
     } else {
       // 100% → 0 (remove)
-      habitLogs.update((current) => current.filter((l) => l.id !== existing.id));
+      habitLogs.update((current: IHabitLog[]) => current.filter((l) => l.id !== existing.id));
     }
   } else {
     // Multi-target: increment until target, then toggle off
     if (existing) {
       if (existing.count < targetCount) {
         const newCount = existing.count + 1;
-        habitLogs.update((current) =>
+        habitLogs.update((current: IHabitLog[]) =>
           current.map((l) =>
             l.id === existing.id
               ? { ...l, count: newCount, completed: newCount >= targetCount, completedAt: Date.now() }
@@ -181,7 +181,7 @@ export function toggleHabitCompletion(
           )
         );
       } else {
-        habitLogs.update((current) => current.filter((l) => l.id !== existing.id));
+        habitLogs.update((current: IHabitLog[]) => current.filter((l) => l.id !== existing.id));
       }
     } else {
       const log: IHabitLog = {
@@ -192,7 +192,7 @@ export function toggleHabitCompletion(
         count: 1,
         completedAt: Date.now(),
       };
-      habitLogs.update((current) => [...current, log]);
+      habitLogs.update((current: IHabitLog[]) => [...current, log]);
       cleanupOldHabitLogs();
     }
   }
@@ -212,12 +212,12 @@ export function setHabitProgress(
   if (progress === 0) {
     // Clear
     if (existing) {
-      habitLogs.update((current) => current.filter((l) => l.id !== existing.id));
+      habitLogs.update((current: IHabitLog[]) => current.filter((l) => l.id !== existing.id));
     }
   } else if (progress === 2) {
     // 100% — completed
     if (existing) {
-      habitLogs.update((current) =>
+      habitLogs.update((current: IHabitLog[]) =>
         current.map((l) =>
           l.id === existing.id
             ? { ...l, count: 2, completed: true, completedAt: Date.now() }
@@ -233,7 +233,7 @@ export function setHabitProgress(
         count: 2,
         completedAt: Date.now(),
       };
-      habitLogs.update((current) => [...current, log]);
+      habitLogs.update((current: IHabitLog[]) => [...current, log]);
       cleanupOldHabitLogs();
     }
   }
@@ -264,11 +264,11 @@ export function calculateStreak(habitId: string): number {
   if (logs.length === 0) return 0;
 
   let streak = 0;
-  let currentDate = momentFn().startOf("day");
+  let currentDate: Moment = momentFn().startOf("day");
 
   for (const log of logs) {
-    const logDate = momentFn(log.date, "YYYY-MM-DD").startOf("day");
-    const diffDays = currentDate.diff(logDate, "days");
+    const logDate: Moment = momentFn(log.date, "YYYY-MM-DD").startOf("day");
+    const diffDays: number = currentDate.diff(logDate, "days");
 
     if (diffDays <= 1) {
       streak++;
@@ -313,8 +313,8 @@ export interface HabitStats {
 }
 
 export function getHeatmapData(habitId?: string): HeatmapCell[] {
-  const today = momentFn();
-  const yearAgo = today.clone().subtract(1, "year");
+  const today: Moment = momentFn();
+  const yearAgo: Moment = today.clone().subtract(1, "year");
   const logs = habitId
     ? cachedLogs.filter((l) => l.habitId === habitId && l.completed)
     : cachedLogs.filter((l) => l.completed);
@@ -328,10 +328,10 @@ export function getHeatmapData(habitId?: string): HeatmapCell[] {
 
   // Build cells for every day in the year
   const cells: HeatmapCell[] = [];
-  const day = yearAgo.clone();
+  const day: Moment = yearAgo.clone();
   while (day.isSameOrBefore(today)) {
-    const dateStr = day.format("YYYY-MM-DD");
-    const count = countByDate.get(dateStr) || 0;
+    const dateStr: string = day.format("YYYY-MM-DD");
+    const count: number = countByDate.get(dateStr) || 0;
     cells.push({ date: dateStr, count, level: 0 });
     day.add(1, "day");
   }
@@ -356,12 +356,12 @@ export function getHeatmapData(habitId?: string): HeatmapCell[] {
 }
 
 export function getWeeklyStats(weeksBack = 12): WeeklyStats[] {
-  const today = momentFn().startOf("week");
+  const today: Moment = momentFn().startOf("week");
   const results: WeeklyStats[] = [];
 
   for (let i = weeksBack - 1; i >= 0; i--) {
-    const weekStart = today.clone().subtract(i, "weeks");
-    const weekEnd = weekStart.clone().endOf("week");
+    const weekStart: Moment = today.clone().subtract(i, "weeks");
+    const weekEnd: Moment = weekStart.clone().endOf("week");
     let total = 0;
     for (const log of cachedLogs) {
       if (
@@ -395,8 +395,8 @@ export function getHabitStats(habitId: string): HabitStats {
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
     );
     for (let i = 1; i < sortedAsc.length; i++) {
-      const prev = momentFn(sortedAsc[i - 1].date).startOf("day");
-      const curr = momentFn(sortedAsc[i].date).startOf("day");
+      const prev: Moment = momentFn(sortedAsc[i - 1].date).startOf("day");
+      const curr: Moment = momentFn(sortedAsc[i].date).startOf("day");
       if (curr.diff(prev, "days") === 1) {
         streak++;
       } else {
@@ -408,11 +408,11 @@ export function getHabitStats(habitId: string): HabitStats {
   }
 
   // Completion rate (last 7 days)
-  const habit = get(habits).find((h) => h.id === habitId);
+  const habit: IHabit | undefined = get(habits).find((h) => h.id === habitId);
   let completionRate = 0;
   if (habit) {
-    const today = momentFn().startOf("day");
-    const weekAgo = today.clone().subtract(7, "days");
+    const today: Moment = momentFn().startOf("day");
+    const weekAgo: Moment = today.clone().subtract(7, "days");
     const recentLogs = logs.filter(l => momentFn(l.date).isAfter(weekAgo));
     const maxPerWeek = habit.frequency === "weekly" ? 1 : 7;
     completionRate = Math.min(100, Math.round((recentLogs.length / maxPerWeek) * 100));
@@ -443,9 +443,9 @@ export interface DayOfWeekStats {
 const DAY_NAMES_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
 function getDayNames(): string[] {
-  const names = tArrayRaw("common.weekdays.short");
-  const labels = names.length === 7 ? names : DAY_NAMES_RU;
-  const sow = get(settings).startOfWeek || "system";
+  const names: string[] = tArrayRaw("common.weekdays.short");
+  const labels: string[] = names.length === 7 ? names : DAY_NAMES_RU;
+  const sow: string = get(settings).startOfWeek || "system";
   if (sow === "sunday" || (sow === "system" && get(locale) === "en")) {
     return [...labels.slice(-1), ...labels.slice(0, -1)];
   }
@@ -455,7 +455,7 @@ function getDayNames(): string[] {
 /** Check if a habit is "active" on a given date */
 function isHabitActiveOnDate(habit: IHabit, date: Moment): boolean {
   if (habit.archived) return false;
-  const dow = date.day(); // moment convention: 0=Sun, 1=Mon, ..., 6=Sat
+  const dow: number = date.day(); // moment convention: 0=Sun, 1=Mon, ..., 6=Sat
   switch (habit.frequency) {
     case "daily":
       return true;
@@ -469,7 +469,7 @@ function isHabitActiveOnDate(habit: IHabit, date: Moment): boolean {
 
 export function getDayOfWeekProductivity(): DayOfWeekStats[] {
   // Get active (non-archived) habits
-  const activeHabits = get(habits).filter((h) => !h.archived);
+  const activeHabits: IHabit[] = get(habits).filter((h) => !h.archived);
 
   // Build a set of unique dates from logs
   const dateSet = new Set<string>();
@@ -484,9 +484,9 @@ export function getDayOfWeekProductivity(): DayOfWeekStats[] {
   const statsByDay = new Map<number, { completedSum: number; activeSum: number; count: number }>();
 
   for (const dateStr of sortedDates) {
-    const date = momentFn(dateStr, "YYYY-MM-DD");
+    const date: Moment = momentFn(dateStr, "YYYY-MM-DD");
     if (!date.isValid()) continue;
-    const dayOfWeek = date.day(); // moment convention: 0=Sun, 1=Mon, ..., 6=Sat
+    const dayOfWeek: number = date.day(); // moment convention: 0=Sun, 1=Mon, ..., 6=Sat
 
     // How many habits are active on this date?
     let activeCount = 0;
@@ -513,7 +513,7 @@ export function getDayOfWeekProductivity(): DayOfWeekStats[] {
   }
 
   // Map visual order to moment day index
-  const sow = get(settings).startOfWeek || "system";
+  const sow: string = get(settings).startOfWeek || "system";
   const isSundayStart = sow === "sunday" || (sow === "system" && get(locale) === "en");
   const visualToMoment = isSundayStart ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
 

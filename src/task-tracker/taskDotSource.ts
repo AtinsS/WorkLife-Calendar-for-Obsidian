@@ -114,12 +114,12 @@ function getMetadataForDate(dateUID: string): IDayMetadata {
 }
 
 export const taskDotSource: ICalendarSource = {
-  getDailyMetadata: async (date: Moment): Promise<IDayMetadata> => {
+  getDailyMetadata: (date: Moment): Promise<IDayMetadata> => {
     const dateUID = getDateUID(date, "day");
-    return getMetadataForDate(dateUID);
+    return Promise.resolve(getMetadataForDate(dateUID));
   },
-  getWeeklyMetadata: async (date: Moment): Promise<IDayMetadata> => {
+  getWeeklyMetadata: (date: Moment): Promise<IDayMetadata> => {
     const dateUID = getDateUID(date, "week");
-    return getMetadataForDate(dateUID);
+    return Promise.resolve(getMetadataForDate(dateUID));
   },
 };

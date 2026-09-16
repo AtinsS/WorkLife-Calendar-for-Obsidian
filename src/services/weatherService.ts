@@ -284,7 +284,7 @@ async function fetchDayDetailOpenMeteo(
   const hourly: HourlyWeather[] = [];
   if (json.hourly?.time) {
     for (let i = 0; i < json.hourly.time.length; i++) {
-      const timeStr = json.hourly.time[i] as string;
+      const timeStr: string = json.hourly.time[i];
       if (!timeStr.startsWith(date)) continue;
       const hCode = Number(json.hourly.weather_code?.[i] ?? 0);
       const hInfo = getWmoCode(hCode);

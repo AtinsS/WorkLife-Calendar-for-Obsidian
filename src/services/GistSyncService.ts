@@ -40,16 +40,18 @@ function scheduleAutoSync(): void {
   if (!autoSyncEnabled) return;
 
   if (autoSyncTimeout) window.clearTimeout(autoSyncTimeout);
-  autoSyncTimeout = window.setTimeout(async () => {
-    if (!autoSyncEnabled) return;
-    console.debug("[GistSync] Auto-sync triggered, syncing...");
-    gistSyncStatus.update((s) => ({ ...s, lastAutoSync: new Date().toLocaleTimeString("ru-RU") }));
-    const result = await syncToGist();
-    if (result.success) {
-      console.debug("[GistSync] Auto-sync completed successfully");
-    } else {
-      console.error("[GistSync] Auto-sync failed:", result.error);
-    }
+  autoSyncTimeout = window.setTimeout(() => {
+    void (async () => {
+      if (!autoSyncEnabled) return;
+      console.debug("[GistSync] Auto-sync triggered, syncing...");
+      gistSyncStatus.update((s) => ({ ...s, lastAutoSync: new Date().toLocaleTimeString("ru-RU") }));
+      const result = await syncToGist();
+      if (result.success) {
+        console.debug("[GistSync] Auto-sync completed successfully");
+      } else {
+        console.error("[GistSync] Auto-sync failed:", result.error);
+      }
+    })();
   }, 5000);
 }
 
@@ -120,7 +122,7 @@ function tasksToIcsEvents(): IcsEvent[] {
     if (task.status === "done") continue;
     if (!task.dateUID) continue;
 
-    const match = task.dateUID.match(/day-(\d{4})-(\d{2})-(\d{2})/);
+    const match = /day-(\d{4})-(\d{2})-(\d{2})/.exec(task.dateUID);
     if (!match) continue;
 
     const [, year, month, day] = match;
@@ -177,7 +179,7 @@ function tasksToIcsEvents(): IcsEvent[] {
     }
 
     if (task.deadline && task.deadline !== task.dateUID) {
-      const dlMatch = task.deadline.match(/day-(\d{4})-(\d{2})-(\d{2})/);
+      const dlMatch = /day-(\d{4})-(\d{2})-(\d{2})/.exec(task.deadline);
       if (dlMatch) {
         events.push({
           uid: `deadline-${task.id}@calendar-plugin-remastered`,

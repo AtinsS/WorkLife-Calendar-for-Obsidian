@@ -1,3 +1,4 @@
+import type { Moment } from "moment";
 import type { TFile } from "obsidian";
 import { getDateFromFile, getDateUID } from "obsidian-daily-notes-interface";
 
@@ -45,7 +46,7 @@ export function getDateUIDFromFile(file: TFile | null): string | null {
   }
 
   // TODO: I'm not checking the path!
-  let date = getDateFromFile(file, "day");
+  let date: Moment | null = getDateFromFile(file, "day");
   if (date) {
     return getDateUID(date, "day");
   }

@@ -282,14 +282,13 @@ export default class CalendarPlugin extends Plugin {
     this.addCommand({
       id: "quick-add-task",
       name: tRaw("main.commands.quickAddTask"),
-      hotkeys: [{ modifiers: ["Ctrl", "Alt"], key: "n" }],
       callback: () => {
         const now = window.moment
           ? window.moment()
           : (
-              globalThis as unknown as { moment: () => Moment }
+              activeWindow as unknown as { moment: () => Moment }
             ).moment();
-        void import("./task-tracker/QuickAddModal").then(({ QuickAddModal }) => {
+        void import("./task-tracker/QuickAddModal").then(({ QuickAddModal }: typeof import("./task-tracker/QuickAddModal")) => {
           new QuickAddModal(this.app, now).open();
         });
       },
@@ -491,11 +490,13 @@ export default class CalendarPlugin extends Plugin {
     // Watch for vault sync file changes (modify + create)
     const debouncedSyncReload = () => {
       if (this.syncReloadTimer) window.clearTimeout(this.syncReloadTimer);
-      this.syncReloadTimer = window.setTimeout(async () => {
-        reloadTaskStores(this);
-        reloadHabitStores(this);
-        await reloadFinanceStores();
-        await reloadFinancialAnalyticsStores();
+      this.syncReloadTimer = window.setTimeout(() => {
+        void (async () => {
+          reloadTaskStores(this);
+          reloadHabitStores(this);
+          await reloadFinanceStores();
+          await reloadFinancialAnalyticsStores();
+        })();
       }, 500);
     };
 
@@ -633,7 +634,7 @@ export default class CalendarPlugin extends Plugin {
     // Open calendar in right sidebar
     const existingCalLeaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CALENDAR);
     if (existingCalLeaves.length === 0) {
-      this.app.workspace.getRightLeaf(false).setViewState({
+      void this.app.workspace.getRightLeaf(false).setViewState({
         type: VIEW_TYPE_CALENDAR,
       });
     }
@@ -649,13 +650,13 @@ export default class CalendarPlugin extends Plugin {
       if (existing.length > 1) {
         existing.slice(1).forEach((leaf) => leaf.detach());
       }
-      workspace.revealLeaf(existing[0]);
+      void workspace.revealLeaf(existing[0]);
       return;
     }
     const leaf = workspace.getLeaf("tab");
     if (leaf) {
       await leaf.setViewState({ type: viewType, active: true });
-      workspace.revealLeaf(leaf);
+      void workspace.revealLeaf(leaf);
     }
   }
 
@@ -703,7 +704,7 @@ export default class CalendarPlugin extends Plugin {
     const { workspace } = this.app;
     const existing = workspace.getLeavesOfType(VIEW_TYPE_WEATHER_DETAIL);
     if (existing.length) {
-      workspace.revealLeaf(existing[0]);
+      void workspace.revealLeaf(existing[0]);
       const view = existing[0].view as WeatherDetailView;
       if (date) view.setDate(date);
       return;
@@ -711,7 +712,7 @@ export default class CalendarPlugin extends Plugin {
     const leaf = workspace.getLeaf("tab");
     if (leaf) {
       await leaf.setViewState({ type: VIEW_TYPE_WEATHER_DETAIL, active: true });
-      workspace.revealLeaf(leaf);
+      void workspace.revealLeaf(leaf);
       if (date) {
         const view = leaf.view as WeatherDetailView;
         view.setDate(date);
@@ -755,7 +756,7 @@ export default class CalendarPlugin extends Plugin {
   async loadDataSafe(): Promise<Record<string, unknown>> {
     let data: Record<string, unknown> | null = null;
     try {
-      data = await this.loadData();
+      data = (await this.loadData()) as Record<string, unknown> | null;
     } catch {
       // base loadData failed
     }

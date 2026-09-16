@@ -14,19 +14,21 @@ const getNoteExistenceClasses = (file: TFile | null): string[] => {
 };
 
 export const streakSource: ICalendarSource = {
-  getDailyMetadata: async (date: Moment): Promise<IDayMetadata> => {
-    const file: TFile | null = getDailyNote(date, get(dailyNotes));
-    return {
+  getDailyMetadata: (date: Moment): Promise<IDayMetadata> => {
+    const dailyNotesMap: Record<string, TFile> = get(dailyNotes);
+    const file: TFile | null = getDailyNote(date, dailyNotesMap);
+    return Promise.resolve({
       classes: getNoteExistenceClasses(file),
       dots: [],
-    };
+    });
   },
 
-  getWeeklyMetadata: async (date: Moment): Promise<IDayMetadata> => {
-    const file: TFile | null = getWeeklyNote(date, get(weeklyNotes));
-    return {
+  getWeeklyMetadata: (date: Moment): Promise<IDayMetadata> => {
+    const weeklyNotesMap: Record<string, TFile> = get(weeklyNotes);
+    const file: TFile | null = getWeeklyNote(date, weeklyNotesMap);
+    return Promise.resolve({
       classes: getNoteExistenceClasses(file),
       dots: [],
-    };
+    });
   },
 };

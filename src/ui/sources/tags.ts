@@ -51,18 +51,20 @@ function getFormattedTagAttributes(note: TFile | null): Record<string, string> {
 }
 
 export const customTagsSource: ICalendarSource = {
-  getDailyMetadata: async (date: Moment): Promise<IDayMetadata> => {
-    const file = getDailyNote(date, get(dailyNotes));
-    return {
+  getDailyMetadata: (date: Moment): Promise<IDayMetadata> => {
+    const dailyNotesMap: Record<string, TFile> = get(dailyNotes);
+    const file: TFile | null = getDailyNote(date, dailyNotesMap);
+    return Promise.resolve({
       dataAttributes: getFormattedTagAttributes(file),
       dots: [],
-    };
+    });
   },
-  getWeeklyMetadata: async (date: Moment): Promise<IDayMetadata> => {
-    const file = getWeeklyNote(date, get(weeklyNotes));
-    return {
+  getWeeklyMetadata: (date: Moment): Promise<IDayMetadata> => {
+    const weeklyNotesMap: Record<string, TFile> = get(weeklyNotes);
+    const file: TFile | null = getWeeklyNote(date, weeklyNotesMap);
+    return Promise.resolve({
       dataAttributes: getFormattedTagAttributes(file),
       dots: [],
-    };
+    });
   },
 };

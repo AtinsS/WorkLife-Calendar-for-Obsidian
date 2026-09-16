@@ -32,7 +32,7 @@ import {
 export async function exampleCreateNoteTask(
   app: App
 ): Promise<void> {
-  const { addTask } = await import("./stores");
+  const { addTask } = await import("./stores") ;
 
   // 1. Создаём задачу
   const task = addTask({
@@ -388,7 +388,7 @@ export async function exampleNoteWithoutTaskId(app: App): Promise<void> {
 export async function test1_CreateNoteTask(app: App): Promise<boolean> {
   console.debug("=== Тест 1: Создание задачи-заметки ===");
 
-  const { addTask } = await import("./stores");
+  const { addTask } = await import("./stores") ;
 
   const task = addTask({
     title: "Тестовая задача",
@@ -415,7 +415,7 @@ export async function test1_CreateNoteTask(app: App): Promise<boolean> {
 
   // Проверяем frontmatter
   const cache = app.metadataCache.getFileCache(createdFile);
-  const frontmatter = cache?.frontmatter;
+  const frontmatter = cache?.frontmatter as Record<string, unknown> | undefined;
 
   if (!frontmatter?.task_id || frontmatter.task_id !== task.id) {
     console.error("task_id не совпадает");
@@ -446,7 +446,7 @@ export async function test2_ChangeStatusFromFrontmatter(
 ): Promise<boolean> {
   console.debug("=== Тест 2: Изменение статуса через frontmatter ===");
 
-  const { addTask } = await import("./stores");
+  const { addTask } = await import("./stores") ;
 
   const task = addTask({
     title: "Тест статуса",
@@ -494,7 +494,7 @@ export async function test2_ChangeStatusFromFrontmatter(
 export async function test3_InvalidFrontmatter(app: App): Promise<boolean> {
   console.debug("=== Тест 3: Невалидный frontmatter ===");
 
-  const { addTask } = await import("./stores");
+  const { addTask } = await import("./stores") ;
 
   const task = addTask({
     title: "Тест невалидных данных",
@@ -541,7 +541,7 @@ export async function test3_InvalidFrontmatter(app: App): Promise<boolean> {
 export async function test4_DeleteNote(app: App): Promise<boolean> {
   console.debug("=== Тест 4: Удаление заметки ===");
 
-  const { addTask } = await import("./stores");
+  const { addTask } = await import("./stores") ;
 
   const task = addTask({
     title: "Тест удаления",
@@ -587,7 +587,7 @@ export async function test4_DeleteNote(app: App): Promise<boolean> {
 export async function test5_RenameNote(app: App): Promise<boolean> {
   console.debug("=== Тест 5: Переименование заметки ===");
 
-  const { addTask } = await import("./stores");
+  const { addTask } = await import("./stores") ;
 
   const task = addTask({
     title: "Тест переименования",

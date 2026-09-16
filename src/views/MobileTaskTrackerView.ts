@@ -26,24 +26,26 @@ export default class MobileTaskTrackerView extends ItemView {
     return "checkbox-glyph";
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): Promise<void> {
     if (this.svelteComponent) { this.svelteComponent.$destroy(); this.svelteComponent = null; }
-    const container = this.containerEl.children[1];
+    const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("mobile-tasks-view-container");
 
     this.svelteComponent = new MobileTasks({
-      target: container as HTMLElement,
+      target: container,
       props: {
         plugin: this.plugin,
       },
     });
+    return Promise.resolve();
   }
 
-  async onClose(): Promise<void> {
+  onClose(): Promise<void> {
     if (this.svelteComponent) {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
+    return Promise.resolve();
   }
 }

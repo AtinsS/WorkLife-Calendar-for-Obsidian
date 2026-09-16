@@ -140,7 +140,7 @@ export class TaskModal extends CustomModal {
     descWrap.createEl("label", { text: tRaw("tasks.modal.description"), cls: "tm-label" });
     this.descriptionInputEl = descWrap.createEl("textarea", {
       cls: "tm-textarea", placeholder: tRaw("tasks.modal.descriptionPlaceholder"),
-    }) as HTMLTextAreaElement;
+    }) ;
     this.descriptionInputEl.value = this.descriptionInput;
     this.descriptionInputEl.rows = 3;
     this.descCounterEl = descWrap.createEl("span", { cls: "tm-char-counter" });
@@ -318,7 +318,7 @@ export class TaskModal extends CustomModal {
     intLabel.createEl("span", { text: tRaw("tasks.modal.interval") });
     const intInput = intRow.createEl("input", {
       type: "number", cls: "tm-input tm-adv-input tm-input-narrow-80", value: String(this.recurrenceInterval), attr: { min: "1" },
-    }) as HTMLInputElement;
+    }) ;
     intInput.addEventListener("input", () => { this.recurrenceInterval = Math.max(1, parseInt(intInput.value) || 1); });
 
     // Дни недели
@@ -383,23 +383,25 @@ export class TaskModal extends CustomModal {
     const createNoteBtn = noteRow.createEl("button", { text: "+", cls: "tm-adv-file-btn" });
     createNoteBtn.setAttribute("title", tRaw("tasks.modal.createNote"));
     createNoteBtn.addEventListener("click", () => {
-      new FolderSuggestModal(this.app, async (folder) => {
-        const title = this.titleInput.trim() || tRaw("tasks.modal.note");
-        const filename = title.replace(/[\\/:*?"<>|]/g, "_") + ".md";
-        const path = `${folder}/${filename}`;
-        const parts = path.split("/");
-        if (parts.length > 1) {
-          const folderPath = parts.slice(0, -1).join("/");
-          if (!this.app.vault.getAbstractFileByPath(folderPath)) {
-            await this.app.vault.createFolder(folderPath);
+      new FolderSuggestModal(this.app, (folder) => {
+        void (async () => {
+          const title = this.titleInput.trim() || tRaw("tasks.modal.note");
+          const filename = title.replace(/[\\/:*?"<>|]/g, "_") + ".md";
+          const path = `${folder}/${filename}`;
+          const parts = path.split("/");
+          if (parts.length > 1) {
+            const folderPath = parts.slice(0, -1).join("/");
+            if (!this.app.vault.getAbstractFileByPath(folderPath)) {
+              await this.app.vault.createFolder(folderPath);
+            }
           }
-        }
-        let file = this.app.vault.getAbstractFileByPath(path);
-        if (!file) {
-          file = await this.app.vault.create(path, "");
-        }
-        this.notePathInput = path;
-        noteInput.value = path;
+          let file = this.app.vault.getAbstractFileByPath(path);
+          if (!file) {
+            file = await this.app.vault.create(path, "");
+          }
+          this.notePathInput = path;
+          noteInput.value = path;
+        })();
       }).open();
     });
 
@@ -412,7 +414,7 @@ export class TaskModal extends CustomModal {
     workLabel.createEl("br");
     workLabel.createEl("span", { text: "Задача будет учитываться в статистике и планировании", cls: "tm-adv-sublabel" });
     const workToggle = workRow.createEl("label", { cls: "tm-toggle" });
-    const workCheckbox = workToggle.createEl("input", { type: "checkbox", cls: "tm-toggle-input" }) as HTMLInputElement;
+    const workCheckbox = workToggle.createEl("input", { type: "checkbox", cls: "tm-toggle-input" }) ;
     workCheckbox.checked = this.isWorkTask;
     workToggle.createEl("span", { cls: "tm-toggle-slider" });
     workCheckbox.addEventListener("change", () => { this.isWorkTask = workCheckbox.checked; this.updateWorkTaskSettings(); });
@@ -436,7 +438,7 @@ export class TaskModal extends CustomModal {
     rateLabel.createEl("span", { text: tRaw("tasks.modal.rate", { currency: "₽" }) });
     const rateInput = rateRow.createEl("input", {
       type: "number", cls: "tm-input tm-adv-input tm-input-narrow-120", value: this.rate, placeholder: "0", attr: { min: "0" },
-    }) as HTMLInputElement;
+    }) ;
     rateInput.addEventListener("input", () => { this.rate = rateInput.value.replace(/[^0-9.,]/g, ""); });
 
     // Переработки с
@@ -445,7 +447,7 @@ export class TaskModal extends CustomModal {
     otStartLabel.createEl("span", { text: tRaw("tasks.modal.overtimeFrom") });
     const otStartInput = otStartRow.createEl("input", {
       type: "number", cls: "tm-input tm-adv-input tm-input-narrow-60", value: this.overtimeStart, placeholder: "8", attr: { min: "1", max: "24" },
-    }) as HTMLInputElement;
+    }) ;
     otStartInput.addEventListener("input", () => { this.overtimeStart = otStartInput.value.replace(/[^0-9]/g, ""); });
 
     // Множитель
@@ -454,7 +456,7 @@ export class TaskModal extends CustomModal {
     otMulLabel.createEl("span", { text: tRaw("tasks.modal.multiplier") });
     const otMulInput = otMulRow.createEl("input", {
       type: "number", cls: "tm-input tm-adv-input tm-input-narrow-80", value: this.overtimeMultiplier, placeholder: "1.5", attr: { min: "1", max: "10", step: "0.1" },
-    }) as HTMLInputElement;
+    }) ;
     otMulInput.addEventListener("input", () => { this.overtimeMultiplier = otMulInput.value.replace(/[^0-9.,]/g, ""); });
 
     this.updateRecurrenceSubFields();
@@ -509,7 +511,7 @@ export class TaskModal extends CustomModal {
     // Validate: endTime cannot be earlier than scheduledTime
     if (this.scheduledTime && this.endTime && this.endTime < this.scheduledTime) {
       // Show error
-      const errorEl = this.contentEl.querySelector(".tm-time-error") as HTMLElement;
+      const errorEl = this.contentEl.querySelector(".tm-time-error") ;
       if (errorEl) {
         errorEl.textContent = tRaw("tasks.modal.errorEndTime");
         window.setTimeout(() => {
@@ -592,7 +594,7 @@ export class TaskModal extends CustomModal {
 
   private extractDateValue(dateUID: string): string {
     if (!dateUID) return "";
-    const match = dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    const match = /^day-(\d{4}-\d{2}-\d{2})/.exec(dateUID);
     return match ? match[1] : "";
   }
 

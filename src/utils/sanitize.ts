@@ -8,7 +8,7 @@ export function sanitizeTitle(input: string): string {
   return input
     .replace(/<[^>]*>/g, "")
     .replace(/&[a-z]+;/gi, "")
-    // eslint-disable-next-line no-control-regex
+    // eslint-disable-next-line no-control-regex -- Strip control characters except \t, \n, \r
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "")
     .trim()
     .substring(0, 500);

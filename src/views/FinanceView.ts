@@ -26,21 +26,23 @@ export default class FinanceView extends ItemView {
     return "coins";
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): Promise<void> {
     if (this.svelteComponent) { this.svelteComponent.$destroy(); this.svelteComponent = null; }
-    const container = this.containerEl.children[1];
+    const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("finance-view-container");
 
     this.svelteComponent = new FinanceTracker({
-      target: container as HTMLElement,
+      target: container,
     });
+    return Promise.resolve();
   }
 
-  async onClose(): Promise<void> {
+  onClose(): Promise<void> {
     if (this.svelteComponent) {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
+    return Promise.resolve();
   }
 }

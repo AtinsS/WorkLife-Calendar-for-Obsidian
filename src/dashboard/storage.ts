@@ -31,7 +31,7 @@ function serializeToYaml(data: DashboardData): string {
 }
 
 function parseYamlFrontmatter(content: string): DashboardData | null {
-  const match = content.match(/^---\n([\s\S]*?)\n---/);
+  const match = /^---\n([\s\S]*?)\n---/.exec(content);
   if (!match) return null;
 
   const yaml = match[1];
@@ -44,13 +44,13 @@ function parseYamlFrontmatter(content: string): DashboardData | null {
   for (const block of cardBlocks) {
     const card: DashboardCard = { id: "", title: "", icon: "", links: [] };
 
-    const idMatch = block.match(/id:\s*"([^"]+)"/);
+    const idMatch = /id:\s*"([^"]+)"/.exec(block);
     if (idMatch) card.id = idMatch[1];
 
-    const titleMatch = block.match(/title:\s*"([^"]+)"/);
+    const titleMatch = /title:\s*"([^"]+)"/.exec(block);
     if (titleMatch) card.title = titleMatch[1].replace(/\\"/g, '"');
 
-    const iconMatch = block.match(/icon:\s*"([^"]+)"/);
+    const iconMatch = /icon:\s*"([^"]+)"/.exec(block);
     if (iconMatch) card.icon = iconMatch[1];
 
     const linksSection = block.split("links:")[1];
@@ -59,13 +59,13 @@ function parseYamlFrontmatter(content: string): DashboardData | null {
       for (const linkBlock of linkBlocks) {
         const link: DashboardLink = { id: "", label: "", notePath: "" };
 
-        const linkIdMatch = linkBlock.match(/id:\s*"([^"]+)"/);
+        const linkIdMatch = /id:\s*"([^"]+)"/.exec(linkBlock);
         if (linkIdMatch) link.id = linkIdMatch[1];
 
-        const labelMatch = linkBlock.match(/label:\s*"([^"]+)"/);
+        const labelMatch = /label:\s*"([^"]+)"/.exec(linkBlock);
         if (labelMatch) link.label = labelMatch[1].replace(/\\"/g, '"');
 
-        const notePathMatch = linkBlock.match(/notePath:\s*"([^"]+)"/);
+        const notePathMatch = /notePath:\s*"([^"]+)"/.exec(linkBlock);
         if (notePathMatch) link.notePath = notePathMatch[1].replace(/\\"/g, '"');
 
         if (link.id && link.notePath) {
@@ -83,7 +83,7 @@ function parseYamlFrontmatter(content: string): DashboardData | null {
 }
 
 function updateFrontmatter(noteContent: string, dashboardYaml: string): string {
-  const fmMatch = noteContent.match(/^(---\n)([\s\S]*?)(\n---)/);
+  const fmMatch = /^(---\n)([\s\S]*?)(\n---)/.exec(noteContent);
   if (fmMatch) {
     const body = noteContent.substring(fmMatch[0].length);
     // Note already has frontmatter — replace or add dashboard section
@@ -95,9 +95,9 @@ function updateFrontmatter(noteContent: string, dashboardYaml: string): string {
       let afterEnd = existingFm.length;
       // Find end of dashboard block (next top-level key or end of frontmatter)
       const afterDash = existingFm.substring(afterStart + 10);
-      const nextKeyMatch = afterDash.match(/\n[a-zA-Z]/);
+      const nextKeyMatch = /\n[a-zA-Z]/.exec(afterDash);
       if (nextKeyMatch) {
-        afterEnd = afterStart + 10 + nextKeyMatch.index;
+        afterEnd = afterStart + 10 + (nextKeyMatch.index ?? 0);
       }
       const after = existingFm.substring(afterEnd);
       const newFm = before + dashboardYaml + after;
@@ -127,7 +127,7 @@ export async function loadDashboard(app: App, filePath?: string): Promise<Dashbo
           return cachedData;
         }
       }
-    } catch {
+    } catch (_e: unknown) {
       // file doesn't exist
     }
   }

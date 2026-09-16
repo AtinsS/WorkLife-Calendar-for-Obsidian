@@ -5,6 +5,7 @@ import { VIEW_TYPE_HABIT_ANALYTICS } from "../constants";
 import type CalendarPlugin from "../main";
 import HabitAnalytics from "../components/HabitAnalytics.svelte";
 import { settings } from "../ui/stores";
+import type { ISettings } from "src/settings";
 import { tRaw } from "../i18n";
 
 export default class HabitAnalyticsView extends ItemView {
@@ -28,25 +29,27 @@ export default class HabitAnalyticsView extends ItemView {
     return "bar-chart";
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): Promise<void> {
     if (this.svelteComponent) { this.svelteComponent.$destroy(); this.svelteComponent = null; }
-    const container = this.containerEl.children[1];
+    const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("habit-analytics-view-container");
 
-    const currentSettings = get(settings);
+    const currentSettings: ISettings = get(settings);
     const habitsHidden = currentSettings.showHabitTracker === false;
 
     this.svelteComponent = new HabitAnalytics({
-      target: container as HTMLElement,
+      target: container,
       props: { habitsHidden },
     });
+    return Promise.resolve();
   }
 
-  async onClose(): Promise<void> {
+  onClose(): Promise<void> {
     if (this.svelteComponent) {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
+    return Promise.resolve();
   }
 }

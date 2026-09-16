@@ -76,7 +76,7 @@ export async function createGist(
 
   // Generate stable URL without revision hash for subscriptions
   // Format: https://gist.githubusercontent.com/{user}/{gist_id}/raw/{filename}
-  const owner: string = data.owner?.login ?? rawUrl.match(/githubusercontent\.com\/([^/]+)\//)?.[1] ?? "";
+  const owner: string = data.owner?.login ?? /githubusercontent\.com\/([^/]+)\//.exec(rawUrl)?.[1] ?? "";
   const stableRawUrl: string = owner && data.id
     ? `https://gist.githubusercontent.com/${owner}/${data.id}/raw/${filename}`
     : rawUrl;

@@ -26,21 +26,23 @@ export default class FinancialAnalyticsView extends ItemView {
     return "trending-up";
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): Promise<void> {
     if (this.svelteComponent) { this.svelteComponent.$destroy(); this.svelteComponent = null; }
-    const container = this.containerEl.children[1];
+    const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("financial-analytics-view-container");
 
     this.svelteComponent = new FinancialAnalytics({
-      target: container as HTMLElement,
+      target: container,
     });
+    return Promise.resolve();
   }
 
-  async onClose(): Promise<void> {
+  onClose(): Promise<void> {
     if (this.svelteComponent) {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
+    return Promise.resolve();
   }
 }

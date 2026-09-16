@@ -26,12 +26,12 @@ export default class KanbanView extends ItemView {
     return "layout-grid";
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): Promise<void> {
     if (this.svelteComponent) {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
-    const container = this.containerEl.children[1];
+    const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("kanban-view-container");
 
@@ -43,21 +43,23 @@ export default class KanbanView extends ItemView {
     const btnTasks = header.createEl("button", { text: "✅", cls: "view-switch-btn", attr: { title: tRaw("tasks.panel.title") } });
     header.createEl("button", { text: "▦", cls: "view-switch-btn active", attr: { title: tRaw("kanban.title") } });
     const btnSchedule = header.createEl("button", { text: "📅", cls: "view-switch-btn", attr: { title: tRaw("hello.navSchedule") } });
-    btnTasks.addEventListener("click", () => this.leaf.setViewState({ type: tasksView, active: true }));
-    btnSchedule.addEventListener("click", () => this.leaf.setViewState({ type: scheduleView, active: true }));
+    btnTasks.addEventListener("click", () => void this.leaf.setViewState({ type: tasksView, active: true }));
+    btnSchedule.addEventListener("click", () => void this.leaf.setViewState({ type: scheduleView, active: true }));
 
     this.svelteComponent = new KanbanBoard({
-      target: container as HTMLElement,
+      target: container,
       props: {
         appInstance: this.plugin.app,
       },
     });
+    return Promise.resolve();
   }
 
-  async onClose(): Promise<void> {
+  onClose(): Promise<void> {
     if (this.svelteComponent) {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
+    return Promise.resolve();
   }
 }

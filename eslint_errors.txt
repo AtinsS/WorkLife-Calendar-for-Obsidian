@@ -1,0 +1,181 @@
+﻿
+  eslint_output.txt:16:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\finance\__tests__\storage-lifecycle.test.ts
+  eslint_output.txt:17:   55:7   error  Async method 'read' has no 'await' expression                                  
+                  @typescript-eslint/require-await
+  eslint_output.txt:18:   58:7   error  Async method 'modify' has no 'await' expression                                
+                  @typescript-eslint/require-await
+  eslint_output.txt:19:   61:7   error  Async method 'create' has no 'await' expression                                
+                  @typescript-eslint/require-await
+  eslint_output.txt:20:  185:71  error  Async arrow function has no 'await' expression                                 
+                  @typescript-eslint/require-await
+> eslint_output.txt:21:  198:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:22:  223:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:23:  249:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:24:  281:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:25:  298:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:26:  319:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:27:  337:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:28:  367:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:29:  390:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:30:  411:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:31:  430:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:32:  461:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:33:  511:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:34:  530:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:35:  559:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:36:  579:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:37:  610:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:38:  627:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:39:  641:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:40:  662:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:41:  681:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:42:  734:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:43:  745:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:44:  754:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:45:  769:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:46:  793:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:47:  806:5   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+  eslint_output.txt:48:
+  eslint_output.txt:49:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\finance\financialAnalyticsStorage.ts
+  eslint_output.txt:50:   69:1   error  Async function 'debouncedSave' has no 'await' expression                @typesc
+ript-eslint/require-await
+> eslint_output.txt:51:   73:35  error  Promise returned in function argument where a void return was expected  @typesc
+ript-eslint/no-misused-promises
+  eslint_output.txt:52:  146:21  error  Use the `RegExp#exec()` method instead                                  @typesc
+ript-eslint/prefer-regexp-exec
+  eslint_output.txt:53:
+  eslint_output.txt:54:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\finance\storage.ts
+  eslint_output.txt:55:  49:1   error  Async function 'debouncedSave' has no 'await' expression                @typescr
+ipt-eslint/require-await
+> eslint_output.txt:56:  53:35  error  Promise returned in function argument where a void return was expected  @typescr
+ipt-eslint/no-misused-promises
+  eslint_output.txt:58:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\habit-tracker\habitSource.ts
+  eslint_output.txt:59:  89:65  error  Async arrow function 'getDailyMetadata' has no 'await' expression   @typescript-
+eslint/require-await
+  eslint_output.txt:60:  93:66  error  Async arrow function 'getWeeklyMetadata' has no 'await' expression  @typescript-
+eslint/require-await
+  eslint_output.txt:61:
+  eslint_output.txt:62:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\io\vaultStorage.ts
+> eslint_output.txt:63:   64:19  error  Expected non-Promise value in a boolean conditional                            
+                           @typescript-eslint/no-misused-promises
+  eslint_output.txt:64:  142:67  error  Operands of '+' operation must either be both strings or both numbers. Consider
+ using a template literal  @typescript-eslint/restrict-plus-operands
+  eslint_output.txt:65:
+  eslint_output.txt:66:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\main.ts
+> eslint_output.txt:67:  493:48  error  Promise returned in function argument where a void return was expected         
+                  @typescript-eslint/no-misused-promises
+> eslint_output.txt:68:  635:7   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:69:  651:7   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:70:  657:7   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:71:  705:7   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:72:  713:7   error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+  eslint_output.txt:73:
+  eslint_output.txt:74:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\services\GistSyncService.ts
+> eslint_output.txt:75:   43:39  error  Promise returned in function argument where a void return was expected  @typesc
+ript-eslint/no-misused-promises
+  eslint_output.txt:106:  524:68  error  Invalid type "unknown" of template literal expression                   @types
+cript-eslint/restrict-template-expressions
+  eslint_output.txt:107:  533:50  error  Async arrow function has no 'await' expression                          @types
+cript-eslint/require-await
+  eslint_output.txt:108:  567:41  error  Async arrow function has no 'await' expression                          @types
+cript-eslint/require-await
+  eslint_output.txt:109:  606:19  error  Use the `RegExp#exec()` method instead                                  @types
+cript-eslint/prefer-regexp-exec
+  eslint_output.txt:110:  631:41  error  Async arrow function has no 'await' expression                          @types
+cript-eslint/require-await
+> eslint_output.txt:111:  651:27  error  Promise returned in function argument where a void return was expected  @types
+cript-eslint/no-misused-promises
+  eslint_output.txt:125:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\task-tracker\taskDotSource.ts
+  eslint_output.txt:126:  117:65  error  Async arrow function 'getDailyMetadata' has no 'await' expression   @typescrip
+t-eslint/require-await
+  eslint_output.txt:127:  121:66  error  Async arrow function 'getWeeklyMetadata' has no 'await' expression  @typescrip
+t-eslint/require-await
+  eslint_output.txt:128:
+  eslint_output.txt:129:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\ui\modal.ts
+> eslint_output.txt:130:  36:34  error  Promise returned in function argument where a void return was expected  @typesc
+ript-eslint/no-misused-promises
+  eslint_output.txt:140:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\utils\sanitize.ts
+  eslint_output.txt:141:  12:14  error  Unexpected control character(s) in regular expression: \x00, \x08, \x0b, \x0c, 
+\x0e, \x1f  no-control-regex
+  eslint_output.txt:142:
+  eslint_output.txt:143:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\view.ts
+  eslint_output.txt:144:   67:3  error  Async method 'onOpen' has no 'await' expression                                
+                  @typescript-eslint/require-await
+> eslint_output.txt:145:  209:7  error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:146:  214:7  error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:147:  215:7  error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+  eslint_output.txt:162:  28:3  error  Async method 'onOpen' has no 'await' expression   @typescript-eslint/require-awa
+it
+  eslint_output.txt:163:  43:3  error  Async method 'onClose' has no 'await' expression  @typescript-eslint/require-awa
+it
+  eslint_output.txt:164:
+  eslint_output.txt:165:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\views\KanbanView.ts
+  eslint_output.txt:166:  29:3   error  Async method 'onOpen' has no 'await' expression                         @typesc
+ript-eslint/require-await
+> eslint_output.txt:167:  46:40  error  Promise returned in function argument where a void return was expected  @typesc
+ript-eslint/no-misused-promises
+> eslint_output.txt:168:  47:43  error  Promise returned in function argument where a void return was expected  @typesc
+ript-eslint/no-misused-promises
+  eslint_output.txt:176:  29:3  error  Async method 'onOpen' has no 'await' expression   @typescript-eslint/require-awa
+it
+  eslint_output.txt:177:  43:3  error  Async method 'onClose' has no 'await' expression  @typescript-eslint/require-awa
+it
+  eslint_output.txt:178:
+  eslint_output.txt:179:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\views\ScheduleView.ts
+  eslint_output.txt:180:  33:3   error  Async method 'onOpen' has no 'await' expression                         @typesc
+ript-eslint/require-await
+> eslint_output.txt:181:  51:40  error  Promise returned in function argument where a void return was expected  @typesc
+ript-eslint/no-misused-promises
+> eslint_output.txt:182:  52:41  error  Promise returned in function argument where a void return was expected  @typesc
+ript-eslint/no-misused-promises
+  eslint_output.txt:183:  83:3   error  Async method 'onClose' has no 'await' expression                        @typesc
+ript-eslint/require-await
+  eslint_output.txt:184:
+  eslint_output.txt:185:V:\dev\obsidian\WorkLife-Calendar-for-Obsidian\src\views\TaskView.ts
+  eslint_output.txt:186:   51:3  error  Async method 'onOpen' has no 'await' expression                                
+                  @typescript-eslint/require-await
+> eslint_output.txt:187:  147:7  error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:188:  152:7  error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:189:  153:7  error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+> eslint_output.txt:190:  162:5  error  Promises must be handled appropriately or explicitly marked as ignored with the
+ `void` operator  @typescript-eslint/no-floating-promises
+
+

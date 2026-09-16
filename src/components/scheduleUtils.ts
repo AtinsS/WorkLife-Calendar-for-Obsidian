@@ -1,7 +1,7 @@
 import type { ITask, IProject } from "../task-tracker/types";
 
 export function extractDateFromUID(dateUID: string): string | null {
-  const match = dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+  const match = /^day-(\d{4}-\d{2}-\d{2})/.exec(dateUID);
   return match ? match[1] : null;
 }
 

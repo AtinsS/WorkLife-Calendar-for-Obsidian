@@ -25,25 +25,27 @@ export default class HabitPanelView extends ItemView {
     return "flame";
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): Promise<void> {
     if (this.svelteComponent) {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
-    const container = this.containerEl.children[1];
+    const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("habit-panel-view-container");
 
     this.svelteComponent = new HabitPanel({
-      target: container as HTMLElement,
+      target: container,
       props: { appInstance: this.plugin.app, showAnalytics: true },
     });
+    return Promise.resolve();
   }
 
-  async onClose(): Promise<void> {
+  onClose(): Promise<void> {
     if (this.svelteComponent) {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
+    return Promise.resolve();
   }
 }

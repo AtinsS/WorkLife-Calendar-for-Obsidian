@@ -33,9 +33,11 @@ export class ConfirmationModal extends CustomModal {
         cls: "wf-btn-confirm",
         text: cta,
       })
-      .addEventListener("click", async (e) => {
-        await onAccept(e);
-        this.close();
+      .addEventListener("click", (e) => {
+        void (async () => {
+          await onAccept(e);
+          this.close();
+        })();
       });
   }
 }

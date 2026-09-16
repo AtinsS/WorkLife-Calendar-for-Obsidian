@@ -1212,7 +1212,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .setDesc(desc)
       .addColorPicker((picker) => {
         picker.setValue(currentColor).onChange(async (value) => {
-          await this.plugin.writeOptions({ [key]: value } as Partial<ISettings>);
+          await this.plugin.writeOptions({ [key]: value });
           applyAllColors(this.plugin.options);
         });
       })
@@ -1221,7 +1221,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           .setButtonText(tRaw("common.reset"))
           .setTooltip(tRaw("settings.appearance.resetColors"))
           .onClick(async () => {
-            await this.plugin.writeOptions({ [key]: defaultValue } as Partial<ISettings>);
+            await this.plugin.writeOptions({ [key]: defaultValue });
             applyAllColors(this.plugin.options);
             this.display();
           })
@@ -1740,27 +1740,31 @@ priority: medium
 
         const testNowBtn = testActions.createEl("button", { text: tRaw("settings.notifications.testNow") });
         testNowBtn.addClass("mod-cta");
-        testNowBtn.addEventListener("click", async () => {
-          testNowBtn.disabled = true;
-          testNowBtn.textContent = "...";
-          const result = await this.plugin.notificationService?.testNtfyImmediate();
-          testNowBtn.textContent = result?.ok ? "✓" : `✗ ${result?.error || ""}`;
-          window.setTimeout(() => {
-            testNowBtn.disabled = false;
-            testNowBtn.textContent = tRaw("settings.notifications.testNow");
-          }, 3000);
+        testNowBtn.addEventListener("click", () => {
+          void (async () => {
+            testNowBtn.disabled = true;
+            testNowBtn.textContent = "...";
+            const result = await this.plugin.notificationService?.testNtfyImmediate();
+            testNowBtn.textContent = result?.ok ? "✓" : `✗ ${result?.error || ""}`;
+            window.setTimeout(() => {
+              testNowBtn.disabled = false;
+              testNowBtn.textContent = tRaw("settings.notifications.testNow");
+            }, 3000);
+          })();
         });
 
         const testLaterBtn = testActions.createEl("button", { text: tRaw("settings.notifications.testScheduled") });
-        testLaterBtn.addEventListener("click", async () => {
-          testLaterBtn.disabled = true;
-          testLaterBtn.textContent = "...";
-          const result = await this.plugin.notificationService?.testNtfyScheduled();
-          testLaterBtn.textContent = result?.ok ? "✓ (1 min)" : `✗ ${result?.error || ""}`;
-          window.setTimeout(() => {
-            testLaterBtn.disabled = false;
-            testLaterBtn.textContent = tRaw("settings.notifications.testScheduled");
-          }, 3000);
+        testLaterBtn.addEventListener("click", () => {
+          void (async () => {
+            testLaterBtn.disabled = true;
+            testLaterBtn.textContent = "...";
+            const result = await this.plugin.notificationService?.testNtfyScheduled();
+            testLaterBtn.textContent = result?.ok ? "✓ (1 min)" : `✗ ${result?.error || ""}`;
+            window.setTimeout(() => {
+              testLaterBtn.disabled = false;
+              testLaterBtn.textContent = tRaw("settings.notifications.testScheduled");
+            }, 3000);
+          })();
         });
       }
 

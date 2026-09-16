@@ -61,7 +61,7 @@ function simpleHash(str: string): string {
 const moduleQueues = new Map<string, Promise<void>>();
 
 function enqueueModuleWrite(moduleName: string, fn: () => Promise<void>): Promise<void> {
-  const current = moduleQueues.get(moduleName) || Promise.resolve();
+  const current = moduleQueues.get(moduleName) ?? Promise.resolve();
   const next = current.then(fn, fn);
   moduleQueues.set(moduleName, next.catch((e: unknown) => {
     console.error(`[vaultStorage] Write failed for module "${moduleName}":`, e);
@@ -139,7 +139,7 @@ export async function loadModuleData(
 
   console.debug(`[VS] loadModule(${moduleName}): start`);
   const data = await tryLoadJson(app, primaryPath);
-  console.debug(`[VS] loadModule(${moduleName}): primary=${data ? Object.keys(data).length + 'k' : 'null'}`);
+  console.debug(`[VS] loadModule(${moduleName}): primary=${data ? `${Object.keys(data).length}k` : 'null'}`);
   if (data !== null) {
     // Verify checksum if meta exists
     const meta = await loadMeta(app);

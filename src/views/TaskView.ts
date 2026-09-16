@@ -11,7 +11,9 @@ import HabitPanel from "../habit-tracker/HabitPanel.svelte";
 import { get } from "svelte/store";
 import { tRaw } from "../i18n";
 import { selectedDate, projects, taskFilter } from "../task-tracker/stores";
+import type { IProject } from "../task-tracker/types";
 import { settings } from "../ui/stores";
+import type { ISettings } from "src/settings";
 import { getDateUID } from "obsidian-daily-notes-interface";
 
 export default class TaskView extends ItemView {
@@ -46,12 +48,12 @@ export default class TaskView extends ItemView {
     return Promise.resolve();
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): Promise<void> {
     this.contentEl.empty();
     this.contentEl.addClass("task-view");
 
     selectedDate.set(getDateUID(momentFn(), "day"));
-    const currentSettings = get(settings);
+    const currentSettings: ISettings = get(settings);
 
     // Main layout: sidebar + panels
     const body = this.contentEl.createDiv({ cls: "task-view-body" });
@@ -87,18 +89,20 @@ export default class TaskView extends ItemView {
 
     // Project sidebar
     this.renderProjectSidebar();
+    return Promise.resolve();
   }
 
   private renderProjectSidebar(): void {
     if (!this.projectSidebar) return;
 
-    projects.subscribe((projectList) => {
+    projects.subscribe((projectList: IProject[]) => {
       this.projectSidebar.empty();
 
       const allBtn = this.projectSidebar.createDiv({ cls: "task-view-sidebar-btn" });
       allBtn.createDiv({ cls: "task-view-sidebar-icon", text: "📂" });
       allBtn.createDiv({ cls: "task-view-sidebar-name", text: tRaw("tasks.tabs.all") });
-      if (get(taskFilter).projectId === null) allBtn.addClass("active");
+      const filter: { projectId: string | null } = get(taskFilter);
+      if (filter.projectId === null) allBtn.addClass("active");
       allBtn.addEventListener("click", () => taskFilter.update((f) => ({ ...f, projectId: null })));
 
       const activeProjects = projectList.filter((p) => !p.archived);
@@ -107,7 +111,7 @@ export default class TaskView extends ItemView {
         btn.style.setProperty("--project-color", project.color || "var(--mcp-accent)");
         btn.createDiv({ cls: "task-view-sidebar-icon", text: project.icon || "📁" });
         btn.createDiv({ cls: "task-view-sidebar-name", text: project.name });
-        if (get(taskFilter).projectId === project.id) btn.addClass("active");
+        if (filter.projectId === project.id) btn.addClass("active");
         btn.addEventListener("click", () => {
           taskFilter.update((f) => ({
             ...f,
@@ -119,13 +123,13 @@ export default class TaskView extends ItemView {
 
     taskFilter.subscribe(() => {
       if (!this.projectSidebar) return;
-      const currentFilter = get(taskFilter);
+      const currentFilter: { projectId: string | null } = get(taskFilter);
       const buttons = this.projectSidebar.querySelectorAll(".task-view-sidebar-btn");
       buttons.forEach((btn, i) => {
         if (i === 0) {
           btn.classList.toggle("active", currentFilter.projectId === null);
         } else {
-          const projectList = get(projects);
+          const projectList: IProject[] = get(projects);
           const activeProjects = projectList.filter((p) => !p.archived);
           const project = activeProjects[i - 1];
           if (project) btn.classList.toggle("active", currentFilter.projectId === project.id);
@@ -141,13 +145,13 @@ export default class TaskView extends ItemView {
 
     const existing = workspace.getLeavesOfType(viewType);
     if (existing.length) {
-      workspace.revealLeaf(existing[0]);
+      void workspace.revealLeaf(existing[0]);
       return;
     }
     const leaf = workspace.getLeaf("tab");
     if (leaf) {
-      leaf.setViewState({ type: viewType, active: true });
-      workspace.revealLeaf(leaf);
+      void leaf.setViewState({ type: viewType, active: true });
+      void workspace.revealLeaf(leaf);
     }
   }
 
@@ -156,6 +160,6 @@ export default class TaskView extends ItemView {
       : viewType === "schedule" ? (window.innerWidth <= 768 ? VIEW_TYPE_MOBILE_SCHEDULE : VIEW_TYPE_SCHEDULE)
       : null;
     if (!target) return;
-    this.leaf.setViewState({ type: target, active: true });
+    void this.leaf.setViewState({ type: target, active: true });
   }
 }

@@ -1,4 +1,4 @@
-﻿module.exports = {
+module.exports = {
   root: true,
   parser: "@typescript-eslint/parser",
   plugins: ["@typescript-eslint"],
@@ -16,7 +16,6 @@
     "@typescript-eslint/no-unsafe-call": "warn",
     "@typescript-eslint/no-unsafe-member-access": "warn",
     "@typescript-eslint/no-unsafe-return": "warn",
-    "@typescript-eslint/no-unsafe-argument": "warn",
     "@typescript-eslint/no-explicit-any": "warn",
   },
 };

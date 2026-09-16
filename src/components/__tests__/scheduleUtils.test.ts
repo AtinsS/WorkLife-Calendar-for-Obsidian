@@ -281,7 +281,7 @@ describe("tasksToEvents", () => {
     const events = tasksToEvents(taskList, []);
 
     expect(events.length).toBe(1);
-    expect((events[0].extendedProps.task as ITask).description).toBe("Some description");
+    expect((events[0].extendedProps.task ).description).toBe("Some description");
   });
 
   it("should handle tasks with recurrence", () => {

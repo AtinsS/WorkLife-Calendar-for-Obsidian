@@ -6,7 +6,7 @@ import type {
 import { get } from "svelte/store";
 
 import { habitLogs, habits } from "./stores";
-import type { IHabitLog } from "./types";
+import type { IHabit, IHabitLog } from "./types";
 
 // --- Cached lookup to avoid N store reads per render ---
 let cachedLogs: IHabitLog[] = [];
@@ -30,7 +30,7 @@ function getLogsMap(): Map<string, number> {
 }
 
 function getActiveCount(): number {
-  const current = get(habits);
+  const current: IHabit[] = get(habits);
   const version: number = current.length;
   if (version !== cachedHabitsVersion) {
     cachedHabitsVersion = version;
@@ -64,7 +64,7 @@ function getWeeklyMetadataForDate(weekStart: Moment): IDayMetadata {
   let totalCount = 0;
 
   for (let i = 0; i < 7; i++) {
-    const dateStr = weekStart.clone().add(i, "days").format("YYYY-MM-DD");
+    const dateStr: string = weekStart.clone().add(i, "days").format("YYYY-MM-DD");
     totalCount += map.get(dateStr) || 0;
   }
 
@@ -86,12 +86,12 @@ function getWeeklyMetadataForDate(weekStart: Moment): IDayMetadata {
 }
 
 export const habitSource: ICalendarSource = {
-  getDailyMetadata: async (date: Moment): Promise<IDayMetadata> => {
-    const dateStr = date.format("YYYY-MM-DD");
-    return getMetadataForDate(dateStr);
+  getDailyMetadata: (date: Moment): Promise<IDayMetadata> => {
+    const dateStr: string = date.format("YYYY-MM-DD");
+    return Promise.resolve(getMetadataForDate(dateStr));
   },
-  getWeeklyMetadata: async (date: Moment): Promise<IDayMetadata> => {
-    const weekStart = date.clone().startOf("week");
-    return getWeeklyMetadataForDate(weekStart);
+  getWeeklyMetadata: (date: Moment): Promise<IDayMetadata> => {
+    const weekStart: Moment = date.clone().startOf("week");
+    return Promise.resolve(getWeeklyMetadataForDate(weekStart));
   },
 };

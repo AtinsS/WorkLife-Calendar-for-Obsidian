@@ -64,7 +64,7 @@ export default class CalendarView extends ItemView {
     return Promise.resolve();
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): Promise<void> {
     this.contentEl.empty();
     if (this.calendar) { this.calendar.$destroy(); this.calendar = null; }
     selectedDate.set(getDateUID(momentFn(), "day"));
@@ -89,6 +89,7 @@ export default class CalendarView extends ItemView {
     this.tasksUnsub = tasks.subscribe(() => {
       if (this.calendar) this.calendar.$set({});
     });
+    return Promise.resolve();
   }
 
   private activeTooltip: HTMLElement | null = null;
@@ -96,7 +97,8 @@ export default class CalendarView extends ItemView {
   onHoverDay = (date: Moment, targetEl: EventTarget, isMetaPressed: boolean): void => {
     if (isMetaPressed) {
       const { format } = getDailyNoteSettings();
-      const note = getDailyNote(date, get(dailyNotes));
+      const dailyNotesMap: Record<string, TFile> = get(dailyNotes);
+      const note: TFile | null = getDailyNote(date, dailyNotesMap);
       this.app.workspace.trigger("link-hover", this, targetEl, date.format(format), note?.path);
     }
   };
@@ -107,13 +109,15 @@ export default class CalendarView extends ItemView {
 
   onHoverWeek = (date: Moment, targetEl: EventTarget, isMetaPressed: boolean): void => {
     if (!isMetaPressed) return;
-    const note = getWeeklyNote(date, get(weeklyNotes));
+    const weeklyNotesMap: Record<string, TFile> = get(weeklyNotes);
+    const note: TFile | null = getWeeklyNote(date, weeklyNotesMap);
     const { format } = getWeeklyNoteSettings();
     this.app.workspace.trigger("link-hover", this, targetEl, date.format(format), note?.path);
   };
 
   private onContextMenuDay = (date: Moment, event: MouseEvent): void => {
-    const note = getDailyNote(date, get(dailyNotes));
+    const dailyNotesMap: Record<string, TFile> = get(dailyNotes);
+    const note: TFile | null = getDailyNote(date, dailyNotesMap);
     const onQuickAdd = () => {
       new QuickAddModal(this.app, date).open();
     };
@@ -121,7 +125,8 @@ export default class CalendarView extends ItemView {
   };
 
   private onContextMenuWeek = (date: Moment, event: MouseEvent): void => {
-    const note = getWeeklyNote(date, get(weeklyNotes));
+    const weeklyNotesMap: Record<string, TFile> = get(weeklyNotes);
+    const note: TFile | null = getWeeklyNote(date, weeklyNotesMap);
     if (!note) return;
     showNoteContextMenu(this.app, note, { x: event.pageX, y: event.pageY });
   };
@@ -132,8 +137,10 @@ export default class CalendarView extends ItemView {
   };
 
   private onFileDeleted = (file: TFile): void => {
-    if (getDateFromFile(file, "day")) dailyNotes.reindex();
-    if (getDateFromFile(file, "week")) weeklyNotes.reindex();
+    const dayDate: Moment | null = getDateFromFile(file, "day");
+    if (dayDate) dailyNotes.reindex();
+    const weekDate: Moment | null = getDateFromFile(file, "week");
+    if (weekDate) weeklyNotes.reindex();
     this.updateActiveFile();
   };
 
@@ -143,8 +150,10 @@ export default class CalendarView extends ItemView {
 
   private onFileCreated = (file: TFile): void => {
     if (this.app.workspace.layoutReady) {
-      if (getDateFromFile(file, "day")) dailyNotes.reindex();
-      if (getDateFromFile(file, "week")) weeklyNotes.reindex();
+      const dayDate: Moment | null = getDateFromFile(file, "day");
+      if (dayDate) dailyNotes.reindex();
+      const weekDate: Moment | null = getDateFromFile(file, "week");
+      if (weekDate) weeklyNotes.reindex();
     }
   };
 
@@ -165,7 +174,7 @@ export default class CalendarView extends ItemView {
     const activeLeaf = this.app.workspace.activeLeaf;
     if (!activeLeaf) return;
     if (activeLeaf.view instanceof FileView) {
-      let date = getDateFromFile(activeLeaf.view.file, "day");
+      let date: Moment | null = getDateFromFile(activeLeaf.view.file, "day");
       if (date) { this.calendar.$set({ displayedMonth: date }); return; }
       const { format } = getWeeklyNoteSettings();
       date = momentFn(activeLeaf.view.file.basename, format, true);
@@ -181,7 +190,7 @@ export default class CalendarView extends ItemView {
 
   selectDateForDay = (date: Moment): void => {
     const dateUID = getDateUID(date, "day");
-    const current = get(selectedDate);
+    const current: string | null = get(selectedDate);
     if (current === dateUID) {
       selectedDate.set(null);
       activeFile.setUID("");
@@ -198,13 +207,13 @@ export default class CalendarView extends ItemView {
     const viewType = isMobile ? VIEW_TYPE_MOBILE_TASKS : VIEW_TYPE_TASKS;
     const existing = workspace.getLeavesOfType(viewType);
     if (existing.length) {
-      workspace.revealLeaf(existing[0]);
+      void workspace.revealLeaf(existing[0]);
       return;
     }
     const leaf = workspace.getLeaf("tab");
     if (leaf) {
-      leaf.setViewState({ type: viewType, active: true });
-      workspace.revealLeaf(leaf);
+      void leaf.setViewState({ type: viewType, active: true });
+      void workspace.revealLeaf(leaf);
     }
   }
 

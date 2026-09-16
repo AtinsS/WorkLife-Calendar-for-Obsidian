@@ -4,6 +4,7 @@ import { get } from "svelte/store";
 import { VIEW_TYPE_SCHEDULE, VIEW_TYPE_TASKS, VIEW_TYPE_KANBAN, VIEW_TYPE_MOBILE_TASKS } from "../constants";
 import type CalendarPlugin from "../main";
 import { settings } from "../ui/stores";
+import type { ISettings } from "src/settings";
 import { tRaw } from "../i18n";
 import ScheduleCalendar from "../components/ScheduleCalendar.svelte";
 
@@ -29,14 +30,14 @@ export default class ScheduleView extends ItemView {
     return "calendar";
   }
 
-  async onOpen(): Promise<void> {
+  onOpen(): Promise<void> {
     // Destroy stale component if onOpen is called again (hot-reload / workspace restore)
     if (this.svelteComponent) {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
 
-    const container = this.containerEl.children[1];
+    const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("schedule-view-container");
 
@@ -47,24 +48,25 @@ export default class ScheduleView extends ItemView {
     const btnTasks = header.createEl("button", { text: "✅", cls: "view-switch-btn", attr: { title: tRaw("tasks.panel.title") } });
     const btnKanban = header.createEl("button", { text: "▦", cls: "view-switch-btn", attr: { title: tRaw("kanban.title") } });
     header.createEl("button", { text: "📅", cls: "view-switch-btn active", attr: { title: tRaw("hello.navSchedule") } });
-    btnTasks.addEventListener("click", () => this.leaf.setViewState({ type: tasksView, active: true }));
-    btnKanban.addEventListener("click", () => this.leaf.setViewState({ type: VIEW_TYPE_KANBAN, active: true }));
+    btnTasks.addEventListener("click", () => void this.leaf.setViewState({ type: tasksView, active: true }));
+    btnKanban.addEventListener("click", () => void this.leaf.setViewState({ type: VIEW_TYPE_KANBAN, active: true }));
+
+    const currentSettings: ISettings = get(settings);
 
     this.svelteComponent = new ScheduleCalendar({
-      target: container as HTMLElement,
+      target: container,
       props: {
         plugin: this.plugin,
-        scheduleDisplay: get(settings),
-        weatherEnabled: get(settings).weatherEnabled,
-        weatherLatitude: get(settings).weatherLatitude,
-        weatherLongitude: get(settings).weatherLongitude,
-        weatherProvider: get(settings).weatherProvider || "open-meteo",
-        weatherApiKey: get(settings).weatherApiKey,
+        scheduleDisplay: currentSettings,
+        weatherEnabled: currentSettings.weatherEnabled,
+        weatherLatitude: currentSettings.weatherLatitude,
+        weatherLongitude: currentSettings.weatherLongitude,
+        weatherProvider: currentSettings.weatherProvider || "open-meteo",
+        weatherApiKey: currentSettings.weatherApiKey,
       },
     });
 
-    // Reactively update scheduleDisplay and weather when settings change
-    this.settingsUnsub = settings.subscribe((val) => {
+    this.settingsUnsub = settings.subscribe((val: ISettings) => {
       if (this.svelteComponent) {
         this.svelteComponent.$set({
           scheduleDisplay: val,
@@ -76,9 +78,10 @@ export default class ScheduleView extends ItemView {
         });
       }
     });
+    return Promise.resolve();
   }
 
-  async onClose(): Promise<void> {
+  onClose(): Promise<void> {
     if (this.settingsUnsub) {
       this.settingsUnsub();
       this.settingsUnsub = null;
@@ -87,5 +90,6 @@ export default class ScheduleView extends ItemView {
       this.svelteComponent.$destroy();
       this.svelteComponent = null;
     }
+    return Promise.resolve();
   }
 }

@@ -39,26 +39,28 @@ async function loadFinanceDataFromVault(): Promise<void> {
   if (!pluginInstance) return;
 
   // Finance always uses vaultStorage (split-file format)
-  const moduleData = await loadModuleData(pluginInstance.app, "finance");
+  const moduleData = await loadModuleData(pluginInstance.app, "finance") as IFinanceData;
   if (moduleData && Object.keys(moduleData).length > 0) {
-    financeData.set(moduleData as IFinanceData);
+    financeData.set(moduleData);
   }
   loaded = true;
 }
 
-async function debouncedSave(): Promise<void> {
+function debouncedSave(): void {
   if (!loaded) return;
   storeIsDirty = true;
   if (saveTimeout) window.clearTimeout(saveTimeout);
-  saveTimeout = window.setTimeout(async () => {
-    if (!pluginInstance) return;
-    isSaving = true;
-    try {
-      await saveModuleData(pluginInstance.app, "finance", get(financeData));
-    } finally {
-      isSaving = false;
-      storeIsDirty = false;
-    }
+  saveTimeout = window.setTimeout(() => {
+    void (async () => {
+      if (!pluginInstance) return;
+      isSaving = true;
+      try {
+        await saveModuleData(pluginInstance.app, "finance", get(financeData));
+      } finally {
+        isSaving = false;
+        storeIsDirty = false;
+      }
+    })();
   }, 300);
 }
 
@@ -70,7 +72,7 @@ export async function immediateFinanceSave(): Promise<void> {
   }
   isSaving = true;
   try {
-    await saveModuleData(pluginInstance.app, "finance", get(financeData) as unknown as Record<string, unknown>);
+    await saveModuleData(pluginInstance.app, "finance", get(financeData));
   } finally {
     isSaving = false;
     storeIsDirty = false;

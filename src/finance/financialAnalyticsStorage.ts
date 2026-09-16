@@ -66,19 +66,21 @@ async function loadFinancialAnalyticsDataFromVault(): Promise<void> {
   loaded = true;
 }
 
-async function debouncedSave(): Promise<void> {
+function debouncedSave(): void {
   if (!loaded) return;
   storeIsDirty = true;
   if (saveTimeout) window.clearTimeout(saveTimeout);
-  saveTimeout = window.setTimeout(async () => {
-    if (!pluginInstance) return;
-    isSaving = true;
-    try {
-      await saveModuleData(pluginInstance.app, "financialAnalytics", get(financialAnalyticsData));
-    } finally {
-      isSaving = false;
-      storeIsDirty = false;
-    }
+  saveTimeout = window.setTimeout(() => {
+    void (async () => {
+      if (!pluginInstance) return;
+      isSaving = true;
+      try {
+        await saveModuleData(pluginInstance.app, "financialAnalytics", get(financialAnalyticsData));
+      } finally {
+        isSaving = false;
+        storeIsDirty = false;
+      }
+    })();
   }, 300);
 }
 
@@ -143,7 +145,7 @@ export function getManualIncomeForMonth(year: number, month: number): number {
   const data = get(financialAnalyticsData);
   return data.manualIncomeSources
     .filter((source) => {
-      const match = source.date.match(/^(\d{4})-(\d{2})/);
+      const match = /^(\d{4})-(\d{2})/.exec(source.date);
       if (match) {
         return parseInt(match[1], 10) === year && parseInt(match[2], 10) === month;
       }

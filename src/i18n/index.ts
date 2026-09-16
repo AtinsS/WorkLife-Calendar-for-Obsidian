@@ -42,10 +42,10 @@ function createT() {
       if (params) {
         return Object.entries(params).reduce(
           (str, [k, v]) => str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v)),
-          value as string
+          value 
         );
       }
-      return value as string;
+      return value ;
     };
   });
 }
@@ -87,10 +87,10 @@ export function tRaw(key: string, params?: Record<string, string | number>): str
   if (params) {
     return Object.entries(params).reduce(
       (str, [k, v]) => str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v)),
-      value as string
+      value 
     );
   }
-  return value as string;
+  return value ;
 }
 
 /**

@@ -50,7 +50,7 @@ function buildNotePath(task: ITask, project: IProject | null, customPath?: strin
 
 function buildNoteContent(task: ITask, project: IProject | null): string {
   // Извлекаем дату из dateUID (формат: "day-YYYY-MM-DD")
-  const dateMatch = task.dateUID?.match(/^day-(\d{4}-\d{2}-\d{2})/);
+  const dateMatch = task.dateUID ? /^day-(\d{4}-\d{2}-\d{2})/.exec(task.dateUID) : null;
   const dateStr = dateMatch ? dateMatch[1] : "";
 
   // Маппинг статусов на символы Tasks плагина
@@ -97,7 +97,7 @@ function buildNoteContent(task: ITask, project: IProject | null): string {
 
   // Добавляем дедлайн (⏰)
   if (task.deadline) {
-    const deadlineMatch = task.deadline.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    const deadlineMatch = /^day-(\d{4}-\d{2}-\d{2})/.exec(task.deadline);
     if (deadlineMatch) {
       taskLine += ` ⏰ ${deadlineMatch[1]}`;
       if (task.deadlineTime) {
@@ -127,7 +127,7 @@ function buildNoteContent(task: ITask, project: IProject | null): string {
     `task_id: ${task.id}`,
     `title: ${task.title}`,
     `status: ${task.status}`,
-    `completed: ${task.completed}`,
+    `completed: ${String(task.completed)}`,
     `date: ${task.dateUID}`,
     `priority: ${task.priority}`,
     `tags: [${task.tags.map((t) => `"${t}"`).join(", ")}]`,
@@ -152,7 +152,7 @@ function buildNoteContent(task: ITask, project: IProject | null): string {
     frontmatter.push(`scheduled_time: ${task.scheduledTime}`);
   }
   if (task.isWorkTask) {
-    frontmatter.push(`is_work_task: ${task.isWorkTask}`);
+    frontmatter.push(`is_work_task: ${String(task.isWorkTask)}`);
     if (task.paymentType) {
       frontmatter.push(`payment_type: ${task.paymentType}`);
     }
@@ -337,7 +337,7 @@ export async function syncTaskToFrontmatter(
   newFrontmatter.push(`task_id: ${task.id}`);
   newFrontmatter.push(`title: ${task.title}`);
   newFrontmatter.push(`status: ${task.status}`);
-  newFrontmatter.push(`completed: ${task.completed}`);
+  newFrontmatter.push(`completed: ${String(task.completed)}`);
   newFrontmatter.push(`date: ${task.dateUID}`);
   newFrontmatter.push(`priority: ${task.priority}`);
   newFrontmatter.push(`tags: [${task.tags.map((t) => `"${t}"`).join(", ")}]`);
@@ -361,7 +361,7 @@ export async function syncTaskToFrontmatter(
     newFrontmatter.push(`scheduled_time: ${task.scheduledTime}`);
   }
   if (task.isWorkTask) {
-    newFrontmatter.push(`is_work_task: ${task.isWorkTask}`);
+    newFrontmatter.push(`is_work_task: ${String(task.isWorkTask)}`);
     if (task.paymentType) {
       newFrontmatter.push(`payment_type: ${task.paymentType}`);
     }
@@ -407,7 +407,7 @@ export async function syncTaskToFrontmatter(
   let taskLine = `- [${statusSymbol}] ${task.title}`;
 
   // Добавляем дату (📅)
-  const dateMatch = task.dateUID?.match(/^day-(\d{4}-\d{2}-\d{2})/);
+  const dateMatch = task.dateUID ? /^day-(\d{4}-\d{2}-\d{2})/.exec(task.dateUID) : null;
   if (dateMatch) {
     taskLine += ` 📅 ${dateMatch[1]}`;
   }
@@ -419,7 +419,7 @@ export async function syncTaskToFrontmatter(
 
   // Добавляем дедлайн (⏰)
   if (task.deadline) {
-    const deadlineMatch = task.deadline.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    const deadlineMatch = /^day-(\d{4}-\d{2}-\d{2})/.exec(task.deadline);
     if (deadlineMatch) {
       taskLine += ` ⏰ ${deadlineMatch[1]}`;
       if (task.deadlineTime) {
@@ -466,7 +466,7 @@ export async function syncTaskToFrontmatter(
 
   // Ищем строку задачи (начинается с "- [" и содержит любой статус)
   for (let i = 0; i < bodyLines.length; i++) {
-    if (bodyLines[i].match(/^- \[[ x/-]\]/)) {
+    if (/^- \[[ x/-]\]/.exec(bodyLines[i])) {
       taskLineIndex = i;
       break;
     }
@@ -521,7 +521,7 @@ function validateFrontmatterField(
   }
 
   if (validValues && !validValues.includes(value)) {
-    console.warn(`[Calendar Plugin] Invalid value for ${field}: "${value}". Ignoring.`);
+    console.warn(`[Calendar Plugin] Invalid value for ${field}: "${String(value)}". Ignoring.`);
     return { valid: false };
   }
 
@@ -530,7 +530,7 @@ function validateFrontmatterField(
 
 export function setupNoteRenameSync(app: App, plugin: CalendarPlugin): void {
   plugin.registerEvent(
-    app.vault.on("rename", async (file, oldPath) => {
+    app.vault.on("rename", (file, oldPath) => {
       if (!(file instanceof TFile)) return;
 
       // Ищем задачу по старому пути
@@ -547,7 +547,7 @@ export function setupNoteRenameSync(app: App, plugin: CalendarPlugin): void {
 
       // Проверяем frontmatter — возможно, это заметка задачи с другим task_id
       const cache = app.metadataCache.getFileCache(file);
-      const frontmatter = cache?.frontmatter;
+      const frontmatter = cache?.frontmatter as Record<string, unknown> | undefined;
       if (!frontmatter?.task_id) return;
 
       const taskId = frontmatter.task_id as string;
@@ -564,7 +564,7 @@ export function setupNoteRenameSync(app: App, plugin: CalendarPlugin): void {
 
 export function setupNoteDeleteSync(app: App, plugin: CalendarPlugin): void {
   plugin.registerEvent(
-    app.vault.on("delete", async (file) => {
+    app.vault.on("delete", (file) => {
       if (!(file instanceof TFile)) return;
 
       const allTasks = get(tasks);
@@ -603,7 +603,7 @@ function parseFrontmatterFromContent(content: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
   for (const line of fmLines) {
-    const match = line.match(/^([\w_]+):\s*(.*)/);
+    const match = /^([\w_]+):\s*(.*)/.exec(line);
     if (!match) continue;
     const key = match[1];
     const raw = match[2].trim();
@@ -628,15 +628,16 @@ function parseFrontmatterFromContent(content: string): Record<string, unknown> {
 
 export function setupNoteTaskSync(app: App, plugin: CalendarPlugin): void {
   plugin.registerEvent(
-    app.vault.on("modify", async (file) => {
+    app.vault.on("modify", (file) => {
       if (isSyncing) return;
       if (!(file instanceof TFile)) return;
 
       // Быстрая проверка через metadataCache — есть ли task_id
       const cache = app.metadataCache.getFileCache(file);
-      if (!cache?.frontmatter?.task_id) return;
+      const frontmatter = cache?.frontmatter as Record<string, unknown> | undefined;
+      if (!frontmatter?.task_id) return;
 
-      const taskId = cache.frontmatter.task_id as string;
+      const taskId = frontmatter.task_id as string;
 
       // Debounce — предотвращает гонку при быстром редакировании.
       // Чтение файла и парсинг frontmatter происходят ВНУТРИ таймера,
@@ -647,19 +648,21 @@ export function setupNoteTaskSync(app: App, plugin: CalendarPlugin): void {
 
       syncDebounceTimers.set(
         taskId,
-        window.setTimeout(async () => {
-          syncDebounceTimers.delete(taskId);
+        window.setTimeout(() => {
+          void (async () => {
+            syncDebounceTimers.delete(taskId);
 
-          const allTasks = get(tasks);
-          const task = allTasks.find((t) => t.id === taskId);
-          if (!task) return;
+            const allTasks = get(tasks);
+            const task = allTasks.find((t) => t.id === taskId);
+            if (!task) return;
 
-          // Читаем файл с диска — гарантированно свежие данные
-          const content = await app.vault.read(file);
-          const frontmatter = parseFrontmatterFromContent(content);
-          const taskLineData = parseTaskLine(content);
+            // Читаем файл с диска — гарантированно свежие данные
+            const content = await app.vault.read(file);
+            const frontmatter = parseFrontmatterFromContent(content);
+            const taskLineData = parseTaskLine(content);
 
-          applyFrontmatterChanges(taskId, frontmatter, task, taskLineData);
+            applyFrontmatterChanges(taskId, frontmatter, task, taskLineData);
+          })();
         }, SYNC_DEBOUNCE_MS)
       );
     })
@@ -693,22 +696,22 @@ function parseTaskLine(content: string): {
 
   // Ищем строку задачи (начинается с "- [")
   for (const line of lines) {
-    const match = line.match(/^- \[([ x/-])\]\s+(.*)/);
+    const match = /^- \[([ x/-])\]\s+(.*)/.exec(line);
     if (!match) continue;
 
     const status = symbolToStatus[match[1]] || "todo";
     const rest = match[2];
 
     // Извлекаем 📅 дату
-    const dateMatch = rest.match(/📅\s*(\d{4}-\d{2}-\d{2})/);
+    const dateMatch = /📅\s*(\d{4}-\d{2}-\d{2})/.exec(rest);
     const date = dateMatch ? `day-${dateMatch[1]}` : undefined;
 
     // Извлекаем 🛫 время запланировано
-    const scheduledMatch = rest.match(/🛫\s*(\d{1,2}:\d{2})/);
+    const scheduledMatch = /🛫\s*(\d{1,2}:\d{2})/.exec(rest);
     const scheduledTime = scheduledMatch ? scheduledMatch[1] : undefined;
 
     // Извлекаем ⏰ дедлайн
-    const deadlineMatch = rest.match(/⏰\s*(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}:\d{2}))?/);
+    const deadlineMatch = /⏰\s*(\d{4}-\d{2}-\d{2})(?:\s+(\d{1,2}:\d{2}))?/.exec(rest);
     const deadline = deadlineMatch ? `day-${deadlineMatch[1]}` : undefined;
     const deadlineTime = deadlineMatch?.[2];
 
@@ -812,7 +815,7 @@ function applyFrontmatterChanges(
 
   // tags
   if (Array.isArray(frontmatter.tags)) {
-    const validTags = frontmatter.tags.filter((t: unknown) => typeof t === "string") as string[];
+    const validTags: string[] = frontmatter.tags.filter((t: unknown): t is string => typeof t === "string");
     if (JSON.stringify(validTags) !== JSON.stringify(task.tags)) {
       changes.tags = validTags;
     }

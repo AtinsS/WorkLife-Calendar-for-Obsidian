@@ -15,7 +15,7 @@ describe("dateUID format consistency", () => {
   it("extractDateValue should parse date from dateUID", () => {
     // This is the regex used in TaskModal.extractDateValue
     const dateUID = "day-2026-07-05T00:00:00+03:00";
-    const match = dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    const match = /^day-(\d{4}-\d{2}-\d{2})/.exec(dateUID);
     expect(match).not.toBeNull();
     expect(match[1]).toBe("2026-07-05");
   });

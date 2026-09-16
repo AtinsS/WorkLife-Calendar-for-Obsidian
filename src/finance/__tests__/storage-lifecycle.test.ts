@@ -52,14 +52,16 @@ function createMockApp() {
         }
         return null;
       },
-      async read(file: { path: string }) {
-        return vaultStore[file.path] ?? "";
+      read(file: { path: string }) {
+        return Promise.resolve(vaultStore[file.path] ?? "");
       },
-      async modify(_file: { path: string }, content: string) {
+      modify(_file: { path: string }, content: string) {
         vaultStore[_file.path] = content;
+        return Promise.resolve();
       },
-      async create(path: string, content: string) {
+      create(path: string, content: string) {
         vaultStore[path] = content;
+        return Promise.resolve();
       },
       async createDir(_path: string) {
         // no-op — directories are implicit in vault mock
@@ -81,14 +83,28 @@ async function flushDebounce(): Promise<void> {
 function getParsedFinanceVault(): Record<string, FinanceMonthData> {
   const raw = vaultStore["calendar-data/finance.json"];
   if (!raw) return {};
-  return JSON.parse(raw);
+  return JSON.parse(raw) as Record<string, FinanceMonthData>;
 }
 
 /** Read parsed analytics data from the split vault file. */
-function getParsedAnalyticsVault(): Record<string, unknown> {
+interface ManualIncomeSource {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  category: string;
+  createdAt: number;
+}
+
+interface AnalyticsVaultData {
+  manualIncomeSources?: ManualIncomeSource[];
+  [key: string]: unknown;
+}
+
+function getParsedAnalyticsVault(): AnalyticsVaultData {
   const raw = vaultStore["calendar-data/financialAnalytics.json"];
   if (!raw) return {};
-  return JSON.parse(raw);
+  return JSON.parse(raw) as AnalyticsVaultData;
 }
 
 /** Convenience: set finance vault data for tests. */
@@ -168,8 +184,8 @@ describe("initFinanceStores — vault loading", () => {
     expect(store["2026-07"]?.monthlyIncome).toBe(999);
   });
 
-  it("should NOT crash if pluginInstance is null (no init)", async () => {
-    expect(async () => await reloadFinanceStores()).not.toThrow();
+  it("should NOT crash if pluginInstance is null (no init)", () => {
+    expect(() => reloadFinanceStores()).not.toThrow();
   });
 });
 
@@ -181,7 +197,7 @@ describe("updateMonthData — vault saving", () => {
     setTasksVault({ version: 6 });
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", {
@@ -206,13 +222,13 @@ describe("updateMonthData — vault saving", () => {
     setTasksVault({ version: 6, tasks: [{ id: "t-1" }] });
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", { monthlyIncome: 50000 });
     await flushDebounce();
 
-    const tasksVault = JSON.parse(vaultStore["calendar-data/tasks.json"]);
+    const tasksVault = JSON.parse(vaultStore["calendar-data/tasks.json"]) as Record<string, unknown>;
     const financeVault = getParsedFinanceVault();
     expect(tasksVault.tasks).toHaveLength(1);
     expect(financeVault["2026-07"].monthlyIncome).toBe(50000);
@@ -232,7 +248,7 @@ describe("updateMonthData — vault saving", () => {
     });
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     const before = getMonthData("2026-06");
@@ -264,7 +280,7 @@ describe("reloadFinanceStores — external vault changes", () => {
     });
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     expect(getMonthData("2026-07").monthlyIncome).toBe(100000);
@@ -281,7 +297,7 @@ describe("reloadFinanceStores — external vault changes", () => {
       },
     });
 
-    reloadFinanceStores();
+    void reloadFinanceStores();
     await flushDebounce();
 
     const data = getMonthData("2026-07");
@@ -302,7 +318,7 @@ describe("reloadFinanceStores — external vault changes", () => {
     });
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     delete vaultStore["calendar-data/finance.json"];
@@ -320,7 +336,7 @@ describe("Full round-trip — write → save → reload → verify", () => {
     setTasksVault({});
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", {
@@ -350,7 +366,7 @@ describe("Full round-trip — write → save → reload → verify", () => {
     expect(vault["2026-07"].distributionRules).toHaveLength(3);
 
     financeData.set({});
-    reloadFinanceStores();
+    void reloadFinanceStores();
     await flushDebounce();
 
     const reloaded = getMonthData("2026-07");
@@ -373,13 +389,13 @@ describe("Full round-trip — write → save → reload → verify", () => {
     setFinanceVault({}); // empty finance
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", { monthlyIncome: 77777 });
     await flushDebounce();
 
-    const tasksVault = JSON.parse(vaultStore["calendar-data/tasks.json"]);
+    const tasksVault = JSON.parse(vaultStore["calendar-data/tasks.json"]) as Record<string, unknown>;
     const financeVault = getParsedFinanceVault();
     expect(tasksVault.tasks).toHaveLength(1);
     expect(financeVault["2026-07"].monthlyIncome).toBe(77777);
@@ -394,7 +410,7 @@ describe("debouncedSave — rapid updates", () => {
     setTasksVault({});
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", { monthlyIncome: 10000 });
@@ -413,7 +429,7 @@ describe("debouncedSave — rapid updates", () => {
     setTasksVault({});
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", { monthlyIncome: 100000 });
@@ -444,7 +460,7 @@ describe("getMonthData — no store mutation", () => {
     setTasksVault({});
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", {
@@ -494,7 +510,7 @@ describe("Computed helpers with vault data", () => {
     });
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     expect(getMainAccountTotal("2026-07")).toBe(53000);
@@ -513,7 +529,7 @@ describe("addIncome — accumulation and vault persistence", () => {
     setTasksVault({});
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     const monthKey = getCurrentMonthKey();
@@ -542,7 +558,7 @@ describe("Delete operations — vault persistence", () => {
     setTasksVault({});
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-06", { monthlyIncome: 100000 });
@@ -562,7 +578,7 @@ describe("Delete operations — vault persistence", () => {
     setTasksVault({});
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-05", { monthlyIncome: 1 });
@@ -593,7 +609,7 @@ describe("Financial Analytics — full lifecycle", () => {
     });
 
     const plugin = createMockPlugin();
-    initFinancialAnalyticsStores(plugin);
+    void initFinancialAnalyticsStores(plugin);
     await flushDebounce();
 
     expect(getTotalManualIncome()).toBe(45000);
@@ -610,7 +626,7 @@ describe("Financial Analytics — full lifecycle", () => {
     expect(vault.manualIncomeSources[1].name).toBe("Консультации");
 
     financialAnalyticsData.set({ manualIncomeSources: [], incomeCategories: [] });
-    reloadFinancialAnalyticsStores();
+    void reloadFinancialAnalyticsStores();
     await flushDebounce();
 
     expect(getTotalManualIncome()).toBe(60000);
@@ -624,7 +640,7 @@ describe("Financial Analytics — full lifecycle", () => {
     });
 
     const plugin = createMockPlugin();
-    initFinancialAnalyticsStores(plugin);
+    void initFinancialAnalyticsStores(plugin);
     await flushDebounce();
 
     updateManualIncomeSource("mi-1", { name: "Новый", amount: 20000 });
@@ -645,7 +661,7 @@ describe("Financial Analytics — full lifecycle", () => {
     setAnalyticsVault({ manualIncomeSources: [] });
 
     const plugin = createMockPlugin();
-    initFinancialAnalyticsStores(plugin);
+    void initFinancialAnalyticsStores(plugin);
     await flushDebounce();
 
     addManualIncomeSource({ name: "Фриланс проект", amount: 50000, date: "2026-07-15", category: "Фриланс" });
@@ -664,7 +680,7 @@ describe("Financial Analytics — full lifecycle", () => {
     });
 
     const plugin = createMockPlugin();
-    initFinancialAnalyticsStores(plugin);
+    void initFinancialAnalyticsStores(plugin);
     await flushDebounce();
 
     updateManualIncomeSource("mi-1", { category: "Инвестиции" });
@@ -717,7 +733,7 @@ describe("Edge cases", () => {
     vaultStore["calendar-data/finance.json"] = "";
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     const data = getMonthData(getCurrentMonthKey());
@@ -728,7 +744,7 @@ describe("Edge cases", () => {
     vaultStore["calendar-data/finance.json"] = "NOT JSON {{{";
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     const data = getMonthData(getCurrentMonthKey());
@@ -737,7 +753,7 @@ describe("Edge cases", () => {
 
   it("should create vault file if it does not exist", async () => {
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", { monthlyIncome: 100 });
@@ -752,7 +768,7 @@ describe("Edge cases", () => {
     setTasksVault({});
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", { monthlyIncome: 100000 });
@@ -776,7 +792,7 @@ describe("incomeSource field", () => {
     setTasksVault({});
 
     const plugin = createMockPlugin();
-    initFinanceStores(plugin);
+    void initFinanceStores(plugin);
     await flushDebounce();
 
     updateMonthData("2026-07", {
@@ -789,7 +805,7 @@ describe("incomeSource field", () => {
     expect(vault["2026-07"].incomeSource).toBe("manual");
 
     financeData.set({});
-    reloadFinanceStores();
+    void reloadFinanceStores();
     await flushDebounce();
 
     const data = getMonthData("2026-07");

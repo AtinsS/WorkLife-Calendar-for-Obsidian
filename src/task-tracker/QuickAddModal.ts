@@ -72,7 +72,7 @@ interface ParsedResult {
 function parseQuickInput(raw: string): ParsedResult {
   const text = raw.trim();
   const loc = get(locale) === "en" ? "en" : "ru";
-  const now = wm() as Moment;
+  const now = wm();
   const found: ParsedSegment[] = [];
   let scheduledTime: string | null = null;
   let endTime: string | null = null;
@@ -83,7 +83,7 @@ function parseQuickInput(raw: string): ParsedResult {
 
   // --- 1. Find priority at start ---
   const prioRe = /^(!{1,2}|~|-)\s*/;
-  const prioM = text.match(prioRe);
+  const prioM = prioRe.exec(text);
   if (prioM) {
     const p = prioM[1];
     priority = p === "!" || p === "!!" ? "high" : p === "~" ? "medium" : "low";
@@ -117,7 +117,7 @@ function parseQuickInput(raw: string): ParsedResult {
     { re: /(?:^|\s)(\d{1,2})[./](\d{1,2})(?:\s|$)/g, resolve: (m) => {
       const day = parseInt(m[1]), month = parseInt(m[2]);
       if (day < 1 || day > 31 || month < 1 || month > 12) return null;
-      const target = wm({ year: now.year(), month: month - 1, day }) as Moment;
+      const target = wm({ year: now.year(), month: month - 1, day });
       if (target.isBefore(now, "day")) target.add(1, "year");
       return { date: target, label: m[0].trim() };
     }},
@@ -126,13 +126,13 @@ function parseQuickInput(raw: string): ParsedResult {
       const day = parseInt(m[1]);
       const monthNum = monthMap[m[2].toLowerCase()];
       if (day < 1 || day > 31 || monthNum === undefined) return null;
-      const target = wm({ year: now.year(), month: monthNum - 1, day }) as Moment;
+      const target = wm({ year: now.year(), month: monthNum - 1, day });
       if (target.isBefore(now, "day")) target.add(1, "year");
       return { date: target, label: m[0].trim() };
     }},
     // YYYY-MM-DD
     { re: /(?:^|\s)(\d{4})-(\d{2})-(\d{2})(?:\s|$)/g, resolve: (m) => {
-      const target = wm(`${m[1]}-${m[2]}-${m[3]}`, "YYYY-MM-DD", true) as Moment;
+      const target = wm(`${m[1]}-${m[2]}-${m[3]}`, "YYYY-MM-DD", true);
       return target.isValid() ? { date: target, label: m[0].trim() } : null;
     }},
   ];

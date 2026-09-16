@@ -120,14 +120,13 @@ export class ProjectModal extends CustomModal {
     header.createEl("span", { text: tRaw("tasks.project.newProject"), cls: "pm-section-title" });
     const chevron = header.createEl("span", { text: "▾", cls: "pm-chevron" });
 
-    const body = section.createDiv("pm-section-body");
-    body.style.display = "none";
+    const body = section.createDiv("pm-section-body pm-section-collapsed");
     chevron.textContent = "▸";
 
     let isExpanded = false;
     header.addEventListener("click", () => {
       isExpanded = !isExpanded;
-      body.style.display = isExpanded ? "" : "none";
+      body.classList.toggle("pm-section-collapsed", !isExpanded);
       chevron.textContent = isExpanded ? "▾" : "▸";
     });
 

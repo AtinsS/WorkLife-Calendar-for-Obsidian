@@ -5,7 +5,6 @@ import type CalendarPlugin from "src/main";
 
 // Obsidian's type defs export moment as `typeof Moment` (the module namespace),
 // but at runtime it's the callable moment function. Cast once here.
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Obsidian types moment as namespace, runtime is callable
 const momentFn = moment as unknown as (inp?: unknown, format?: string, strict?: boolean) => Moment;
 import { tasks } from "src/task-tracker/stores";
 import type { ITask } from "src/task-tracker/types";
@@ -55,7 +54,7 @@ export class NotificationService {
    *  Keys are task IDs (or "id-deadline"), values are Unix delivery timestamps. */
   private loadNtfySchedule(): Record<string, number> {
     try {
-      const raw = localStorage.getItem(NTFY_DEDUP_KEY);
+      const raw = this.plugin.app.loadLocalStorage(NTFY_DEDUP_KEY) as string | null;
       if (!raw) return {};
       return JSON.parse(raw) as Record<string, number>;
     } catch {
@@ -71,7 +70,7 @@ export class NotificationService {
       if (v > now) pruned[k] = v;
     }
     try {
-      localStorage.setItem(NTFY_DEDUP_KEY, JSON.stringify(pruned));
+      this.plugin.app.saveLocalStorage(NTFY_DEDUP_KEY, JSON.stringify(pruned));
     } catch { /* quota exceeded — ignore */ }
   }
 
@@ -172,10 +171,10 @@ export class NotificationService {
             this.firedEstimateExceeded.add(estimateKey);
             const estH = Math.floor(task.estimatedTime / 60);
             const estM = task.estimatedTime % 60;
-            const estStr = estH > 0 ? `${estH}ч ${estM > 0 ? estM + 'м' : ''}` : `${estM}м`;
+            const estStr = estH > 0 ? `${estH}ч ${estM > 0 ? `${estM}м` : ''}` : `${estM}м`;
             const actH = Math.floor(totalMs / 3_600_000);
             const actM = Math.floor((totalMs % 3_600_000) / 60_000);
-            const actStr = actH > 0 ? `${actH}ч ${actM > 0 ? actM + 'м' : ''}` : `${actM}м`;
+            const actStr = actH > 0 ? `${actH}ч ${actM > 0 ? `${actM}м` : ''}` : `${actM}м`;
             this.notify(
               tRaw("taskStore.notificationTitle"),
               tRaw("notifications.estimateExceeded", { title: task.title, expected: estStr, actual: actStr }),
@@ -187,7 +186,7 @@ export class NotificationService {
 
       // Deadline notifications
       if (this.getSettings().notifyDeadlines && task.deadline) {
-        const deadlineMatch = task.deadline.match(/^day-(\d{4})-(\d{2})-(\d{2})/);
+        const deadlineMatch = /^day-(\d{4})-(\d{2})-(\d{2})/.exec(task.deadline);
         if (deadlineMatch) {
           const [, y, m, d] = deadlineMatch;
           const deadlineDate = new Date(`${y}-${m}-${d}T00:00:00`);
@@ -243,7 +242,7 @@ export class NotificationService {
   }
 
   private getScheduledMoment(task: ITask): Moment | null {
-    const match: RegExpMatchArray | null = task.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    const match: RegExpMatchArray | null = /^day-(\d{4}-\d{2}-\d{2})/.exec(task.dateUID);
     if (!match) return null;
 
     const dateStr: string = match[1];
@@ -367,7 +366,7 @@ export class NotificationService {
 
       // Task with deadline today/tomorrow
       if (task.deadline) {
-        const dlMatch = task.deadline.match(/^day-(\d{4})-(\d{2})-(\d{2})/);
+        const dlMatch = /^day-(\d{4})-(\d{2})-(\d{2})/.exec(task.deadline);
         if (!dlMatch) continue;
         const [, y, m, d] = dlMatch;
         const dlDate = momentFn(`${y}-${m}-${d} 09:00`, "YYYY-MM-DD HH:mm", true);
