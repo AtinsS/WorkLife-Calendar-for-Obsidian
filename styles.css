@@ -54,6 +54,10 @@
   --mcp-blur: blur(0px);
 }
 
+.ai-hidden {
+  display: none !important;
+}
+
 /* ============================================
    SETTINGS BANNER
    ============================================ */
@@ -8997,6 +9001,18 @@ svg.dot.filled {
   border-radius: 50%;
   flex-shrink: 0;
   margin-top: 6px;
+}
+
+.ai-pri-dot-high {
+  background-color: #f44336;
+}
+
+.ai-pri-dot-medium {
+  background-color: #ff9800;
+}
+
+.ai-pri-dot-low {
+  background-color: #4caf50;
 }
 
 /* Task info */

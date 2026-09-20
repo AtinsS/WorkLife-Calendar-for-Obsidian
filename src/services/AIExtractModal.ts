@@ -66,11 +66,11 @@ export class AIExtractModal extends CustomModal {
 
     // Preview area
     this.previewEl = this.contentEl.createDiv({ cls: "ai-preview" });
-    this.previewEl.style.display = "none";
+    this.previewEl.addClass("ai-hidden");
 
     // Footer
     this.footerEl = this.contentEl.createDiv({ cls: "ai-footer" });
-    this.footerEl.style.display = "none";
+    this.footerEl.addClass("ai-hidden");
 
     // Extract button
     const extractBtn = this.contentEl.createEl("button", {
@@ -203,11 +203,11 @@ export class AIExtractModal extends CustomModal {
   private renderPreview(): void {
     if (!this.previewEl || !this.footerEl) return;
 
-    this.previewEl.style.display = "";
-    this.footerEl.style.display = "";
+    this.previewEl.removeClass("ai-hidden");
+    this.footerEl.removeClass("ai-hidden");
 
     const extractBtn = (this as unknown as Record<string, unknown>)._extractBtn as HTMLElement | undefined;
-    if (extractBtn) extractBtn.style.display = "none";
+    if (extractBtn) extractBtn.addClass("ai-hidden");
 
     this.previewEl.empty();
 
@@ -286,9 +286,8 @@ export class AIExtractModal extends CustomModal {
         });
 
         // Priority dot
-        const priDot = taskRow.createSpan({ cls: "ai-pri-dot" });
-        const priColors: Record<string, string> = { high: "#f44336", medium: "#ff9800", low: "#4caf50" };
-        priDot.style.backgroundColor = priColors[task.priority] || "#ff9800";
+        const priorityClass = task.priority === "high" || task.priority === "low" ? task.priority : "medium";
+        taskRow.createSpan({ cls: `ai-pri-dot ai-pri-dot-${priorityClass}` });
 
         // Main info
         const info = taskRow.createDiv({ cls: "ai-task-info" });
