@@ -8,7 +8,7 @@
   import {
     tasks, projects, selectedDate, activeTab, taskFilter,
     addTask, updateTask, updateTaskStatus, removeTask,
-    createNextRecurringInstance, clearAllRecurringTasks, resetTaskTimer,
+    createNextRecurringInstance, clearAllRecurringTasks, clearRecurringByProject, clearRecurringByName, resetTaskTimer,
     carryOverOverdueTasks,
   } from "./stores";
   import { createNoteTask, deleteNoteTask, shouldSyncTaskToNote, syncTaskToNote } from "./noteTasks";
@@ -18,6 +18,7 @@
   import TimeLogsModal from "./TimeLogsModal.svelte";
   import { TaskModal } from "./TaskModal";
   import { ProjectModal } from "./ProjectModal";
+  import { AIExtractModal } from "../services/AIExtractModal";
   import { t } from "../i18n";
 
   export let appInstance: App;
@@ -302,7 +303,10 @@
   function openProjectSettings() { new ProjectModal(appInstance).open(); }
   function toggleMenu() { showMenu = !showMenu; }
   function closeMenu() { showMenu = false; }
+  function openAIExtract() { closeMenu(); new AIExtractModal(appInstance).open(); }
   function toggleSearch() { showSearch = !showSearch; if (!showSearch) searchQuery = ""; }
+
+  let showRecurringMenu = false;
 
   function handleClearRecurring() {
     const allTasksList = get(tasks);
@@ -310,9 +314,38 @@
     const recurringInstances = allTasksList.filter((t) => t.isRecurringInstance);
     const total = recurringParents.length + recurringInstances.length;
     if (total === 0) { alert($t("tasks.panel.noRecurring")); return; }
-    if (!confirm($t("tasks.panel.deleteCompleted", { count: recurringParents.length }))) return;
+    showRecurringMenu = true;
+  }
+
+  function clearRecurringAll() {
     const result = clearAllRecurringTasks();
-    alert($t("tasks.panel.deleteCompleted", { count: result.parentCount }));
+    showRecurringMenu = false;
+    alert($t("tasks.panel.recurringCleared", { count: String(result.parentCount + result.instanceCount) }));
+  }
+
+  function clearRecurringByProj(projectId: string) {
+    const result = clearRecurringByProject(projectId);
+    showRecurringMenu = false;
+    alert($t("tasks.panel.recurringCleared", { count: String(result.parentCount + result.instanceCount) }));
+  }
+
+  function clearRecurringByTitle(title: string) {
+    const result = clearRecurringByName(title);
+    showRecurringMenu = false;
+    alert($t("tasks.panel.recurringCleared", { count: String(result.parentCount + result.instanceCount) }));
+  }
+
+  function getRecurringProjects(): IProject[] {
+    const allTasksList = get(tasks);
+    const recurringParents = allTasksList.filter((t) => t.recurrence && !t.isRecurringInstance);
+    const projIds = new Set(recurringParents.map((t) => t.projectId).filter(Boolean));
+    return get(projects).filter((p) => projIds.has(p.id));
+  }
+
+  function getRecurringNames(): string[] {
+    const allTasksList = get(tasks);
+    const recurringParents = allTasksList.filter((t) => t.recurrence && !t.isRecurringInstance);
+    return [...new Set(recurringParents.map((t) => t.title))];
   }
 </script>
 
@@ -369,7 +402,21 @@
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { openProjectSettings(); closeMenu(); }}>{$t("tasks.panel.menuProjects")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { showTimeLogs = true; closeMenu(); }}>{$t("tasks.panel.menuTimeLogs")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { clearCompletedTasks(); closeMenu(); }}>{$t("tasks.panel.menuCleanDone")}</button>
-            <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { handleClearRecurring(); closeMenu(); }}>{$t("tasks.panel.menuCleanRecurring")}</button>
+            <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={handleClearRecurring}>{$t("tasks.panel.menuCleanRecurring")} ▸</button>
+            {#if showRecurringMenu}
+              <div class="task-tracker-submenu">
+                <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={clearRecurringAll}>{$t("tasks.panel.recurringAll")}</button>
+                {#each getRecurringProjects() as proj}
+                  <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByProj(proj.id)}>{proj.icon} {proj.name}</button>
+                {/each}
+                {#each getRecurringNames() as name}
+                  <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByTitle(name)}>📝 {name}</button>
+                {/each}
+              </div>
+            {/if}
+            {#if $settings.ollamaEnabled && !isMobile}
+              <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={openAIExtract}>🤖 {$t("ai.button")}</button>
+            {/if}
           </div>
         {/if}
       </div>
@@ -435,7 +482,21 @@
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { openProjectSettings(); closeMenu(); }}>{$t("tasks.panel.menuProjects")}</button>
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { showTimeLogs = true; closeMenu(); }}>{$t("tasks.panel.menuTimeLogs")}</button>
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { clearCompletedTasks(); closeMenu(); }}>{$t("tasks.panel.menuCleanDone")}</button>
-              <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { handleClearRecurring(); closeMenu(); }}>{$t("tasks.panel.menuCleanRecurring")}</button>
+              <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={handleClearRecurring}>{$t("tasks.panel.menuCleanRecurring")} ▸</button>
+              {#if showRecurringMenu}
+                <div class="task-tracker-submenu">
+                  <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={clearRecurringAll}>{$t("tasks.panel.recurringAll")}</button>
+                  {#each getRecurringProjects() as proj}
+                    <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByProj(proj.id)}>{proj.icon} {proj.name}</button>
+                  {/each}
+                  {#each getRecurringNames() as name}
+                    <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByTitle(name)}>📝 {name}</button>
+                  {/each}
+                </div>
+              {/if}
+              {#if $settings.ollamaEnabled && !isMobile}
+                <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={openAIExtract}>🤖 {$t("ai.button")}</button>
+              {/if}
             </div>
           {/if}
         </div>

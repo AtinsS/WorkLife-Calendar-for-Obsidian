@@ -110,7 +110,6 @@
   }
 
   async function handleDelete() {
-    if (!confirm(get(t)("tasks.item.deleteConfirm"))) return;
     if (task.notePath && appInstance) {
       const { deleteNoteTask } = await import("./noteTasks");
       await deleteNoteTask(task.notePath, appInstance);

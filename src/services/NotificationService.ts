@@ -135,8 +135,9 @@ export class NotificationService {
         const scheduledMoment = this.getScheduledMoment(task);
         if (scheduledMoment && scheduledMoment.isValid()) {
           const fireAt = scheduledMoment.valueOf();
-          const reminderKey = `${task.id}:reminder`;
-          const overdueKey = `${task.id}:overdue`;
+          // Include dateUID + scheduledTime in key so carryOver / reschedule clears stale fired state
+          const reminderKey = `${task.id}@${task.dateUID}@${task.scheduledTime}:reminder`;
+          const overdueKey = `${task.id}@${task.dateUID}@${task.scheduledTime}:overdue`;
 
           const reminderMs = this.getSettings().reminderMinutesBefore * 60_000;
           if (this.getSettings().notifyReminders && now >= fireAt - reminderMs && now < fireAt && !this.firedReminders.has(reminderKey)) {
@@ -162,7 +163,7 @@ export class NotificationService {
 
       // Estimated time exceeded — notify when work time exceeds estimate
       if (this.getSettings().notifyEstimateExceeded && task.estimatedTime && task.status === "progress") {
-        const estimateKey = `${task.id}:estimate-exceeded`;
+        const estimateKey = `${task.id}@estimate-exceeded`;
         if (!this.firedEstimateExceeded.has(estimateKey)) {
           const estimatedMs = task.estimatedTime * 60_000;
           const currentSessionMs = getActiveTimer(task.id) || 0;
@@ -196,7 +197,7 @@ export class NotificationService {
           const diffDays = Math.round(diffMs / 86400000);
 
           // Deadline start — when the deadline day begins (9:00 AM)
-          const deadlineStartKey = `${task.id}:deadline-start`;
+          const deadlineStartKey = `${task.id}@${task.deadline}:deadline-start`;
           if (diffDays === 0 && nowDate.getHours() >= 9 && !this.firedDeadline.has(deadlineStartKey)) {
             this.firedDeadline.add(deadlineStartKey);
             const timeStr = task.deadlineTime ? ` в ${task.deadlineTime}` : "";
@@ -209,7 +210,7 @@ export class NotificationService {
 
           // Deadline end — when the deadline time passes
           if (task.deadlineTime && diffDays <= 0) {
-            const deadlineEndKey = `${task.id}:deadline-end`;
+            const deadlineEndKey = `${task.id}@${task.deadline}:deadline-end`;
             if (!this.firedDeadline.has(deadlineEndKey)) {
               const deadlineDateTime = new Date(`${y}-${m}-${d}T${task.deadlineTime}:00`);
               if (now >= deadlineDateTime.getTime()) {
@@ -224,7 +225,7 @@ export class NotificationService {
           }
 
           // 1 day before deadline
-          const deadlineKey = `${task.id}:deadline`;
+          const deadlineKey = `${task.id}@${task.deadline}:deadline`;
           if (diffDays === 1 && !this.firedDeadline.has(deadlineKey)) {
             this.firedDeadline.add(deadlineKey);
             const timeStr = task.deadlineTime ? ` в ${task.deadlineTime}` : "";
@@ -513,25 +514,25 @@ export class NotificationService {
   private cleanupFiredKeys(activeTasks: ITask[]): void {
     const activeIds = new Set(activeTasks.map((t) => t.id));
     for (const key of this.firedReminders) {
-      const taskId = key.split(":")[0];
+      const taskId = key.split("@")[0];
       if (!activeIds.has(taskId)) {
         this.firedReminders.delete(key);
       }
     }
     for (const key of this.firedOverdue) {
-      const taskId = key.split(":")[0];
+      const taskId = key.split("@")[0];
       if (!activeIds.has(taskId)) {
         this.firedOverdue.delete(key);
       }
     }
     for (const key of this.firedDeadline) {
-      const taskId = key.split(":")[0];
+      const taskId = key.split("@")[0];
       if (!activeIds.has(taskId)) {
         this.firedDeadline.delete(key);
       }
     }
     for (const key of this.firedEstimateExceeded) {
-      const taskId = key.split(":")[0];
+      const taskId = key.split("@")[0];
       if (!activeIds.has(taskId)) {
         this.firedEstimateExceeded.delete(key);
       }

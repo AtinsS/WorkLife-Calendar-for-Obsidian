@@ -59,6 +59,7 @@ import Dashboard from "./dashboard/Dashboard.svelte";
 import HelloView from "./components/HelloView.svelte";
 import { NotificationService } from "./services/NotificationService";
 import { initGistSync } from "./services/GistSyncService";
+import { AIExtractModal } from "./services/AIExtractModal";
 import { migrateFromSingleFile, migrateRootModuleFiles, VAULT_DATA_DIR } from "./io/vaultStorage";
 
 declare global {
@@ -437,6 +438,22 @@ export default class CalendarPlugin extends Plugin {
                 editor.replaceRange("```hello\n```", cursor);
                 editor.setCursor({ line: cursor.line + 1, ch: 0 });
               }
+            });
+        });
+      })
+    );
+
+    // Right-click on .md file → "Extract tasks with AI"
+    this.registerEvent(
+      this.app.workspace.on("file-menu", (menu, file) => {
+        if (!(file instanceof TFile) || file.extension !== "md") return;
+        if (!this.options.ollamaEnabled) return;
+        if (window.innerWidth <= 768) return;
+        menu.addItem((item) => {
+          item.setTitle(tRaw("ai.contextMenuExtract"))
+            .setIcon("sparkles")
+            .onClick(() => {
+              new AIExtractModal(this.app, file.path).open();
             });
         });
       })

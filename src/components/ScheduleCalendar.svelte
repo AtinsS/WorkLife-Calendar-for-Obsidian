@@ -933,11 +933,7 @@
       }
     }
 
-    // Double-click → open task editor
-    el.addEventListener("dblclick", (e: MouseEvent) => {
-      e.stopPropagation();
-      openTaskEditor(task);
-    });
+    // Task editor is now opened on single left-click via eventClick handler
   }
 
   function handleEventClick(info: any): void {
@@ -979,7 +975,8 @@
         }
       }
     }
-    // Left-click on event — do nothing (context menu is on right-click)
+    // Left-click on event — open task editor
+    openTaskEditor(task);
   }
 
   function handleEventContextMenu(e: MouseEvent): void {

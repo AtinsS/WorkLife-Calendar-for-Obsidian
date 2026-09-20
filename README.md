@@ -84,65 +84,73 @@ If the plugin saves your time and helps with your work, you can support the deve
 <details>
 <summary><h3>✨ Detailed Features (expand)</h3></summary>
 
-### 📅 Calendar and Schedule
-- Full view (day / week / month) based on the **FullCalendar** library with drag & drop support.
-- Visual indicators of tasks and habits directly in the calendar grid.
-- Create tasks by clicking and change time by dragging.
-- **Weather** for each day of the week (Open-Meteo API, no keys) for the visible date range.
-- Adaptive mobile schedule for small screens.
+# 📅 Calendar & Schedule
+- Day / week / month view on **FullCalendar** with drag & drop.
+- Task and habit indicators right in the calendar grid.
+- Create tasks by click, change time by dragging.
+- **Weather** for each day of the week (Open-Meteo, no API keys).
+- Adaptive mobile schedule.
 
-### ✅ Tasks and Time Management
-- **4 statuses:** *To Do* → *In Progress* → *Paused* → *Done*.
-- **Quick task addition** — `Ctrl+Alt+N` from anywhere in Obsidian opens a smart input window. Supports natural language parsing with color highlighting:
-  - Project `@Work 14-15 meeting`
-  - Time: `14:00 buy milk`, `14-15 meeting`, `from 16:00 to 18:00 meeting`
-  - Date: `tomorrow buy milk`, `Friday report`, `25.07 meeting`, `+3 task`
+# ✅ Tasks & Time Management
+- **4 statuses:** To Do → In Progress → On Hold → Done.
+- **Quick add** — `Ctrl+Alt+N` from anywhere. Natural language parsing with color highlighting:
+  - Project: `@Work 14-15 meeting`
+  - Time: `14:00 buy milk`, `14-15 meeting`, `from 16:00 to 18:00 call`
+  - Date: `tomorrow buy milk`, `friday report`, `25.07 meeting`, `+3 task`
   - Priority: `! urgent`, `~ medium`, `- low`
-  - Date and time work in any position: `tomorrow at 14:00 buy milk` or `buy milk tomorrow at 14:00`
-  - `Enter` opens the advanced editor with pre-filled data, or the `⋯` button
-- **Kanban board** — visual task management with 4 columns (To Do / In Progress / Paused / Done):
-  - Drag & drop tasks between columns to change status
-  - Create tasks directly in the "To Do" column
-  - Informative cards with project color, time, deadline, priority, work task badge, recurrence, note link, and live timer
-  - Date filters: Today / All / Specific date / Project
-  - Right-click context menu for editing and deleting
-- **Recurring tasks:** daily / weekly / monthly with customizable interval.
-- **Projects:** group tasks with color labeling.
-- **Timer:** built-in time tracking with auto-resume on Obsidian restart. Live timer on Kanban cards with pause indication.
-- **Checklists:** a checklist can be created for each task.
-- **Deadlines and estimates:** comparison of planned and actual time, notifications about approaching deadlines.
-- **Two-way synchronization** with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) and [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugins via regular `.md` files.
+  - Date and time in any position: `tomorrow at 14:00 buy milk`
+  - `Enter` → advanced editor with prefilled data.
+- **Kanban board** — 4 columns, drag & drop between them, create tasks in the "To Do" column.
+  - Cards: project color, time, deadline, priority, work-task badge, recurrence, note link, live timer.
+  - Filters: Today / All / Specific date / Project.
+  - Right-click context menu.
+- **Recurring tasks:** daily / weekly / monthly with custom interval.
+- **Projects:** grouping with color labels.
+- **Timer:** time tracking with auto-resume on Obsidian restart, live timer on cards.
+- **Checklists** for each task.
+- **Deadlines & estimates:** planned vs actual, deadline notifications.
+- **Sync** with Tasks and Dataview plugins via `.md` files.
 
-### 🔄 Habit Tracker
-- Flexible frequency (days of the week, day of the month).
-- Quantitative goals for each habit.
-- Streak counting and visual indicators on the calendar.
-- **Display modes** — choose where to show habits: in the task panel (default), as a separate tab, or hidden. Setting: Settings → General → "Habits mode".
-- **Full CRUD** — create, edit, delete habits from the habits panel and from the dashboard.
+# 🔄 Habit Tracker
+- Flexible frequency (days of week, day of month).
+- Quantitative goals.
+- Streaks and calendar indicators.
+- **Display modes:** in task panel (default) / separate tab / hidden. Setting: General → "Habits mode".
+- **Full CRUD** from habit panel and dashboard.
 
-### 💰 Finance and Analytics
-- **Income:** automatic calculation from the rate of work tasks or manual entry.
-- **Budget:** expense categories with icons and distribution rules.
-- **Savings:** goals with completion percentage.
-- **Analytics:** bar and pie charts by project, income/expense dynamics by month, plan vs actual comparison.
+# 💰 Finance & Analytics
+- **Income:** automatic by rate from work tasks, or manual entry.
+- **Budget:** expense categories with icons and allocation rules.
+- **Savings:** goals with progress percentage.
+- **Analytics:** charts by project, income/expense dynamics by month, plan vs actual.
 
-### 🎨 Appearance and UI
+# 🎨 Appearance & UI
 - Customizable accent color.
-- Glass panels (glassmorphism) with customizable background and transparency.
-- **Info panel** under the tabs (date, time, weather, tasks) with display settings.
-- **Dashboard** for quick access to notes, with task and habit management (create, edit, delete).
+- Glassmorphism panels with background and transparency settings.
+- **Info panel** below tabs (date, time, weather, tasks).
+- **Dashboard** for notes, tasks and habits (create, edit, delete).
 
-### 🌍 Localization and Language
-- **Two languages:** Russian and English. Switch in the plugin settings.
-- **System language** — automatic OS language detection.
-- **Week start** — set the first day of the week (Monday / Sunday / by language). Affects the calendar, schedule, creation of recurring tasks and habits.
-- All strings are translated: interface, settings, notifications, weather, analytics.
+# 🌍 Localization
+- **Russian and English**, switchable in settings.
+- **System language** — auto-detect.
+- **Week start:** Monday / Sunday / by language. Affects calendar, schedule, recurring tasks and habits.
+- Everything translated: UI, settings, notifications, weather, analytics.
 
-### ⛅ Weather Viewing
-- **Weather tab** — opens from the sidebar when selecting a day.
-- **Weather in week view** — makes planning the week easier.
-- **Provider selection** — in the settings you can connect your preferred provider (available: Open-Meteo, OpenWeatherMap, WeatherApi, Visual Crossing)
- 
+# ⛅ Weather
+- **Weather tab** from the sidebar when a day is selected.
+- **Weather in week view** — easier weekly planning.
+- **Provider choice:** Open-Meteo, OpenWeatherMap, WeatherApi, Visual Crossing.
+
+# 🤖 AI Task Extraction (Ollama)
+- **Local AI** — extract tasks from `.md` notes using an Ollama model. No data leaves your machine.
+- **Smart parsing** — understands weeks (`## Week 1`), days (`### Day 3`), headers, checkboxes, time estimates.
+- **Project binding** for extracted tasks.
+- **Time scheduling** — AI suggests start time; manual end-time editing; auto-schedule toggle.
+- **Subtasks** — checkboxes become checklist items.
+- **Right-click** on a `.md` file → "Extract tasks with AI".
+- **Settings** — Ollama URL, model, context limit, connection test, live AI test.
+- **Desktop only** — AI extraction is disabled on mobile.
+
 </details>
 
 <details>

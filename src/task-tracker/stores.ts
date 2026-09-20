@@ -762,7 +762,6 @@ export function clearAllRecurringTasks(): { parentCount: number; instanceCount: 
   const parentCount = parentIds.size;
   const instanceCount = recurringInstances.length;
 
-  // Remove all recurring instances and parent recurring tasks
   const idsToRemove = new Set([
     ...parentIds,
     ...recurringInstances.map((t) => t.id),
@@ -771,6 +770,46 @@ export function clearAllRecurringTasks(): { parentCount: number; instanceCount: 
   debouncedSave();
 
   return { parentCount, instanceCount };
+}
+
+export function clearRecurringByProject(projectId: string): { parentCount: number; instanceCount: number } {
+  const allTasks = get(tasks);
+  const recurringParents = allTasks.filter(
+    (t) => t.recurrence && !t.isRecurringInstance && t.projectId === projectId
+  );
+  const parentIds = new Set(recurringParents.map((t) => t.id));
+  const recurringInstances = allTasks.filter(
+    (t) => t.isRecurringInstance && t.parentTaskId && parentIds.has(t.parentTaskId)
+  );
+
+  const idsToRemove = new Set([
+    ...parentIds,
+    ...recurringInstances.map((t) => t.id),
+  ]);
+  tasks.update((current) => current.filter((t) => !idsToRemove.has(t.id)));
+  debouncedSave();
+
+  return { parentCount: parentIds.size, instanceCount: recurringInstances.length };
+}
+
+export function clearRecurringByName(title: string): { parentCount: number; instanceCount: number } {
+  const allTasks = get(tasks);
+  const recurringParents = allTasks.filter(
+    (t) => t.recurrence && !t.isRecurringInstance && t.title === title
+  );
+  const parentIds = new Set(recurringParents.map((t) => t.id));
+  const recurringInstances = allTasks.filter(
+    (t) => t.isRecurringInstance && t.parentTaskId && parentIds.has(t.parentTaskId)
+  );
+
+  const idsToRemove = new Set([
+    ...parentIds,
+    ...recurringInstances.map((t) => t.id),
+  ]);
+  tasks.update((current) => current.filter((t) => !idsToRemove.has(t.id)));
+  debouncedSave();
+
+  return { parentCount: parentIds.size, instanceCount: recurringInstances.length };
 }
 
 export function calculateTaskEarnings(task: ITask): number {

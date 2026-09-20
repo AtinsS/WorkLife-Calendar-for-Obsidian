@@ -14,6 +14,7 @@ import {
 import type CalendarPlugin from "./main";
 import { fetchWeekWeather, getWeatherAttribution, type WeatherProvider } from "./services/weatherService";
 import { initLocale, tRaw } from "./i18n";
+import { testOllamaConnection, testOllamaModel } from "./services/OllamaService";
 
 export interface ISettings {
   wordsPerDot: number;
@@ -139,6 +140,12 @@ export interface ISettings {
   navBtnRadius?: string;
   navBtnSize?: string;
   navAccentColor?: string;
+
+  // Ollama AI settings
+  ollamaEnabled: boolean;
+  ollamaUrl: string;
+  ollamaModel: string;
+  ollamaContextSize: number;
 }
 
 export const defaultSettings = Object.freeze({
@@ -240,6 +247,12 @@ export const defaultSettings = Object.freeze({
   navBtnRadius: "",
   navBtnSize: "",
   navAccentColor: "",
+
+  // Ollama AI defaults
+  ollamaEnabled: false,
+  ollamaUrl: "http://localhost:11434",
+  ollamaModel: "llama3.1",
+  ollamaContextSize: 0, // 0 = unlimited
 });
 
 export function applyAccentColor(hex: string): void {
@@ -382,6 +395,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       { key: "appearance", label: tRaw("settings.tabs.appearance") },
       { key: "sync", label: tRaw("settings.tabs.sync") },
       { key: "notifications", label: tRaw("settings.tabs.notifications") },
+      { key: "ai", label: tRaw("settings.tabs.ai") },
     ];
 
     const tabButtons: Record<string, HTMLButtonElement> = {};
@@ -525,6 +539,10 @@ export class CalendarSettingsTab extends PluginSettingTab {
     // Notifications tab
     const notif = tabContainers["notifications"];
     this.addNotificationSettings(notif);
+
+    // AI tab
+    const ai = tabContainers["ai"];
+    this.addOllamaSettings(ai);
 
     // Store references for switchTab
     this._tabButtons = tabButtons;
@@ -1922,5 +1940,165 @@ priority: medium
           });
         text.inputEl.addClass("mcp-input-md");
       });
+  }
+
+  addOllamaSettings(container: HTMLElement): void {
+    new Setting(container).setName(tRaw("settings.ai.sectionOllama")).setHeading();
+
+    new Setting(container)
+      .setName(tRaw("settings.ai.enabled"))
+      .setDesc(tRaw("settings.ai.enabledDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.ollamaEnabled);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ ollamaEnabled: value });
+          this.display(); // refresh to show/hide fields
+        });
+      });
+
+    if (!this.plugin.options.ollamaEnabled) return;
+
+    new Setting(container)
+      .setName(tRaw("settings.ai.url"))
+      .setDesc(tRaw("settings.ai.urlDesc"))
+      .addText((text) => {
+        text
+          .setPlaceholder(tRaw("settings.ai.urlPlaceholder"))
+          .setValue(this.plugin.options.ollamaUrl || "http://localhost:11434")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ ollamaUrl: value });
+          });
+        text.inputEl.addClass("mcp-input-xl");
+      });
+
+    // Model selector with "Find models" button
+    const modelSetting = container.createDiv({ cls: "setting-item" });
+    const modelInfo = modelSetting.createDiv({ cls: "setting-item-info" });
+    modelInfo.createDiv({ cls: "setting-item-name", text: tRaw("settings.ai.model") });
+    modelInfo.createDiv({ cls: "setting-item-description", text: tRaw("settings.ai.modelDesc") });
+    const modelControl = modelSetting.createDiv({ cls: "setting-item-control" });
+
+    // Dropdown for model selection
+    const modelSelect = modelControl.createEl("select", { cls: "dropdown" });
+    const currentModel = this.plugin.options.ollamaModel || "llama3.1";
+    modelSelect.createEl("option", { value: currentModel, text: currentModel });
+    modelSelect.value = currentModel;
+    modelSelect.addEventListener("change", async () => {
+      await this.plugin.writeOptions({ ollamaModel: modelSelect.value });
+    });
+
+    // "Find models" button
+    const findModelsBtn = modelControl.createEl("button", { text: tRaw("settings.ai.findModels") });
+    findModelsBtn.addClass("mod-cta");
+    findModelsBtn.addEventListener("click", () => {
+      void (async () => {
+        findModelsBtn.disabled = true;
+        findModelsBtn.textContent = tRaw("settings.ai.finding");
+        const url = this.plugin.options.ollamaUrl || "http://localhost:11434";
+        const result = await testOllamaConnection(url);
+        findModelsBtn.disabled = false;
+        findModelsBtn.textContent = tRaw("settings.ai.findModels");
+
+        if (result.ok && result.models && result.models.length > 0) {
+          // Preserve current selection
+          const prev = modelSelect.value;
+          modelSelect.empty();
+          for (const name of result.models) {
+            modelSelect.createEl("option", { value: name, text: name });
+          }
+          // Restore selection if still available, otherwise pick first
+          if (result.models.includes(prev)) {
+            modelSelect.value = prev;
+          } else {
+            modelSelect.value = result.models[0];
+            await this.plugin.writeOptions({ ollamaModel: result.models[0] });
+          }
+        }
+      })();
+    });
+
+    new Setting(container)
+      .setName(tRaw("settings.ai.contextSize"))
+      .setDesc(tRaw("settings.ai.contextSizeDesc"))
+      .addText((text) => {
+        text
+          .setPlaceholder("0")
+          .setValue(String(this.plugin.options.ollamaContextSize || 0))
+          .onChange(async (value) => {
+            const num = parseInt(value);
+            if (!isNaN(num) && num >= 0) {
+              await this.plugin.writeOptions({ ollamaContextSize: num });
+            }
+          });
+        text.inputEl.type = "number";
+        text.inputEl.min = "0";
+        text.inputEl.addClass("mcp-input-md");
+      });
+
+    // Test connection button
+    const btnRow = container.createDiv();
+    btnRow.addClass("mcp-btn-row");
+
+    const testBtn = btnRow.createEl("button", { text: tRaw("settings.ai.testConnection") });
+    testBtn.addClass("mcp-btn");
+    testBtn.addEventListener("click", () => {
+      void (async () => {
+        testBtn.disabled = true;
+        testBtn.textContent = tRaw("settings.ai.checking");
+        testBtn.removeClass("mcp-color-success", "mcp-color-danger");
+
+        const url = this.plugin.options.ollamaUrl || "http://localhost:11434";
+        const result = await testOllamaConnection(url);
+
+        if (result.ok && result.models) {
+          const modelCount = result.models.length;
+          if (modelCount > 0) {
+            testBtn.textContent = tRaw("settings.ai.modelsFound", { count: String(modelCount) });
+            testBtn.addClass("mcp-color-success");
+          } else {
+            testBtn.textContent = tRaw("settings.ai.noModels");
+            testBtn.addClass("mcp-color-danger");
+          }
+        } else {
+          testBtn.textContent = `${tRaw("settings.ai.connectionError")}${result.error ? `: ${result.error}` : ""}`;
+          testBtn.addClass("mcp-color-danger");
+        }
+
+        window.setTimeout(() => {
+          testBtn.disabled = false;
+          testBtn.removeClass("mcp-color-success", "mcp-color-danger");
+          testBtn.textContent = tRaw("settings.ai.testConnection");
+        }, 5000);
+      })();
+    });
+
+    // Live AI test button
+    const aiTestBtn = btnRow.createEl("button", { text: tRaw("settings.ai.testAI") });
+    aiTestBtn.addClass("mcp-btn");
+    aiTestBtn.addEventListener("click", () => {
+      void (async () => {
+        aiTestBtn.disabled = true;
+        aiTestBtn.textContent = tRaw("settings.ai.testing");
+        aiTestBtn.removeClass("mcp-color-success", "mcp-color-danger");
+
+        const url = this.plugin.options.ollamaUrl || "http://localhost:11434";
+        const model = this.plugin.options.ollamaModel || "llama3.1";
+        const result = await testOllamaModel(url, model);
+
+        if (result.ok) {
+          aiTestBtn.textContent = `✓ ${result.model}: "${(result.response || "").slice(0, 60)}"`;
+          aiTestBtn.addClass("mcp-color-success");
+        } else {
+          aiTestBtn.textContent = `✗ ${result.error || "failed"}`;
+          aiTestBtn.addClass("mcp-color-danger");
+        }
+
+        window.setTimeout(() => {
+          aiTestBtn.disabled = false;
+          aiTestBtn.removeClass("mcp-color-success", "mcp-color-danger");
+          aiTestBtn.textContent = tRaw("settings.ai.testAI");
+        }, 8000);
+      })();
+    });
   }
 }
