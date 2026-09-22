@@ -25,14 +25,38 @@ interface ChatEntry {
 }
 
 /**
+ * Insert text at the caret, preserving selection replace and undo when possible.
+ */
+function insertTextAtCursor(
+  el: HTMLInputElement | HTMLTextAreaElement,
+  text: string,
+): void {
+  el.focus();
+  // execCommand keeps the native undo stack in Chromium/Obsidian
+  if (document.execCommand("insertText", false, text)) return;
+  const start = el.selectionStart ?? el.value.length;
+  const end = el.selectionEnd ?? start;
+  el.value = el.value.slice(0, start) + text + el.value.slice(end);
+  const pos = start + text.length;
+  el.setSelectionRange(pos, pos);
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function isSpaceKey(e: KeyboardEvent): boolean {
+  return (e.key === " " || e.code === "Space") && !e.ctrlKey && !e.metaKey && !e.altKey;
+}
+
+/**
  * Stop global/hotkey handlers from swallowing typed characters (especially Space).
- * Never preventDefault on normal keys — the field keeps default insertion.
+ * Never preventDefault on normal keys — the field keeps default insertion —
+ * except Space, which is inserted manually so hotkeys cannot cancel it.
  */
 function guardTyping(
   el: HTMLInputElement | HTMLTextAreaElement,
   onEnter?: () => void,
 ): void {
   el.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.isComposing || e.keyCode === 229) return;
     if (e.key === "Escape") return;
     if (onEnter && e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -40,9 +64,16 @@ function guardTyping(
       onEnter();
       return;
     }
-    // Space, letters, digits — default insertion must stay; only stop bubbling
+    // Space: take full control — a hotkey may have already preventDefault'd insertion
+    if (isSpaceKey(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      insertTextAtCursor(el, " ");
+      return;
+    }
+    // Letters, digits — default insertion must stay; only stop bubbling
     e.stopPropagation();
-  });
+  }, true);
 }
 
 export class AIExtractModal extends CustomModal {
@@ -686,6 +717,7 @@ export class AIExtractModal extends CustomModal {
             }
           }
         });
+        guardTyping(endTimeInput);
 
         if (task.estimatedMinutes) {
           const estH = Math.floor(task.estimatedMinutes / 60);

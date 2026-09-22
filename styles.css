@@ -8808,7 +8808,9 @@ svg.dot.filled {
 .ai-extract-modal input,
 .ai-extract-modal textarea,
 .wf-dialog-content input,
-.wf-dialog-content textarea {
+.wf-dialog-content textarea,
+.ai-ask-input,
+.ai-ask-input-shell {
   user-select: text !important;
   -webkit-user-select: text !important;
 }

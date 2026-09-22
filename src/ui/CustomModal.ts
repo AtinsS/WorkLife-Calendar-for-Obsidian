@@ -1,5 +1,11 @@
 import type { App } from "obsidian";
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!target || !(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable === true;
+}
+
 export abstract class CustomModal {
   protected app: App;
   protected containerEl: HTMLElement;
@@ -7,6 +13,7 @@ export abstract class CustomModal {
   protected contentEl: HTMLElement;
   private isOpen = false;
   private keyHandler: ((e: KeyboardEvent) => void) | null = null;
+  private typingShield: ((e: KeyboardEvent) => void) | null = null;
 
   constructor(app: App) {
     this.app = app;
@@ -48,17 +55,21 @@ export abstract class CustomModal {
     };
     document.addEventListener("keydown", this.keyHandler);
 
+    // Shield typing in form fields (especially Space) from global/hotkey handlers.
+    // Window capture runs BEFORE document capture, where Obsidian hotkeys live —
+    // stopPropagation here keeps default insertion but hides keys from hotkeys.
+    this.typingShield = (e: KeyboardEvent) => {
+      if (e.key === "Escape") return; // allow modal close
+      if (e.isComposing || e.keyCode === 229) return; // IME composition
+      if (!isEditableTarget(e.target)) return;
+      e.stopPropagation();
+    };
+    window.addEventListener("keydown", this.typingShield, true);
+
     // Keep typed characters (especially Space) inside form fields.
     // Global/hotkey listeners on document must not steal or preventDefault them.
     this.contentEl.addEventListener("keydown", (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement | null;
-      if (!target) return;
-      const tag = target.tagName;
-      const editable =
-        tag === "INPUT" ||
-        tag === "TEXTAREA" ||
-        target.isContentEditable === true;
-      if (!editable) return;
+      if (!isEditableTarget(e.target)) return;
       if (e.key === "Escape") return; // allow modal close
       // Stop bubbling only — never preventDefault — so typing works normally
       e.stopPropagation();
@@ -76,6 +87,10 @@ export abstract class CustomModal {
     if (this.keyHandler) {
       document.removeEventListener("keydown", this.keyHandler);
       this.keyHandler = null;
+    }
+    if (this.typingShield) {
+      window.removeEventListener("keydown", this.typingShield, true);
+      this.typingShield = null;
     }
 
     this.overlayEl.remove();
