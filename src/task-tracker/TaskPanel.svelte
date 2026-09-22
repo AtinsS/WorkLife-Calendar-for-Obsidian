@@ -76,6 +76,12 @@
   function goToday() {
     selectedDate.set(getDateUID(moment(), "day"));
   }
+  /** Enter/Space on date label — ignore when typing in form fields (Space must insert). */
+  function onDateKeydown(e: KeyboardEvent) {
+    const tgt = e.target as HTMLElement;
+    if (tgt?.tagName === "INPUT" || tgt?.tagName === "TEXTAREA" || tgt?.isContentEditable) return;
+    if (e.key === "Enter" || e.key === " ") goToday();
+  }
 
   $: filteredTasks = allTasksForDate.filter((t) => {
     if ($taskFilter.projectId && t.projectId !== $taskFilter.projectId) return false;
@@ -432,7 +438,7 @@
       {#if currentDate}
         <button class="date-nav-btn" on:click={prevDay}>‹</button>
         <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-        <span class="task-tracker-date" role="button" tabindex="0" on:click={goToday} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToday(); }}>{formatDate(currentDate)}</span>
+        <span class="task-tracker-date" role="button" tabindex="0" on:click={goToday} on:keydown={onDateKeydown}>{formatDate(currentDate)}</span>
         <button class="date-nav-btn" on:click={nextDay}>›</button>
       {:else}
         <span class="task-tracker-date-all">{$t("tasks.panel.allTasks")}</span>
@@ -449,7 +455,7 @@
           <div class="task-tracker-date-nav">
             <button class="date-nav-btn" on:click={prevDay} title={$t("tasks.panel.prevDay")}>‹</button>
             <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-            <span class="task-tracker-date" role="button" tabindex="0" on:click={goToday} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') goToday(); }} title={$t("tasks.panel.today")}>{formatDate(currentDate)}</span>
+            <span class="task-tracker-date" role="button" tabindex="0" on:click={goToday} on:keydown={onDateKeydown} title={$t("tasks.panel.today")}>{formatDate(currentDate)}</span>
             <button class="date-nav-btn" on:click={nextDay} title={$t("tasks.panel.nextDay")}>›</button>
           </div>
         {:else}

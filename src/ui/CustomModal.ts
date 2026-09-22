@@ -48,6 +48,22 @@ export abstract class CustomModal {
     };
     document.addEventListener("keydown", this.keyHandler);
 
+    // Keep typed characters (especially Space) inside form fields.
+    // Global/hotkey listeners on document must not steal or preventDefault them.
+    this.contentEl.addEventListener("keydown", (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      const tag = target.tagName;
+      const editable =
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        target.isContentEditable === true;
+      if (!editable) return;
+      if (e.key === "Escape") return; // allow modal close
+      // Stop bubbling only — never preventDefault — so typing works normally
+      e.stopPropagation();
+    });
+
     this.onOpen();
   }
 

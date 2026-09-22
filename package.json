@@ -1,6 +1,6 @@
 {
   "name": "worklife-calendar",
-  "version": "2.18.32",
+  "version": "2.19.32",
   "description": "Calendar, task tracker, habit tracker, and financial planner for Obsidian",
   "author": "AtinsS",
   "main": "main.js",
@@ -52,6 +52,7 @@
       "./jest.setup.js"
     ],
     "moduleNameMapper": {
+      "^obsidian$": "<rootDir>/__mocks__/obsidian.ts",
       "src/(.*)": "<rootDir>/src/$1"
     },
     "transform": {

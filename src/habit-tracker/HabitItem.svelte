@@ -45,6 +45,16 @@
   }
 
   function handleKeydown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    // Never steal keys (incl. Space) from nested form fields
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable)
+    ) {
+      return;
+    }
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
       toggle();

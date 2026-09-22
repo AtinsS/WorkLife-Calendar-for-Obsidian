@@ -6,12 +6,44 @@ import { CustomModal } from "../ui/CustomModal";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { tRaw } from "../i18n";
 import type { ExtractedTask } from "./OllamaService";
-import { extractTasksFromNote } from "./OllamaService";
+import {
+  extractTasksFromNoteStream,
+  applyTasksInstruction,
+} from "./OllamaService";
 import { addTask, addChecklistItem, projects } from "../task-tracker/stores";
 import { settings } from "../ui/stores";
 import type { ISettings } from "../settings";
 
 const momentFn = window.moment;
+
+type ChatRole = "user" | "assistant";
+
+interface ChatEntry {
+  role: ChatRole;
+  text: string;
+  streaming?: boolean;
+}
+
+/**
+ * Stop global/hotkey handlers from swallowing typed characters (especially Space).
+ * Never preventDefault on normal keys — the field keeps default insertion.
+ */
+function guardTyping(
+  el: HTMLInputElement | HTMLTextAreaElement,
+  onEnter?: () => void,
+): void {
+  el.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Escape") return;
+    if (onEnter && e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      onEnter();
+      return;
+    }
+    // Space, letters, digits — default insertion must stay; only stop bubbling
+    e.stopPropagation();
+  });
+}
 
 export class AIExtractModal extends CustomModal {
   private notePath: string;
@@ -19,16 +51,29 @@ export class AIExtractModal extends CustomModal {
   private tasks: ExtractedTask[] = [];
   private distributeStartDate = "";
   private isAnalyzing = false;
+  private isAsking = false;
   private selectedProjectId: string | null = null;
   private dayDateOverrides: Map<number, string> = new Map();
   private autoScheduleTime = false;
   private originalTasks: ExtractedTask[] = []; // snapshot before auto-schedule
   private draggedTaskIdx: number | null = null;
+  private extractAbort: AbortController | null = null;
+  private askAbort: AbortController | null = null;
 
   private previewEl: HTMLDivElement | null = null;
   private statusEl: HTMLDivElement | null = null;
   private footerEl: HTMLDivElement | null = null;
   private autoScheduleToggleEl: HTMLInputElement | null = null;
+  private analysisPanelEl: HTMLDivElement | null = null;
+  private analysisStreamEl: HTMLDivElement | null = null;
+  private analysisSpinnerEl: HTMLDivElement | null = null;
+  private askPanelEl: HTMLDivElement | null = null;
+  private chatLogEl: HTMLDivElement | null = null;
+  private chatInputEl: HTMLTextAreaElement | null = null;
+  private chatSendBtn: HTMLButtonElement | null = null;
+  private chatHistory: ChatEntry[] = [];
+  private extractBtnEl: HTMLButtonElement | null = null;
+  private askReady = false;
 
   constructor(app: App, initialNotePath?: string) {
     super(app);
@@ -53,6 +98,7 @@ export class AIExtractModal extends CustomModal {
       value: this.notePath,
     });
     noteInput.addEventListener("input", () => { this.notePath = noteInput.value; });
+    guardTyping(noteInput);
     const noteBtn = noteRow.createEl("button", { text: "...", cls: "ai-file-btn" });
     noteBtn.addEventListener("click", () => {
       new FileSuggestModal(this.app, async (filePath) => {
@@ -64,6 +110,16 @@ export class AIExtractModal extends CustomModal {
     // Status
     this.statusEl = this.contentEl.createDiv({ cls: "ai-status" });
 
+    // Live analysis panel (animation + streaming model output) — always mounted
+    this.analysisPanelEl = this.contentEl.createDiv({ cls: "ai-analysis-panel ai-hidden" });
+    const analysisHeader = this.analysisPanelEl.createDiv({ cls: "ai-analysis-header" });
+    this.analysisSpinnerEl = analysisHeader.createDiv({ cls: "ai-analysis-spinner" });
+    analysisHeader.createSpan({ text: tRaw("ai.analyzing"), cls: "ai-analysis-label" });
+    this.analysisStreamEl = this.analysisPanelEl.createDiv({ cls: "ai-analysis-stream" });
+
+    // Ask-AI prompt window — placed high so it's immediately visible
+    this.renderAskPanel();
+
     // Preview area
     this.previewEl = this.contentEl.createDiv({ cls: "ai-preview" });
     this.previewEl.addClass("ai-hidden");
@@ -73,17 +129,25 @@ export class AIExtractModal extends CustomModal {
     this.footerEl.addClass("ai-hidden");
 
     // Extract button
-    const extractBtn = this.contentEl.createEl("button", {
+    this.extractBtnEl = this.contentEl.createEl("button", {
       text: tRaw("ai.extract"),
       cls: "ai-btn ai-btn-primary ai-extract-btn",
     });
-    extractBtn.addEventListener("click", () => void this.runExtraction());
-    (this as unknown as Record<string, unknown>)._extractBtn = extractBtn;
+    this.extractBtnEl.addEventListener("click", () => void this.runExtraction());
 
     // Auto-load if note path was provided
     if (this.notePath) {
       void this.loadNoteContent().then(() => void this.runExtraction());
     }
+  }
+
+  private getOllamaOpts(): { url: string; model: string; contextSize: number } {
+    const opts: ISettings = get(settings);
+    return {
+      url: opts.ollamaUrl || "http://localhost:11434",
+      model: opts.ollamaModel || "llama3.1",
+      contextSize: opts.ollamaContextSize || 0,
+    };
   }
 
   private async loadNoteContent(): Promise<void> {
@@ -98,7 +162,63 @@ export class AIExtractModal extends CustomModal {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Analysis animation + streaming
+  // -------------------------------------------------------------------------
+
+  private setAnalyzing(active: boolean, label?: string): void {
+    this.isAnalyzing = active;
+    if (active) {
+      this.analysisPanelEl?.removeClass("ai-hidden");
+      this.analysisPanelEl?.addClass("ai-analysis-active");
+      this.analysisSpinnerEl?.removeClass("ai-hidden");
+      const labelEl = this.analysisPanelEl?.querySelector(".ai-analysis-label");
+      if (labelEl) labelEl.textContent = label || tRaw("ai.analyzing");
+      if (this.extractBtnEl) this.extractBtnEl.disabled = true;
+      // Prompt window stays locked until monitoring finishes
+      this.setAskEnabled(false);
+    } else {
+      this.analysisPanelEl?.removeClass("ai-analysis-active");
+      this.analysisSpinnerEl?.addClass("ai-hidden");
+      if (this.extractBtnEl) this.extractBtnEl.disabled = false;
+      // Enable only after monitoring is done and we have tasks
+      this.setAskEnabled(this.askReady && this.tasks.length > 0);
+    }
+  }
+
+  /** Enable/disable the prompt window (input + send). */
+  private setAskEnabled(enabled: boolean): void {
+    if (this.chatInputEl) this.chatInputEl.disabled = !enabled;
+    if (this.chatSendBtn) this.chatSendBtn.disabled = !enabled || this.isAsking;
+    if (this.askPanelEl) {
+      if (enabled) this.askPanelEl.removeClass("ai-ask-disabled");
+      else this.askPanelEl.addClass("ai-ask-disabled");
+    }
+    if (this.chatInputEl) {
+      this.chatInputEl.placeholder = enabled
+        ? tRaw("ai.askPlaceholder")
+        : tRaw("ai.askDisabledPlaceholder");
+    }
+  }
+
+  private appendStreamDelta(delta: string): void {
+    if (!this.analysisStreamEl) return;
+    // Keep the raw model stream visible with a soft typing feel
+    this.analysisStreamEl.textContent = (this.analysisStreamEl.textContent ?? "") + delta;
+    this.analysisStreamEl.scrollTop = this.analysisStreamEl.scrollHeight;
+  }
+
+  private resetAnalysisStream(): void {
+    if (this.analysisStreamEl) this.analysisStreamEl.textContent = "";
+    if (this.analysisPanelEl) this.analysisPanelEl.removeClass("ai-hidden");
+  }
+
+  private hideAnalysisPanel(): void {
+    if (this.analysisPanelEl) this.analysisPanelEl.addClass("ai-hidden");
+  }
+
   private async runExtraction(): Promise<void> {
+    if (this.isAnalyzing) return;
     if (!this.notePath) {
       this.showStatus(tRaw("ai.noNoteSelected"), "error");
       return;
@@ -110,37 +230,72 @@ export class AIExtractModal extends CustomModal {
       return;
     }
 
-    const opts: ISettings = get(settings);
-    const url = opts.ollamaUrl || "http://localhost:11434";
-    const model = opts.ollamaModel || "llama3.1";
-    const contextSize = opts.ollamaContextSize || 0;
+    const { url, model, contextSize } = this.getOllamaOpts();
 
-    this.isAnalyzing = true;
+    this.extractAbort?.abort();
+    this.extractAbort = new AbortController();
+    this.resetAnalysisStream();
+    this.setAnalyzing(true, `${model}: ${tRaw("ai.analyzing")}`);
     this.showStatus(`⚡ ${model}: ${tRaw("ai.analyzing")}`, "loading");
+    this.askReady = false;
 
     try {
-      this.tasks = await extractTasksFromNote(url, model, this.noteContent, contextSize);
+      const result = await extractTasksFromNoteStream(
+        url,
+        model,
+        this.noteContent,
+        contextSize,
+        {
+          signal: this.extractAbort.signal,
+          onDelta: (delta) => this.appendStreamDelta(delta),
+          onProgress: (stage) => {
+            if (stage === "connecting") {
+              this.setAnalyzing(true, tRaw("ai.stages.connecting"));
+            } else if (stage === "streaming") {
+              this.setAnalyzing(true, tRaw("ai.stages.streaming"));
+            } else if (stage === "fallback") {
+              this.setAnalyzing(true, tRaw("ai.stages.fallback"));
+            } else if (stage === "parsing") {
+              this.setAnalyzing(true, tRaw("ai.stages.parsing"));
+            }
+          },
+        },
+      );
+
+      this.tasks = result.tasks;
 
       if (this.tasks.length === 0) {
+        this.askReady = false;
+        this.setAnalyzing(false);
         this.showStatus(tRaw("ai.noTasksHint"), "info");
         return;
       }
 
       this.dayDateOverrides.clear();
+      // Use week context dates as default distribution start if available
+      if (result.weekContext.weekStart) {
+        this.distributeStartDate = result.weekContext.weekStart;
+      }
       // Store original task state for toggle restore
       this.originalTasks = this.tasks.map((t) => ({ ...t, subtasks: [...t.subtasks] }));
 
-      this.showStatus(`✓ ${model} → ${tRaw("ai.preview")} (${this.tasks.length})`, "success");
-      this.renderPreview();
+      const ctxInfo = result.weekContext.weekFocus ? ` · ${result.weekContext.weekFocus}` : "";
+      this.showStatus(`✓ ${model} → ${tRaw("ai.preview")} (${this.tasks.length})${ctxInfo}`, "success");
+      this.askReady = true;
+      this.setAnalyzing(false);
+      this.hideAnalysisPanel();
+      this.renderPreview(true);
     } catch (e: unknown) {
+      this.askReady = false;
+      this.setAnalyzing(false);
       const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes("Failed to fetch") || msg.includes("ECONNREFUSED") || msg.includes("NetworkError")) {
+      if (msg.includes("Failed to fetch") || msg.includes("ECONNREFUSED") || msg.includes("NetworkError") || msg.includes("fetch")) {
         this.showStatus(tRaw("ai.connectionError"), "error");
       } else {
         this.showStatus(tRaw("ai.error", { error: msg }), "error");
       }
     } finally {
-      this.isAnalyzing = false;
+      this.extractAbort = null;
     }
   }
 
@@ -149,6 +304,168 @@ export class AIExtractModal extends CustomModal {
     this.statusEl.textContent = text;
     this.statusEl.className = "ai-status ai-status-" + type;
   }
+
+  // -------------------------------------------------------------------------
+  // Prompt window — edit tasks or answer questions in task context
+  // -------------------------------------------------------------------------
+
+  private renderAskPanel(): void {
+    if (!this.contentEl) return;
+    this.askPanelEl?.remove();
+
+    this.askPanelEl = this.contentEl.createDiv({ cls: "ai-ask-panel ai-ask-disabled" });
+
+    const askHeader = this.askPanelEl.createDiv({ cls: "ai-ask-header" });
+    const titleWrap = askHeader.createDiv({ cls: "ai-ask-title-wrap" });
+    titleWrap.createSpan({ text: "✦", cls: "ai-ask-icon" });
+    titleWrap.createSpan({ text: tRaw("ai.askTitle"), cls: "ai-ask-title" });
+    const toggleBtn = askHeader.createEl("button", {
+      text: "▾",
+      cls: "ai-ask-toggle",
+      attr: { "aria-label": tRaw("ai.askToggle") },
+    });
+
+    const askBody = this.askPanelEl.createDiv({ cls: "ai-ask-body" });
+
+    this.chatLogEl = askBody.createDiv({ cls: "ai-chat-log" });
+    this.chatLogEl.createDiv({
+      cls: "ai-chat-hint",
+      text: tRaw("ai.askHint"),
+    });
+
+    const inputShell = askBody.createDiv({ cls: "ai-ask-input-shell" });
+    this.chatInputEl = inputShell.createEl("textarea", {
+      cls: "ai-ask-input",
+      placeholder: tRaw("ai.askDisabledPlaceholder"),
+      attr: { rows: "2" },
+    });
+    this.chatInputEl.disabled = true;
+    guardTyping(this.chatInputEl, () => void this.sendPromptCommand());
+
+    this.chatSendBtn = inputShell.createEl("button", {
+      text: tRaw("ai.askSend"),
+      cls: "ai-btn ai-btn-primary ai-ask-send",
+    });
+    this.chatSendBtn.disabled = true;
+    this.chatSendBtn.addEventListener("click", () => void this.sendPromptCommand());
+
+    toggleBtn.addEventListener("click", () => {
+      const collapsed = this.askPanelEl?.hasClass("ai-ask-collapsed") ?? false;
+      if (collapsed) {
+        this.askPanelEl?.removeClass("ai-ask-collapsed");
+        toggleBtn.textContent = "▾";
+      } else {
+        this.askPanelEl?.addClass("ai-ask-collapsed");
+        toggleBtn.textContent = "▸";
+      }
+    });
+  }
+
+  private renderChatEntry(entry: ChatEntry): HTMLElement {
+    if (!this.chatLogEl) return document.createElement("div");
+    // Drop the initial hint once real chat starts
+    this.chatLogEl.querySelector(".ai-chat-hint")?.remove();
+
+    const row = this.chatLogEl.createDiv({ cls: `ai-chat-msg ai-chat-msg-${entry.role}` });
+    row.createDiv({ cls: "ai-chat-role", text: entry.role === "user" ? tRaw("ai.chatYou") : tRaw("ai.chatAI") });
+    const bubble = row.createDiv({ cls: "ai-chat-bubble" });
+    bubble.textContent = entry.text;
+    if (entry.streaming) {
+      row.addClass("ai-chat-streaming");
+      row.createDiv({ cls: "ai-chat-cursor" });
+    }
+    this.chatLogEl.scrollTop = this.chatLogEl.scrollHeight;
+    return row;
+  }
+
+  /**
+   * Send a prompt-window message:
+   * - edit commands are APPLIED to the task list (dates, grouping, priority…)
+   * - questions are answered in the context of current tasks
+   * Locked while analysis is running; locked again while a command runs.
+   */
+  private async sendPromptCommand(): Promise<void> {
+    if (this.isAsking || this.isAnalyzing || !this.chatInputEl) return;
+    const question = this.chatInputEl.value.trim();
+    if (!question) return;
+
+    if (this.tasks.length === 0) {
+      new Notice(tRaw("ai.askNoContext"));
+      return;
+    }
+
+    const { url, model, contextSize } = this.getOllamaOpts();
+    this.chatInputEl.value = "";
+    this.isAsking = true;
+    this.setAskEnabled(false);
+
+    const userEntry: ChatEntry = { role: "user", text: question };
+    this.chatHistory.push(userEntry);
+    this.renderChatEntry(userEntry);
+
+    const assistantEntry: ChatEntry = { role: "assistant", text: tRaw("ai.applying"), streaming: true };
+    this.chatHistory.push(assistantEntry);
+    const assistantRow = this.renderChatEntry(assistantEntry);
+    const bubbleEl = assistantRow.querySelector(".ai-chat-bubble") as HTMLElement | null;
+
+    this.askAbort?.abort();
+    this.askAbort = new AbortController();
+
+    try {
+      const result = await applyTasksInstruction(
+        url,
+        model,
+        question,
+        this.tasks,
+        contextSize > 0 ? this.noteContent.slice(0, contextSize) : this.noteContent,
+        this.distributeStartDate || undefined,
+        {
+          signal: this.askAbort.signal,
+          onDelta: () => {
+            // Keep a live pulse in the bubble while the model works
+            if (bubbleEl) {
+              const dots = ".".repeat((Math.floor(Date.now() / 350) % 3) + 1);
+              bubbleEl.textContent = `${tRaw("ai.applying")}${dots}`;
+            }
+          },
+        },
+      );
+
+      assistantEntry.text = result.summary || tRaw("ai.done");
+      if (bubbleEl) bubbleEl.textContent = assistantEntry.text;
+
+      if (result.action === "edit" && result.tasks.length > 0) {
+        // Apply edits to the live preview
+        this.tasks = result.tasks.map((t) => ({ ...t, subtasks: [...t.subtasks] }));
+        this.originalTasks = this.tasks.map((t) => ({ ...t, subtasks: [...t.subtasks] }));
+        this.dayDateOverrides.clear();
+        this.renderPreview(true);
+        assistantEntry.text = `${result.summary}\n${tRaw("ai.appliedCount", { count: String(this.tasks.length) })}`;
+        if (bubbleEl) bubbleEl.textContent = assistantEntry.text;
+        this.showStatus(`✓ ${tRaw("ai.appliedCount", { count: String(this.tasks.length) })}`, "success");
+      } else if (result.tasks.length > 0) {
+        // Answer only — keep tasks as-is (model may echo a full copy)
+        this.tasks = this.tasks.map((t) => ({ ...t, subtasks: [...t.subtasks] }));
+      }
+
+      assistantEntry.streaming = false;
+      assistantRow.removeClass("ai-chat-streaming");
+      assistantRow.querySelector(".ai-chat-cursor")?.remove();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      assistantEntry.streaming = false;
+      assistantEntry.text = tRaw("ai.error", { error: msg });
+      if (bubbleEl) bubbleEl.textContent = assistantEntry.text;
+      assistantRow.removeClass("ai-chat-streaming");
+      assistantRow.querySelector(".ai-chat-cursor")?.remove();
+      assistantRow.addClass("ai-chat-msg-error");
+    } finally {
+      this.isAsking = false;
+      this.setAskEnabled(!this.isAnalyzing && this.askReady && this.tasks.length > 0);
+      this.askAbort = null;
+    }
+  }
+
 
   /** Resolve the actual date string for a given dayIndex, using overrides or start date */
   private resolveDateForDay(dayIndex: number): string {
@@ -163,18 +480,25 @@ export class AIExtractModal extends CustomModal {
   private getDistribution(): Map<string, ExtractedTask[]> {
     const result = new Map<string, ExtractedTask[]>();
 
-    // Group by dayIndex
-    const byDay = new Map<number, ExtractedTask[]>();
+    // Group by effective date — explicit task.date wins over day-level override
+    const byDate = new Map<string, ExtractedTask[]>();
     for (const task of this.tasks) {
       const day = task.dayIndex || 1;
-      const list = byDay.get(day) ?? [];
+      const override = this.dayDateOverrides.get(day);
+      let dateStr: string;
+      if (task.date) {
+        dateStr = task.date;
+      } else if (override) {
+        dateStr = override;
+      } else {
+        dateStr = this.resolveDateForDay(day);
+      }
+      const list = byDate.get(dateStr) ?? [];
       list.push(task);
-      byDay.set(day, list);
+      byDate.set(dateStr, list);
     }
 
-    for (const [dayIdx, dayTasks] of byDay) {
-      const dateStr = this.resolveDateForDay(dayIdx);
-
+    for (const [dateStr, dayTasks] of byDate) {
       // Auto-fill scheduledTime only when toggle is on and task has no time
       if (this.autoScheduleTime) {
         let nextMinutes = 9 * 60;
@@ -200,19 +524,19 @@ export class AIExtractModal extends CustomModal {
     return result;
   }
 
-  private renderPreview(): void {
+  private renderPreview(animate = false): void {
     if (!this.previewEl || !this.footerEl) return;
 
     this.previewEl.removeClass("ai-hidden");
     this.footerEl.removeClass("ai-hidden");
 
-    const extractBtn = (this as unknown as Record<string, unknown>)._extractBtn as HTMLElement | undefined;
-    if (extractBtn) extractBtn.addClass("ai-hidden");
+    if (this.extractBtnEl) this.extractBtnEl.addClass("ai-hidden");
 
     this.previewEl.empty();
 
     const distribution = this.getDistribution();
     const dateEntries = [...distribution.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    let animIdx = 0;
 
     for (const [date, dayTasks] of dateEntries) {
       // Find the dayIndex for this date group
@@ -220,6 +544,10 @@ export class AIExtractModal extends CustomModal {
 
       // Day card — drop target
       const dayCard = this.previewEl.createDiv({ cls: "ai-day-card" });
+      if (animate) {
+        dayCard.addClass("ai-card-enter");
+        dayCard.style.animationDelay = `${Math.min(animIdx++, 8) * 60}ms`;
+      }
       dayCard.addEventListener("dragover", (e) => {
         e.preventDefault();
         dayCard.classList.add("ai-day-card-drop");
@@ -232,6 +560,7 @@ export class AIExtractModal extends CustomModal {
         dayCard.classList.remove("ai-day-card-drop");
         if (this.draggedTaskIdx !== null && this.draggedTaskIdx < this.tasks.length) {
           this.tasks[this.draggedTaskIdx].dayIndex = dayIdx;
+          this.tasks[this.draggedTaskIdx].date = undefined; // clear model date so dayIndex takes effect
           this.draggedTaskIdx = null;
           this.renderPreview();
         }
@@ -240,7 +569,10 @@ export class AIExtractModal extends CustomModal {
       // Day header with editable date
       const dayHeader = dayCard.createDiv({ cls: "ai-day-card-header" });
       const dayTitle = dayHeader.createDiv({ cls: "ai-day-card-title" });
-      dayTitle.createEl("span", { text: `День ${dayIdx}`, cls: "ai-day-num" });
+      dayTitle.createEl("span", {
+        text: tRaw("ai.dayLabel", { n: String(dayIdx) }),
+        cls: "ai-day-num",
+      });
       const m = momentFn(date, "YYYY-MM-DD", true);
       if (m.isValid()) {
         dayTitle.createEl("span", { text: m.format("dddd, D MMMM"), cls: "ai-day-date-label" });
@@ -264,6 +596,10 @@ export class AIExtractModal extends CustomModal {
         const task = dayTasks[i];
         const taskIdx = this.tasks.indexOf(task);
         const taskRow = taskList.createDiv({ cls: "ai-task-row" });
+        if (animate) {
+          taskRow.addClass("ai-card-enter");
+          taskRow.style.animationDelay = `${Math.min(animIdx++, 12) * 40}ms`;
+        }
         taskRow.draggable = true;
         taskRow.addEventListener("dragstart", (e) => {
           this.draggedTaskIdx = taskIdx;
@@ -299,6 +635,7 @@ export class AIExtractModal extends CustomModal {
           value: task.title,
         });
         titleEl.addEventListener("input", () => { this.tasks[taskIdx].title = titleEl.value; });
+        guardTyping(titleEl);
 
         // Description (if present)
         if (task.description) {
@@ -319,6 +656,7 @@ export class AIExtractModal extends CustomModal {
           this.tasks[taskIdx].scheduledTime = timeInput.value || undefined;
           this.updateEndTime(taskIdx, endTimeInput);
         });
+        guardTyping(timeInput);
 
         meta.createEl("span", { text: "—", cls: "ai-task-time-sep" });
 
@@ -518,6 +856,10 @@ export class AIExtractModal extends CustomModal {
   }
 
   onClose(): void {
+    this.extractAbort?.abort();
+    this.extractAbort = null;
+    this.askAbort?.abort();
+    this.askAbort = null;
     this.contentEl.empty();
   }
 }
