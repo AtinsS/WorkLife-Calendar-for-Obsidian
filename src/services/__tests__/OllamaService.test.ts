@@ -2,6 +2,9 @@ import {
   isTemporalTitle,
   sanitizeTemporalTasks,
   fixDayIndex,
+  detectNoteFormat,
+  parseStructuredNote,
+  normalizeExtractedTasks,
   type ExtractedTask,
 } from "../OllamaService";
 
@@ -315,5 +318,163 @@ describe("fixDayIndex", () => {
     ];
     const result = fixDayIndex(tasks);
     expect(result.map((t) => t.dayIndex)).toEqual([1, 1, 2, 2, 3]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dual-format structured extraction
+// ---------------------------------------------------------------------------
+
+describe("isTemporalTitle — themed day headings are NOT temporal", () => {
+  it("keeps study-plan day themes as real task titles", () => {
+    expect(isTemporalTitle("День 1 (пн). PostgreSQL + Prisma + Workspace — 2 ч")).toBe(false);
+    expect(isTemporalTitle("PostgreSQL + Prisma + Workspace")).toBe(false);
+    expect(isTemporalTitle("День 2 (вт). Express + Socket.io + Rooms — 2 ч")).toBe(false);
+  });
+
+  it("still treats bare day labels as temporal", () => {
+    expect(isTemporalTitle("День 1")).toBe(true);
+    expect(isTemporalTitle("День 1 (пн)")).toBe(true);
+    expect(isTemporalTitle("Понедельник (21.09)")).toBe(true);
+  });
+});
+
+describe("detectNoteFormat", () => {
+  const studyPlan = `### День 1 (пн). PostgreSQL + Prisma + Workspace — 2 ч
+
+**Что делаем:** настраиваем базу данных.
+
+- [ ] docker-compose.yml с PostgreSQL 16
+- [ ] .env с DATABASE_URL
+    - Workspace — id, name
+- [ ] npx prisma init
+
+### День 2 (вт). Express + Socket.io + Rooms — 2 ч
+- [ ] Переписать index.ts
+`;
+
+  const dailyList = `## 📅 Понедельник (21.09)
+- [ ] 🔴 Созвон с командой в 10:00 — обсудить ТЗ лендинга
+- [ ] 🟡 Набросать структуру новой статьи в блог
+- [ ] 🟢 Утренние страницы (15 мин)
+
+## 📅 Вторник (22.09)
+- [ ] 🔴 Вёрстка главного экрана лендинга
+- [ ] 🟡 Прочитать главу 4 курса по Python
+- [ ] 🟢 Прогулка 30 мин
+`;
+
+  it("detects study-plan format", () => {
+    expect(detectNoteFormat(studyPlan)).toBe("study-plan");
+  });
+
+  it("detects daily-list format", () => {
+    expect(detectNoteFormat(dailyList)).toBe("daily-list");
+  });
+
+  it("does not confuse the two formats", () => {
+    expect(detectNoteFormat(studyPlan)).not.toBe("daily-list");
+    expect(detectNoteFormat(dailyList)).not.toBe("study-plan");
+  });
+
+  it("returns unknown for free-form notes", () => {
+    expect(detectNoteFormat("Just some prose about the weather.")).toBe("unknown");
+    expect(parseStructuredNote("Just some prose.")).toBeNull();
+  });
+});
+
+describe("parseStructuredNote — Format A study plan", () => {
+  const note = `### День 1 (пн). PostgreSQL + Prisma + Workspace — 2 ч
+
+**Что делаем:** настраиваем базу данных и описываем все модели.
+
+- [ ] docker-compose.yml с PostgreSQL 16 (порт 5432).
+- [ ] .env с DATABASE_URL.
+- [ ] Схема БД (все модели):
+    - Workspace — id, name, apiKey.
+    - Operator — id, email, password.
+- [ ] npx prisma migrate dev --name init.
+
+### День 2 (вт). Express + Socket.io + Rooms — 2 ч
+
+- [ ] Переписать apps/server/src/index.ts
+- [ ] Event sendMessage
+`;
+
+  it("heading is ONE task, checklist items are subtasks", () => {
+    const parsed = parseStructuredNote(note);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.format).toBe("study-plan");
+    expect(parsed!.tasks).toHaveLength(2);
+
+    const day1 = parsed!.tasks[0];
+    expect(day1.title).toBe("PostgreSQL + Prisma + Workspace");
+    expect(day1.estimatedMinutes).toBe(120);
+    expect(day1.dayIndex).toBe(1);
+    expect(day1.weekday).toBe("Понедельник");
+    expect(day1.description).toContain("настраиваем базу данных");
+    // 4 top-level checkboxes + 2 nested model lines flattened as checklist detail
+    expect(day1.subtasks.length).toBeGreaterThanOrEqual(4);
+    expect(day1.subtasks.map((s) => s.title).join("|")).toContain("docker-compose.yml");
+    expect(day1.subtasks.map((s) => s.title).join("|")).toContain("npx prisma migrate");
+    // parent must survive normalize (not collapsed into free subtasks)
+    const { tasks } = normalizeExtractedTasks({ tasks: parsed!.tasks });
+    expect(tasks.some((t) => t.title.includes("PostgreSQL"))).toBe(true);
+    expect(tasks.filter((t) => t.title.includes("PostgreSQL"))[0].subtasks.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("second day is a separate parent task", () => {
+    const parsed = parseStructuredNote(note)!;
+    expect(parsed.tasks[1].title).toBe("Express + Socket.io + Rooms");
+    expect(parsed.tasks[1].dayIndex).toBe(2);
+    expect(parsed.tasks[1].subtasks.some((s) => s.title.includes("sendMessage"))).toBe(true);
+  });
+});
+
+describe("parseStructuredNote — Format B daily notes", () => {
+  const note = `## 📅 Понедельник (21.09)
+- [ ] 🔴 Созвон с командой в 10:00 — обсудить ТЗ лендинга
+- [ ] 🟡 Набросать структуру новой статьи в блог
+- [ ] 🟢 Утренние страницы (15 мин)
+
+## 📅 Вторник (22.09)
+- [ ] 🔴 Вёрстка главного экрана лендинга
+- [ ] 🟡 Прочитать главу 4 курса по Python
+- [ ] 🟢 Прогулка 30 мин
+
+## 📅 Среда (23.09) ← сегодня
+- [ ] 🔴 Доделать блок «Отзывы» на лендинге
+`;
+
+  it("day headers are never tasks; each line is an independent task", () => {
+    const parsed = parseStructuredNote(note);
+    expect(parsed).not.toBeNull();
+    expect(parsed!.format).toBe("daily-list");
+    expect(parsed!.tasks).toHaveLength(7);
+    expect(parsed!.tasks.every((t) => !isTemporalTitle(t.title))).toBe(true);
+    expect(parsed!.tasks.some((t) => t.title.includes("Понедельник"))).toBe(false);
+  });
+
+  it("maps 🔴🟡🟢 to priorities", () => {
+    const parsed = parseStructuredNote(note)!;
+    expect(parsed.tasks[0].priority).toBe("high"); // Созвон
+    expect(parsed.tasks[1].priority).toBe("medium"); // статья
+    expect(parsed.tasks[2].priority).toBe("low"); // страницы
+  });
+
+  it("parses times and durations from lines", () => {
+    const parsed = parseStructuredNote(note)!;
+    expect(parsed.tasks[0].scheduledTime).toBe("10:00");
+    expect(parsed.tasks[0].title).toContain("Созвон");
+    expect(parsed.tasks[2].estimatedMinutes).toBe(15);
+    expect(parsed.tasks[5].estimatedMinutes).toBe(30); // Прогулка 30 мин
+  });
+
+  it("binds date and weekday from day headers", () => {
+    const parsed = parseStructuredNote(note)!;
+    expect(parsed.tasks[0].date).toMatch(/\d{4}-09-21$/);
+    expect(parsed.tasks[0].weekday).toBe("Понедельник");
+    expect(parsed.tasks[3].date).toMatch(/-09-22$/);
+    expect(parsed.tasks[6].weekday).toBe("Среда");
   });
 });

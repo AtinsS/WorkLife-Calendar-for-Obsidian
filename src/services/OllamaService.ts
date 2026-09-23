@@ -48,54 +48,44 @@ export interface ExtractionResult {
 
 const SYSTEM_PROMPT = `You extract actionable tasks from planning documents. Return ONLY valid JSON.
 
+TWO KNOWN FORMATS — do not mix them:
+
+FORMAT A — STUDY/WORK PLAN (theme per day).
+Heading IS the main task. Checklist items under it are SUBTASKS, not independent tasks.
+INPUT:
+### День 1 (пн). PostgreSQL + Prisma + Workspace — 2 ч
+**Что делаем:** настраиваем базу данных и описываем модели.
+- [ ] docker-compose.yml с PostgreSQL 16
+- [ ] .env с DATABASE_URL
+    - Workspace — id, name, apiKey
+    - Operator — id, email
+- [ ] npx prisma init
+
+OUTPUT (one task + nested subtasks; duration from heading → estimatedMinutes):
+{"title": "PostgreSQL + Prisma + Workspace", "description": "настраиваем базу данных и описываем модели.", "estimatedMinutes": 120, "dayIndex": 1, "weekday": "Понедельник", "subtasks": [{"title": "docker-compose.yml с PostgreSQL 16"}, {"title": ".env с DATABASE_URL"}, {"title": "Workspace — id, name, apiKey"}, {"title": "Operator — id, email"}, {"title": "npx prisma init"}]}
+
+FORMAT B — DAILY NOTES (day headers + independent checklist lines).
+Day header is NEVER a task. Each checkbox/emoji line is an INDEPENDENT task.
+INPUT:
+## 📅 Понедельник (21.09)
+- [ ] 🔴 Созвон с командой в 10:00 — обсудить ТЗ лендинга
+- [ ] 🟡 Набросать структуру статьи
+- [ ] 🟢 Утренние страницы (15 мин)
+
+OUTPUT (flat tasks; 🔴=high 🟡=medium 🟢=low; "в 10:00" → scheduledTime):
+{"tasks": [
+  {"title": "Созвон с командой — обсудить ТЗ лендинга", "priority": "high", "scheduledTime": "10:00", "dayIndex": 1, "date": "2025-09-21", "weekday": "Понедельник", "subtasks": []},
+  {"title": "Набросать структуру статьи", "priority": "medium", "dayIndex": 1, "date": "2025-09-21", "weekday": "Понедельник", "subtasks": []},
+  {"title": "Утренние страницы", "priority": "low", "estimatedMinutes": 15, "dayIndex": 1, "date": "2025-09-21", "weekday": "Понедельник", "subtasks": []}
+]}
+
 RULES:
-- Each day header starts a new group. Tasks under it get an INCREMENTING dayIndex (1, 2, 3...).
-- Items under day/date headers are INDEPENDENT tasks. The header itself is never a task.
-- Sub-items under topic headers (### Подготовка, ## Ремонт) become subtasks of that topic.
-- Do NOT include: day names, dates, "Тема дня:", headers, tables, trackers.
-- Strip time markers (🕐 HH:MM, 🕐 HH:MM–HH:MM) and priority markers (⏫ 🔼 🔽) from titles into fields.
-- For time ranges like "10:00–13:00" set scheduledTime="10:00" and estimatedMinutes=180.
-- Infer priority: ⏫/срочно/urgent/deadline → "high", 🔽/optional/hobby → "low", else "medium".
-
-EXAMPLE INPUT:
-> Неделя: 22.09 – 28.09
-> Фокус недели: разработка
-
-## Понедельник · 22.09
-Тема дня: планирование и разгон
-
-Утренняя рутина (зарядка, душ, завтрак) 🕐 07:00
-Разобрать входящие и составить план на неделю ⏫ 🕐 09:00
-Deep work: основная задача проекта 🕐 10:00–13:00
-Обед + прогулка 🕐 13:00
-Встречи/созвоны 🕐 14:00–16:00
-Спортзал 🕐 18:00
-Чтение 30 мин 🕐 21:00
-
-## Вторник · 23.09
-### Backend разработка
-API эндпоинты
-Тесты
-
-### Подготовка к встрече
-Слайды
-Отчёт
-
-EXAMPLE OUTPUT:
-{
-  "weekContext": {"weekStart": "2025-09-22", "weekEnd": "2025-09-28", "weekFocus": "разработка"},
-  "tasks": [
-    {"title": "Утренняя рутина (зарядка, душ, завтрак)", "priority": "medium", "scheduledTime": "07:00", "dayIndex": 1, "dayNumber": 1, "weekday": "Понедельник", "date": "2025-09-22", "dayTheme": "планирование и разгон", "subtasks": []},
-    {"title": "Разобрать входящие и составить план на неделю", "priority": "high", "scheduledTime": "09:00", "dayIndex": 1, "dayNumber": 1, "weekday": "Понедельник", "date": "2025-09-22", "dayTheme": "планирование и разгон", "subtasks": []},
-    {"title": "Deep work: основная задача проекта", "priority": "medium", "scheduledTime": "10:00", "estimatedMinutes": 180, "dayIndex": 1, "dayNumber": 1, "weekday": "Понедельник", "date": "2025-09-22", "dayTheme": "планирование и разгон", "subtasks": []},
-    {"title": "Обед + прогулка", "priority": "low", "scheduledTime": "13:00", "dayIndex": 1, "dayNumber": 1, "weekday": "Понедельник", "date": "2025-09-22", "dayTheme": "планирование и разгон", "subtasks": []},
-    {"title": "Встречи/созвоны", "priority": "medium", "scheduledTime": "14:00", "estimatedMinutes": 120, "dayIndex": 1, "dayNumber": 1, "weekday": "Понедельник", "date": "2025-09-22", "dayTheme": "планирование и разгон", "subtasks": []},
-    {"title": "Спортзал", "priority": "low", "scheduledTime": "18:00", "dayIndex": 1, "dayNumber": 1, "weekday": "Понедельник", "date": "2025-09-22", "dayTheme": "планирование и разгон", "subtasks": []},
-    {"title": "Чтение 30 мин", "priority": "low", "scheduledTime": "21:00", "estimatedMinutes": 30, "dayIndex": 1, "dayNumber": 1, "weekday": "Понедельник", "date": "2025-09-22", "dayTheme": "планирование и разгон", "subtasks": []},
-    {"title": "Backend разработка", "priority": "medium", "dayIndex": 2, "dayNumber": 2, "weekday": "Вторник", "date": "2025-09-23", "subtasks": [{"title": "API эндпоинты"}, {"title": "Тесты"}]},
-    {"title": "Подготовка к встрече", "priority": "medium", "dayIndex": 2, "dayNumber": 2, "weekday": "Вторник", "date": "2025-09-23", "subtasks": [{"title": "Слайды"}, {"title": "Отчёт"}]}
-  ]
-}
+- Detect format first. Format A: heading=task, nested list=subtasks. Format B: each line=task.
+- Each day/date section gets an INCREMENTING dayIndex (1, 2, 3...).
+- Do NOT turn day headers (Понедельник, День 1, 📅 Вторник) into tasks in Format B.
+- In Format A do NOT flatten the theme heading into its subtasks — keep the heading as the parent task.
+- Strip markers (🕐 ⏫ 🔼 🔽 🔴 🟡 🟢) into fields. "в 10:00" / "10:00–13:00" → scheduledTime + estimatedMinutes.
+- "— 2 ч", "(15 мин)", "2 часа" in heading/line → estimatedMinutes.
 
 OUTPUT SCHEMA:
 {
@@ -136,6 +126,302 @@ function buildUserPrompt(noteSlice: string): string {
 Extract tasks from this document:
 
 ${noteSlice}`;
+}
+
+// ---------------------------------------------------------------------------
+// Structured note parser — deterministic dual-format extraction (fast path)
+// ---------------------------------------------------------------------------
+
+export type NoteFormat = "study-plan" | "daily-list" | "unknown";
+
+const DAY_NAME_RU = "понедельник|вторник|среда|четверг|пятница|суббота|воскресенье";
+const DAY_NAME_EN = "monday|tuesday|wednesday|thursday|friday|saturday|sunday";
+const DAY_ABBR = "пн|вт|ср|чт|пт|сб|вс";
+
+const WEEKDAY_TO_NUM: Record<string, number> = {
+  "воскресенье": 0, "sunday": 0, "вс": 0,
+  "понедельник": 1, "monday": 1, "пн": 1,
+  "вторник": 2, "tuesday": 2, "вт": 2,
+  "среда": 3, "wednesday": 3, "ср": 3,
+  "четверг": 4, "thursday": 4, "чт": 4,
+  "пятница": 5, "friday": 5, "пт": 5,
+  "суббота": 6, "saturday": 6, "сб": 6,
+};
+
+const WEEKDAY_LABEL_RU: Record<number, string> = {
+  0: "Воскресенье", 1: "Понедельник", 2: "Вторник", 3: "Среда",
+  4: "Четверг", 5: "Пятница", 6: "Суббота",
+};
+
+/** Detect which of the two known note shapes this document uses. */
+export function detectNoteFormat(content: string): NoteFormat {
+  const studyDay = (content.match(new RegExp(`^#{1,6}\\s*(?:день|day)\\s*\\d+`, "gim")) ?? []).length;
+  const dailyDay = (
+    content.match(
+      new RegExp(`^(?:#{1,6}\\s*)?(?:📅\\s*)?(?:${DAY_NAME_RU}|${DAY_NAME_EN})\\s*(?:\\(|$)`, "gim"),
+    ) ?? []
+  ).length;
+  const checkboxLines = (content.match(/^\s*[-*]\s*\[[ xX]?\]/gm) ?? []).length;
+  const emojiTasks = (content.match(/^\s*[-*]?\s*[🔴🟡🟢]/gm) ?? []).length;
+  const plainList = (content.match(/^\s*[-*]\s+\S/gm) ?? []).length;
+
+  if (studyDay > 0 && (checkboxLines > 0 || plainList > 0)) {
+    // Theme days with checklist body → study plan wins even if day names appear
+    return "study-plan";
+  }
+  if (dailyDay > 0 && (emojiTasks > 0 || checkboxLines > 0)) {
+    return "daily-list";
+  }
+  if (studyDay > 0) return "study-plan";
+  if (dailyDay > 0) return "daily-list";
+  return "unknown";
+}
+
+function makeDate(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseDateToken(monthDay: string, yearHint?: string): string | null {
+  const m = monthDay.match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$/);
+  if (!m) return null;
+  const now = new Date();
+  let year = yearHint ? parseInt(yearHint) : (m[3] ? parseInt(m[3]) : now.getFullYear());
+  if (year < 100) year += year < 70 ? 2000 : 1900;
+  const month = parseInt(m[2]);
+  const day = parseInt(m[1]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  return makeDate(year, month, day);
+}
+
+function weekdayFromDate(dateStr: string): { weekday: string; dayIndexNum: number } | null {
+  const d = new Date(`${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  const n = d.getDay();
+  return { weekday: WEEKDAY_LABEL_RU[n], dayIndexNum: n };
+}
+
+function emojiPriority(text: string): "low" | "medium" | "high" {
+  if (/🔴/.test(text)) return "high";
+  if (/🟢/.test(text)) return "low";
+  return "medium";
+}
+
+function cleanLineText(text: string): string {
+  return text
+    .replace(/^\s*\[[ xX]?\]\s*/, "")
+    .replace(/[🔴🟡🟢📅✅☑☐✔🕐⏫🔼🔽⚡❗⬜]\s*/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+interface StructuredParse {
+  format: NoteFormat;
+  tasks: ExtractedTask[];
+  weekContext: WeekContext;
+}
+
+/**
+ * FORMAT A — `### День 1 (пн). Title — 2 ч` is ONE task;
+ * `- [ ]` / nested bullets under it are subtasks (not free tasks).
+ */
+function parseStudyPlan(content: string): ExtractedTask[] {
+  const lines = content.split(/\r?\n/);
+  const tasks: ExtractedTask[] = [];
+  let daySeq = 0;
+  let current: ExtractedTask | null = null;
+  let lastSubtaskIndent = 0;
+
+  const dayHead = new RegExp(
+    `^(#{1,6})\\s*(?:день|day)\\s*(\\d+)\\s*(?:\\(\\s*([^)]+?)\\s*\\))?\\s*[.:=\\-–—]?\\s*(.*)$`,
+    "i",
+  );
+  const listRe = /^(\s*)([-*+]|\d+\.)\s+(?:\[[ xX]?\]\s*)?(.*)$/;
+
+  const pushCurrent = () => {
+    if (current) {
+      current.subtasks = current.subtasks.filter((s) => s.title.length > 0);
+      tasks.push(current);
+      current = null;
+    }
+  };
+
+  for (const raw of lines) {
+    const head = raw.match(dayHead);
+    if (head) {
+      pushCurrent();
+      daySeq += 1;
+      const dayNumber = parseInt(head[2], 10);
+      const abbrOrName = (head[3] || "").toLowerCase().trim();
+      let rest = (head[4] || "").trim();
+
+      // Split trailing duration: "— 2 ч" / "- 30 мин" / "(2 часа)"
+      let estimatedMinutes: number | undefined;
+      const dur = rest.match(/\s*[–\-—(]\s*(\d+(?:[.,]\d+)?)\s*(мин|min|час(?:а|ов)?|ч|h|hr|hour)\s*\)?\s*$/i);
+      if (dur) {
+        const n = parseFloat(dur[1].replace(",", "."));
+        estimatedMinutes = /^(мин|min)/i.test(dur[2]) ? Math.round(n) : Math.round(n * 60);
+        rest = rest.slice(0, dur.index).trim();
+      }
+
+      const weekdayNum = WEEKDAY_TO_NUM[abbrOrName];
+      const weekday = weekdayNum != null ? WEEKDAY_LABEL_RU[weekdayNum] : abbrOrName
+        ? abbrOrName.charAt(0).toUpperCase() + abbrOrName.slice(1)
+        : undefined;
+
+      current = {
+        title: rest || `День ${dayNumber}`,
+        description: undefined,
+        priority: "medium",
+        estimatedMinutes,
+        dayIndex: daySeq,
+        dayNumber,
+        weekday,
+        subtasks: [],
+        selected: true,
+      };
+      lastSubtaskIndent = 0;
+      continue;
+    }
+
+    if (!current) continue;
+
+    // Description block: **Что делаем:** … / **Что делаем** …
+    const desc = raw.match(/^\s*(?:\*\*)?\s*(?:что\s+делаем|описание|goal|описание\s+дня)\s*(?:\*\*)?\s*[.:–—-]?\s*(.+)$/i);
+    if (desc) {
+      current.description = desc[1].replace(/\*\*/g, "").trim();
+      continue;
+    }
+
+    const li = raw.match(listRe);
+    if (li) {
+      const indent = li[1].replace(/\t/g, "  ").length;
+      const text = cleanLineText(li[3] || "");
+      if (!text) continue;
+      if (!current.subtasks) current.subtasks = [];
+      current.subtasks.push({ title: text });
+      lastSubtaskIndent = indent;
+      continue;
+    }
+
+    // Indented continuation without bullet → detail of last subtask
+    const cont = raw.match(/^(\s{2,})\S/);
+    if (cont && current.subtasks.length > 0 && cont[1].replace(/\t/g, "  ").length > lastSubtaskIndent) {
+      const text = cleanLineText(raw);
+      if (text) {
+        const last = current.subtasks[current.subtasks.length - 1];
+        last.title = `${last.title} ${text}`;
+      }
+    }
+  }
+  pushCurrent();
+  return tasks.filter((t) => t.title.length > 0);
+}
+
+/**
+ * FORMAT B — `## 📅 Понедельник (21.09)` starts a day; each `- [ ] 🔴 …`
+ * line is an independent task (header is never a task).
+ */
+function parseDailyList(content: string): { tasks: ExtractedTask[]; weekContext: WeekContext } {
+  const lines = content.split(/\r?\n/);
+  const tasks: ExtractedTask[] = [];
+  const dates: string[] = [];
+  let daySeq = 0;
+  let currentDate: string | undefined;
+  let currentWeekday: string | undefined;
+  let currentDayNumber: number | undefined;
+
+  const dayHead = new RegExp(
+    `^(#{1,6}\\s*)?(?:📅\\s*)?(${DAY_NAME_RU}|${DAY_NAME_EN})\\s*(?:\\(\\s*(\\d{1,2}\\.\\d{1,2}(?:\\.\\d{2,4})?)\\s*\\))?.*$`,
+    "i",
+  );
+  const listRe = /^(\s*)([-*+]|\d+\.)\s+(?:\[[ xX]?\]\s*)?(.*)$/;
+
+  for (const raw of lines) {
+    const head = raw.match(dayHead);
+    // Only treat as day header if the line is mostly the day name (not a task line)
+    if (head && !/^\s*[-*+]\s/.test(raw) && (head[3] || head[1] || /^\s*(?:📅|#)/.test(raw) || new RegExp(`^(${DAY_NAME_RU}|${DAY_NAME_EN})`, "i").test(raw.trim()))) {
+      const isTaskish = /\[[ xX]\]|🔴|🟡|🟢/.test(raw) && raw.includes("—") && !head[3];
+      if (!isTaskish) {
+        daySeq += 1;
+        const nameKey = (head[2] || "").toLowerCase();
+        const parsedDate = head[3] ? parseDateToken(head[3]) : undefined;
+        if (parsedDate) dates.push(parsedDate);
+        const wd = weekdayFromDate(parsedDate ?? "");
+        currentWeekday = wd?.weekday ?? WEEKDAY_LABEL_RU[WEEKDAY_TO_NUM[nameKey] ?? -1];
+        currentDate = parsedDate;
+        currentDayNumber = WEEKDAY_TO_NUM[nameKey] != null ? WEEKDAY_TO_NUM[nameKey] + 1 : daySeq;
+        continue;
+      }
+    }
+
+    if (daySeq === 0) continue;
+
+    const li = raw.match(listRe);
+    const body = li ? li[3] || "" : /^\s*[🔴🟡🟢]/.test(raw) ? raw.trim() : "";
+    if (!body) continue;
+
+    let title = cleanLineText(body);
+    // Strip inline time "в 10:00" / "10:00–11:00"
+    let scheduledTime: string | undefined;
+    let estimatedMinutes: number | undefined;
+    const range = parseTimeRange(title);
+    if (range) {
+      scheduledTime = range.start;
+      estimatedMinutes = range.minutes;
+      title = stripTimeFromTitle(title);
+    } else {
+      const single = parseSingleTime(title);
+      if (single) {
+        scheduledTime = single;
+        title = stripTimeFromTitle(title);
+      }
+    }
+    const dur = parseDurationHint(title);
+    if (dur && !estimatedMinutes) {
+      estimatedMinutes = dur;
+      title = title.replace(/\s*\(?\s*\d+\s*(?:мин|min|час(?:а|ов)?|ч|h)\s*\)?\s*$/i, "").trim();
+    }
+    const priority = emojiPriority(body);
+
+    tasks.push({
+      title: title || "Задача",
+      priority,
+      estimatedMinutes,
+      dayIndex: daySeq,
+      dayNumber: currentDayNumber,
+      weekday: currentWeekday,
+      date: currentDate,
+      scheduledTime,
+      subtasks: [],
+      selected: true,
+    });
+  }
+
+  dates.sort();
+  const weekContext: WeekContext = {
+    weekStart: dates[0],
+    weekEnd: dates[dates.length - 1],
+  };
+  return { tasks, weekContext };
+}
+
+/**
+ * Deterministic extract for the two known note shapes.
+ * Returns null when the note does not match — caller falls back to the LLM.
+ */
+export function parseStructuredNote(content: string): StructuredParse | null {
+  const format = detectNoteFormat(content);
+  if (format === "study-plan") {
+    const tasks = parseStudyPlan(content);
+    if (tasks.length === 0) return null;
+    return { format, tasks: tasks.map((t) => enrichTask(t)), weekContext: {} };
+  }
+  if (format === "daily-list") {
+    const { tasks, weekContext } = parseDailyList(content);
+    if (tasks.length === 0) return null;
+    return { format, tasks: tasks.map((t) => enrichTask(t)), weekContext };
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +509,7 @@ function parseSingleTime(text: string): string | null {
 function parseDurationHint(text: string): number | null {
   const mMin = text.match(/(\d+)\s*(?:мин|min)/i);
   if (mMin) return parseInt(mMin[1]);
-  const mHour = text.match(/(\d+(?:[.,]\d+)?)\s*(?:час|hour|hr|h)\b/i);
+  const mHour = text.match(/(\d+(?:[.,]\d+)?)\s*(?:час(?:а|ов)?|ч|h|hr|hour)\b/i);
   if (mHour) return Math.round(parseFloat(mHour[1].replace(",", ".")) * 60);
   return null;
 }
@@ -232,6 +518,8 @@ function stripTimeFromTitle(title: string): string {
   return title
     .replace(/🕐\s*\d{1,2}:\d{2}\s*[–\-—]\s*\d{1,2}:\d{2}/gu, "")
     .replace(/🕐\s*\d{1,2}:\d{2}/gu, "")
+    .replace(/\b[вс]\s+\d{1,2}:\d{2}\s*[–\-—]\s*\d{1,2}:\d{2}/giu, "")
+    .replace(/\b[вс]\s+\d{1,2}:\d{2}/giu, "")
     .replace(/\s*\d{1,2}:\d{2}\s*[–\-—]\s*\d{1,2}:\d{2}\s*$/u, "")
     .replace(/\s*\d{1,2}:\d{2}\s*$/u, "")
     .replace(/\s+/g, " ")
@@ -239,12 +527,16 @@ function stripTimeFromTitle(title: string): string {
 }
 
 function stripPriorityFromTitle(title: string): string {
-  return title.replace(/[⏫🔼🔽⚡❗⬜]\s*/gu, "").replace(/\s+/g, " ").trim();
+  return title
+    .replace(/[⏫🔼🔽⚡❗⬜🔴🟡🟢]\s*/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function extractPriorityFromTitle(title: string): "low" | "medium" | "high" | null {
-  if (/⏫|⚡|❗/.test(title)) return "high";
-  if (/🔽/.test(title)) return "low";
+  if (/⏫|⚡|❗|🔴/.test(title)) return "high";
+  if (/🔽|🟢/.test(title)) return "low";
+  if (/🟡/.test(title)) return "medium";
   if (/\b(срочно|urgent|критично|дедлайн|deadline|ASAP)\b/i.test(title)) return "high";
   if (/\b(опционально|если останется|nice.to.have|hobby|хобби)\b/i.test(title)) return "low";
   return null;
@@ -287,33 +579,38 @@ function enrichTask(t: ExtractedTask): ExtractedTask {
 // Temporal sanitizer — strip time containers from model output
 // ---------------------------------------------------------------------------
 
-const TEMPORAL_PATTERNS: RegExp[] = [
-  // Day names — \b doesn't work with Cyrillic, use Unicode-aware boundaries
-  /(?<!\p{L})(понедельник|вторник|среда|четверг|пятница|суббота|воскресенье)(?!\p{L})/iu,
-  /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i,
-  // "День N" / "Day N"
-  /(?<!\p{L})(день|day)\s*\d+/iu,
-  // Week references
-  /(?<!\p{L})(недел[яьие]|week)\s*\d*/iu,
-  // Month names
-  /(?<!\p{L})(январь|февраль|март|апрель|май|июнь|июль|август|сентябрь|октябрь|ноябрь|декабрь)(?!\p{L})/iu,
-  /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i,
-  // Date patterns: 22.09, 22/09, 22-09 — negative lookbehind for colon (avoids matching time like "10:00-13:00")
-  /(?<!:)\b\d{1,2}[./-]\d{1,2}([./-]\d{2,4})?\b/,
-  // "До обеда", "После обеда", "Утро", "Вечер"
-  /^(утро|день|вечер|ночь|утром|днём|вечером|ночью|до обеда|после обеда)$/i,
-];
-
-/** Check if a title is purely temporal (a time container, not a task). */
+/**
+ * Check if a title is purely temporal (a day/date container, not a task).
+ * "Понедельник (21.09)" → true.
+ * "День 1 (пн). PostgreSQL + Prisma — 2 ч" → false (real themed task).
+ */
 export function isTemporalTitle(title: string): boolean {
-  const t = title.trim()
+  let t = title.trim()
     .replace(/·/gu, " ")
     .replace(/[–—]/gu, "-")
-    .replace(/[🕐⏫🔼🔽⚡❗⬜]/gu, "")
+    .replace(/[🕐⏫🔼🔽⚡❗⬜🔴🟡🟢📅✅☑☐✔]/gu, "")
+    .replace(/←\s*сегодня/giu, " ")
     .replace(/\s+/g, " ")
     .trim();
   if (!t) return true;
-  return TEMPORAL_PATTERNS.some((re) => re.test(t));
+
+  t = t
+    .replace(/(?<!\p{L})(понедельник|вторник|среда|четверг|пятница|суббота|воскресенье)(?!\p{L})/giu, " ")
+    .replace(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/gi, " ")
+    .replace(/(?<!\p{L})(пн|вт|ср|чт|пт|сб|вс)(?!\p{L})/giu, " ")
+    .replace(/(?<!\p{L})(день|day)\s*\d+/giu, " ")
+    .replace(/(?<!\p{L})(недел[яьие]|week)\s*\d*/giu, " ")
+    .replace(/(?<!\p{L})(январь|февраль|март|апрель|май|июнь|июль|август|сентябрь|октябрь|ноябрь|декабрь)(?!\p{L})/giu, " ")
+    .replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi, " ")
+    .replace(/(\d+(?:[.,]\d+)?)\s*(?:мин|min|час(?:а|ов)?|ч|h|hr|hour)\b/giu, " ")
+    .replace(/\b\d{1,2}:\d{2}([–-]\d{1,2}:\d{2})?\b/g, " ")
+    .replace(/(?<!\p{L})(утро|утром|день|днём|вечер|вечером|ночь|ночью|до обеда|после обеда)(?!\p{L})/giu, " ")
+    // dates last so "26.09" / "21.09.2025" are not left behind after dashes
+    .replace(/\b\d{1,2}[./-]\d{1,2}([./-]\d{2,4})?\b/g, " ")
+    .replace(/[()«»"'.,:;!?*#|`+/#\-–—]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return t.length === 0;
 }
 
 /**
@@ -704,6 +1001,23 @@ export async function extractTasksFromNoteStream(
 ): Promise<StreamExtractionResult> {
   const noteSlice =
     contextSize > 0 ? sliceAtLineBoundary(noteContent, contextSize) : noteContent;
+
+  // Fast path: well-known study-plan / daily-notes shapes parse without LLM
+  const structured = parseStructuredNote(noteSlice);
+  if (structured && structured.tasks.length > 0) {
+    opts.onProgress?.("parsing");
+    const normalized = normalizeExtractedTasks({
+      tasks: structured.tasks,
+      weekContext: structured.weekContext,
+    });
+    return {
+      tasks: normalized.tasks,
+      weekContext: normalized.weekContext,
+      rawText: "",
+      usedFallback: false,
+    };
+  }
+
   const userPrompt = buildUserPrompt(noteSlice);
 
   let lastError: Error | null = null;

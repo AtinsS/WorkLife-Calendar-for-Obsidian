@@ -8816,23 +8816,38 @@ svg.dot.filled {
 }
 
 .ai-extract-modal {
-  max-width: 560px !important;
-  width: 95vw !important;
+  max-width: 720px !important;
+  width: min(720px, 96vw) !important;
 }
 
 .ai-extract-modal .wf-dialog-content {
   padding: 0 !important;
   overflow-y: auto !important;
+  display: flex !important;
+  flex-direction: column;
+  max-height: min(85vh, 820px);
 }
 
-/* Header */
-.ai-header {
-  padding: 20px 20px 12px;
+/* Top bar */
+.ai-top {
+  padding: 16px 16px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--background-primary, #1a1a2e);
+}
+
+.ai-top-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
 }
 
 .ai-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: #fff;
   font-family: var(--font-interface);
@@ -8901,13 +8916,25 @@ svg.dot.filled {
 /* Note row */
 .ai-note-row {
   display: flex;
-  gap: 6px;
-  padding: 0 20px 10px;
+  gap: 8px;
+  align-items: center;
+}
+
+.ai-note-row .ai-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ai-extract-btn {
+  width: auto !important;
+  margin: 0 !important;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 /* Status */
 .ai-status {
-  padding: 6px 20px;
+  padding: 8px 16px;
   font-size: 12px;
   color: rgba(200, 210, 220, 0.5);
   min-height: 18px;
@@ -8927,12 +8954,14 @@ svg.dot.filled {
 
 /* Preview */
 .ai-preview {
-  padding: 0 20px;
-  max-height: 380px;
+  padding: 8px 16px;
+  flex: 1;
+  min-height: 120px;
+  max-height: none;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 /* Day card */
@@ -8967,17 +8996,6 @@ svg.dot.filled {
 .ai-day-date-label {
   font-size: 11px;
   color: rgba(200, 210, 220, 0.5);
-}
-
-.ai-day-date-input {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
-  padding: 2px 6px;
-  font-size: 11px;
-  color: rgba(200, 210, 220, 0.6);
-  outline: none;
-  cursor: pointer;
 }
 
 /* Tasks list */
@@ -9139,22 +9157,38 @@ svg.dot.filled {
 
 /* Footer */
 .ai-footer {
-  padding: 12px 20px 20px;
+  padding: 10px 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.12);
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
 }
 
-.ai-footer-row {
+.ai-footer-toolbar {
   display: flex;
-  gap: 10px;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .ai-footer-field {
   flex: 1;
+  min-width: 120px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.ai-footer-field-date {
+  max-width: 160px;
+}
+
+.ai-footer-field-date .ai-input {
+  height: 32px;
 }
 
 .ai-footer-label {
@@ -9223,6 +9257,11 @@ svg.dot.filled {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+  align-items: center;
+}
+
+.ai-add-btn {
+  min-width: 180px;
 }
 
 .ai-btn {
@@ -9259,14 +9298,13 @@ svg.dot.filled {
 }
 
 .ai-extract-btn {
-  margin: 0 20px 16px;
-  width: calc(100% - 40px);
+  flex-shrink: 0;
 }
 
 /* ===== Analysis animation + streaming ===== */
 
 .ai-analysis-panel {
-  margin: 0 20px 10px;
+  margin: 0 16px 8px;
   border: 1px solid rgba(95, 153, 225, 0.45);
   border-radius: 10px;
   background: rgba(95, 153, 225, 0.1);
@@ -9380,28 +9418,29 @@ svg.dot.filled {
 /* ===== Ask AI / prompt window ===== */
 
 .ai-ask-panel {
-  margin: 8px 20px;
-  border: 1px solid rgba(95, 153, 225, 0.22);
-  border-radius: 14px;
-  background: linear-gradient(180deg, rgba(95, 153, 225, 0.08), rgba(20, 24, 36, 0.35));
+  margin: 0;
+  border: none;
+  border-top: 1px solid rgba(95, 153, 225, 0.18);
+  border-radius: 0;
+  background: rgba(20, 24, 36, 0.55);
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px 14px;
-  box-shadow: 0 0 0 1px rgba(95, 153, 225, 0.05), 0 8px 24px rgba(0, 0, 0, 0.2);
-  position: relative;
-  overflow: hidden;
+  gap: 8px;
+  padding: 10px 16px 14px;
+  box-shadow: none;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
 }
 
 .ai-ask-panel::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: linear-gradient(180deg, #5f99e1, rgba(95, 153, 225, 0.15));
-  border-radius: 2px;
+  display: none;
+}
+
+.ai-ask-hint-inline {
+  font-size: 10px;
+  color: rgba(200, 210, 220, 0.35);
+  white-space: nowrap;
 }
 
 .ai-ask-header {
@@ -9587,15 +9626,16 @@ svg.dot.filled {
   padding: 0 14px;
 }
 
-/* Prompt window locked while analysis / command is running */
+/* Prompt window locked while analysis / command is running.
+   Keep pointer-events so the textarea can hold focus — a disabled/pointer-events
+   lock blurs the field and Space then scrolls the modal content. */
 .ai-ask-disabled {
   opacity: 0.5;
   filter: grayscale(0.25);
-  pointer-events: none;
 }
 
-.ai-ask-disabled .ai-ask-toggle {
-  pointer-events: auto;
+.ai-ask-disabled .ai-ask-send {
+  pointer-events: none;
 }
 
 .ai-ask-input:disabled {

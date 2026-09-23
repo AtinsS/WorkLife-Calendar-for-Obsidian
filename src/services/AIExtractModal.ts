@@ -2,7 +2,10 @@ import type { App } from "obsidian";
 import { Notice } from "obsidian";
 import { get } from "svelte/store";
 import { getDateUID } from "obsidian-daily-notes-interface";
-import { CustomModal } from "../ui/CustomModal";
+import {
+  CustomModal,
+  guardTyping,
+} from "../ui/CustomModal";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { tRaw } from "../i18n";
 import type { ExtractedTask } from "./OllamaService";
@@ -22,58 +25,6 @@ interface ChatEntry {
   role: ChatRole;
   text: string;
   streaming?: boolean;
-}
-
-/**
- * Insert text at the caret, preserving selection replace and undo when possible.
- */
-function insertTextAtCursor(
-  el: HTMLInputElement | HTMLTextAreaElement,
-  text: string,
-): void {
-  el.focus();
-  // execCommand keeps the native undo stack in Chromium/Obsidian
-  if (document.execCommand("insertText", false, text)) return;
-  const start = el.selectionStart ?? el.value.length;
-  const end = el.selectionEnd ?? start;
-  el.value = el.value.slice(0, start) + text + el.value.slice(end);
-  const pos = start + text.length;
-  el.setSelectionRange(pos, pos);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
-function isSpaceKey(e: KeyboardEvent): boolean {
-  return (e.key === " " || e.code === "Space") && !e.ctrlKey && !e.metaKey && !e.altKey;
-}
-
-/**
- * Stop global/hotkey handlers from swallowing typed characters (especially Space).
- * Never preventDefault on normal keys — the field keeps default insertion —
- * except Space, which is inserted manually so hotkeys cannot cancel it.
- */
-function guardTyping(
-  el: HTMLInputElement | HTMLTextAreaElement,
-  onEnter?: () => void,
-): void {
-  el.addEventListener("keydown", (e: KeyboardEvent) => {
-    if (e.isComposing || e.keyCode === 229) return;
-    if (e.key === "Escape") return;
-    if (onEnter && e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      e.stopPropagation();
-      onEnter();
-      return;
-    }
-    // Space: take full control — a hotkey may have already preventDefault'd insertion
-    if (isSpaceKey(e)) {
-      e.preventDefault();
-      e.stopPropagation();
-      insertTextAtCursor(el, " ");
-      return;
-    }
-    // Letters, digits — default insertion must stay; only stop bubbling
-    e.stopPropagation();
-  }, true);
 }
 
 export class AIExtractModal extends CustomModal {
@@ -116,55 +67,73 @@ export class AIExtractModal extends CustomModal {
   onOpen(): void {
     this.containerEl.addClass("ai-extract-modal");
 
-    // Header
-    const header = this.contentEl.createDiv({ cls: "ai-header" });
-    header.createEl("h2", { text: tRaw("ai.button"), cls: "ai-title" });
+    // ── Top bar: title + note + extract ──────────────────────────────────
+    const top = this.contentEl.createDiv({ cls: "ai-top" });
+    const topHead = top.createDiv({ cls: "ai-top-head" });
+    topHead.createEl("h2", { text: tRaw("ai.button"), cls: "ai-title" });
 
-    // Note selector row
-    const noteRow = this.contentEl.createDiv({ cls: "ai-note-row" });
+    const noteRow = top.createDiv({ cls: "ai-note-row" });
     const noteInput = noteRow.createEl("input", {
       type: "text",
       cls: "ai-input",
       placeholder: tRaw("ai.selectNoteDesc"),
       value: this.notePath,
     });
-    noteInput.addEventListener("input", () => { this.notePath = noteInput.value; });
-    guardTyping(noteInput);
-    const noteBtn = noteRow.createEl("button", { text: "...", cls: "ai-file-btn" });
+    noteInput.addEventListener("input", () => {
+      this.notePath = noteInput.value;
+    });
+    // Enter on note path = extract (same as «Извлечь задачи»)
+    guardTyping(noteInput, () => void this.runExtraction());
+    const noteBtn = noteRow.createEl("button", {
+      text: "…",
+      cls: "ai-file-btn",
+      attr: { title: tRaw("ai.selectNote") },
+    });
     noteBtn.addEventListener("click", () => {
       new FileSuggestModal(this.app, async (filePath) => {
         this.notePath = filePath;
         noteInput.value = filePath;
       }).open();
     });
+    this.extractBtnEl = noteRow.createEl("button", {
+      text: tRaw("ai.extract"),
+      cls: "ai-btn ai-btn-primary ai-extract-btn",
+    });
+    this.extractBtnEl.addEventListener("click", () => void this.runExtraction());
 
     // Status
     this.statusEl = this.contentEl.createDiv({ cls: "ai-status" });
 
-    // Live analysis panel (animation + streaming model output) — always mounted
+    // Live analysis panel
     this.analysisPanelEl = this.contentEl.createDiv({ cls: "ai-analysis-panel ai-hidden" });
     const analysisHeader = this.analysisPanelEl.createDiv({ cls: "ai-analysis-header" });
     this.analysisSpinnerEl = analysisHeader.createDiv({ cls: "ai-analysis-spinner" });
     analysisHeader.createSpan({ text: tRaw("ai.analyzing"), cls: "ai-analysis-label" });
     this.analysisStreamEl = this.analysisPanelEl.createDiv({ cls: "ai-analysis-stream" });
 
-    // Ask-AI prompt window — placed high so it's immediately visible
-    this.renderAskPanel();
-
-    // Preview area
+    // Preview (main scroll area)
     this.previewEl = this.contentEl.createDiv({ cls: "ai-preview" });
     this.previewEl.addClass("ai-hidden");
 
-    // Footer
+    // Footer: settings + actions
     this.footerEl = this.contentEl.createDiv({ cls: "ai-footer" });
     this.footerEl.addClass("ai-hidden");
 
-    // Extract button
-    this.extractBtnEl = this.contentEl.createEl("button", {
-      text: tRaw("ai.extract"),
-      cls: "ai-btn ai-btn-primary ai-extract-btn",
+    // Ask AI composer — sticky bottom, always visible after extract
+    this.renderAskPanel();
+
+    // Global Enter when focus is not in a field → add selected tasks
+    this.contentEl.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.key !== "Enter" || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || t?.isContentEditable) return;
+      if (tag === "BUTTON" || tag === "A") return;
+      if (!this.footerEl || this.footerEl.hasClass("ai-hidden")) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      void this.addSelectedTasks();
     });
-    this.extractBtnEl.addEventListener("click", () => void this.runExtraction());
 
     // Auto-load if note path was provided
     if (this.notePath) {
@@ -217,9 +186,16 @@ export class AIExtractModal extends CustomModal {
     }
   }
 
-  /** Enable/disable the prompt window (input + send). */
+  /**
+   * Enable/disable the prompt window (input + send).
+   * Uses readOnly instead of disabled so the caret/focus survive lock/unlock —
+   * `disabled` blurs the field and Space then scrolls .wf-dialog-content.
+   */
   private setAskEnabled(enabled: boolean): void {
-    if (this.chatInputEl) this.chatInputEl.disabled = !enabled;
+    if (this.chatInputEl) {
+      this.chatInputEl.readOnly = !enabled;
+      this.chatInputEl.disabled = false;
+    }
     if (this.chatSendBtn) this.chatSendBtn.disabled = !enabled || this.isAsking;
     if (this.askPanelEl) {
       if (enabled) this.askPanelEl.removeClass("ai-ask-disabled");
@@ -229,6 +205,10 @@ export class AIExtractModal extends CustomModal {
       this.chatInputEl.placeholder = enabled
         ? tRaw("ai.askPlaceholder")
         : tRaw("ai.askDisabledPlaceholder");
+      if (enabled) {
+        this.lastEditable = this.chatInputEl;
+        this.chatInputEl.focus();
+      }
     }
   }
 
@@ -350,6 +330,10 @@ export class AIExtractModal extends CustomModal {
     const titleWrap = askHeader.createDiv({ cls: "ai-ask-title-wrap" });
     titleWrap.createSpan({ text: "✦", cls: "ai-ask-icon" });
     titleWrap.createSpan({ text: tRaw("ai.askTitle"), cls: "ai-ask-title" });
+    titleWrap.createSpan({
+      text: "Enter — выполнить · Shift+Enter — перенос",
+      cls: "ai-ask-hint-inline",
+    });
     const toggleBtn = askHeader.createEl("button", {
       text: "▾",
       cls: "ai-ask-toggle",
@@ -370,8 +354,16 @@ export class AIExtractModal extends CustomModal {
       placeholder: tRaw("ai.askDisabledPlaceholder"),
       attr: { rows: "2" },
     });
-    this.chatInputEl.disabled = true;
+    this.chatInputEl.readOnly = true;
+    this.lastEditable = this.chatInputEl;
+    // Enter = «Выполнить», Shift+Enter = newline
     guardTyping(this.chatInputEl, () => void this.sendPromptCommand());
+    inputShell.addEventListener("mousedown", (e) => {
+      const t = e.target as HTMLElement | null;
+      if (t === this.chatInputEl || t?.closest("button")) return;
+      e.preventDefault();
+      this.chatInputEl?.focus();
+    });
 
     this.chatSendBtn = inputShell.createEl("button", {
       text: tRaw("ai.askSend"),
@@ -597,7 +589,7 @@ export class AIExtractModal extends CustomModal {
         }
       });
 
-      // Day header with editable date
+      // Day header
       const dayHeader = dayCard.createDiv({ cls: "ai-day-card-header" });
       const dayTitle = dayHeader.createDiv({ cls: "ai-day-card-title" });
       dayTitle.createEl("span", {
@@ -608,17 +600,6 @@ export class AIExtractModal extends CustomModal {
       if (m.isValid()) {
         dayTitle.createEl("span", { text: m.format("dddd, D MMMM"), cls: "ai-day-date-label" });
       }
-
-      // Editable date
-      const dateInput = dayHeader.createEl("input", {
-        type: "date",
-        cls: "ai-day-date-input",
-        value: date,
-      });
-      dateInput.addEventListener("change", () => {
-        this.dayDateOverrides.set(dayIdx, dateInput.value);
-        this.renderPreview();
-      });
 
       // Tasks in this day
       const taskList = dayCard.createDiv({ cls: "ai-day-tasks" });
@@ -650,6 +631,7 @@ export class AIExtractModal extends CustomModal {
         checkbox.checked = task.selected;
         checkbox.addEventListener("change", () => {
           this.tasks[taskIdx].selected = checkbox.checked;
+          this.renderFooter();
         });
 
         // Priority dot
@@ -774,11 +756,10 @@ export class AIExtractModal extends CustomModal {
     if (!this.footerEl) return;
     this.footerEl.empty();
 
-    // Top row: project + start date
-    const topRow = this.footerEl.createDiv({ cls: "ai-footer-row" });
+    // Compact toolbar: project · from · auto-time
+    const toolbar = this.footerEl.createDiv({ cls: "ai-footer-toolbar" });
 
-    // Project selector
-    const projWrap = topRow.createDiv({ cls: "ai-footer-field" });
+    const projWrap = toolbar.createDiv({ cls: "ai-footer-field" });
     projWrap.createEl("label", { text: tRaw("ai.project"), cls: "ai-footer-label" });
     const projSelect = projWrap.createEl("select", { cls: "ai-select" });
     projSelect.createEl("option", { value: "", text: tRaw("ai.noProject") });
@@ -790,8 +771,7 @@ export class AIExtractModal extends CustomModal {
       this.selectedProjectId = projSelect.value || null;
     });
 
-    // Start date
-    const dateWrap = topRow.createDiv({ cls: "ai-footer-field" });
+    const dateWrap = toolbar.createDiv({ cls: "ai-footer-field ai-footer-field-date" });
     dateWrap.createEl("label", { text: tRaw("ai.distributeFrom"), cls: "ai-footer-label" });
     const dateInput = dateWrap.createEl("input", {
       type: "date",
@@ -804,14 +784,11 @@ export class AIExtractModal extends CustomModal {
       this.renderPreview();
     });
 
-    // Auto-schedule toggle
-    const toggleRow = this.footerEl.createDiv({ cls: "ai-footer-toggle" });
-    const toggleLabel = toggleRow.createEl("label", { cls: "ai-toggle-label" });
+    const toggleLabel = toolbar.createEl("label", { cls: "ai-toggle-label" });
     this.autoScheduleToggleEl = toggleLabel.createEl("input", { type: "checkbox", cls: "ai-toggle-cb" });
     this.autoScheduleToggleEl.checked = this.autoScheduleTime;
     this.autoScheduleToggleEl.addEventListener("change", () => {
       this.autoScheduleTime = (this.autoScheduleToggleEl as HTMLInputElement | null)?.checked ?? false;
-      // Restore original times when toggling off
       if (!this.autoScheduleTime) {
         for (let i = 0; i < this.tasks.length; i++) {
           if (this.originalTasks[i]) {
@@ -823,7 +800,7 @@ export class AIExtractModal extends CustomModal {
     });
     toggleLabel.createSpan({ text: tRaw("ai.autoSchedule") });
 
-    // Action buttons
+    // Actions row
     const btnRow = this.footerEl.createDiv({ cls: "ai-footer-btns" });
 
     const selectAllBtn = btnRow.createEl("button", { text: tRaw("ai.selectAll"), cls: "ai-btn" });
@@ -838,7 +815,14 @@ export class AIExtractModal extends CustomModal {
       this.renderPreview();
     });
 
-    const addBtn = btnRow.createEl("button", { text: tRaw("ai.addSelected"), cls: "ai-btn ai-btn-primary" });
+    const selectedCount = this.tasks.filter((t) => t.selected).length;
+    const addBtn = btnRow.createEl("button", {
+      text: selectedCount > 0
+        ? `${tRaw("ai.addSelected")} (${selectedCount})`
+        : tRaw("ai.addSelected"),
+      cls: "ai-btn ai-btn-primary ai-add-btn",
+    });
+    addBtn.disabled = selectedCount === 0;
     addBtn.addEventListener("click", () => void this.addSelectedTasks());
   }
 
