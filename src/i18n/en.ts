@@ -365,6 +365,8 @@ export const en = {
       ntfyTopicDesc: "Topic name for receiving notifications in the ntfy app",
       ntfyScheduled: "Scheduled push notifications",
       ntfyScheduledDesc: "Send tasks to ntfy.sh when Obsidian opens — notifications arrive at the right time even when Obsidian is closed. Works with tasks for the next 3 days.",
+      ntfyDailyDigest: "Morning digest at 6:00",
+      ntfyDailyDigestDesc: "Send the current day's task list to ntfy.sh at 6:00. The notification arrives even if Obsidian is closed.",
       testNow: "Test (now)",
       testScheduled: "Test (scheduled)",
       sectionDiagnostics: "Diagnostics & log",
@@ -985,6 +987,8 @@ export const en = {
     deadlineToday: "🎯 Deadline today: {title}",
     deadlineExpired: "🔴 Deadline expired: {title}",
     deadlineTomorrow: "⏰ Deadline tomorrow: {title}",
+    dailyDigest: "📋 Tasks for {date}\n\n{list}\n\nTotal: {count}",
+    dailyDigestEmpty: "📋 No tasks for {date}",
   },
 
   // Services - GitHub Gist

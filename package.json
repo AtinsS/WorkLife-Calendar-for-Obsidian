@@ -1,6 +1,6 @@
 {
   "name": "worklife-calendar",
-  "version": "2.20.00",
+  "version": "2.20.01",
   "description": "Calendar, task tracker, habit tracker, and financial planner for Obsidian",
   "author": "AtinsS",
   "main": "main.js",
@@ -9,7 +9,7 @@
     "lint": "svelte-check && eslint . --ext .ts",
     "build": "npm run lint && rollup -c rollup.config.mjs",
     "test": "jest --passWithNoTests",
-    "test:watch": "yarn test -- --watch"
+    "test:watch": "npm test -- --watch"
   },
   "dependencies": {
     "@fullcalendar/core": "^6.1.21",
@@ -19,15 +19,19 @@
     "@fullcalendar/timegrid": "^6.1.21",
     "d3": "^7.9.0",
     "luxon": "^3.7.2",
-    "obsidian": "obsidianmd/obsidian-api#master",
+    "obsidian": "1.13.1",
     "obsidian-calendar-ui": "0.3.12",
-    "obsidian-daily-notes-interface": "0.9.0",
+    "obsidian-daily-notes-interface": "0.9.5",
     "svelte": "^3.59.2",
     "tslib": "2.1.0"
   },
+  "overrides": {
+    "obsidian": "1.13.1",
+    "obsidian-daily-notes-interface": "0.9.5"
+  },
   "devDependencies": {
-    "@codemirror/state": "^6.7.5",
-    "@codemirror/view": "^6.43.12",
+    "@codemirror/state": "6.5.0",
+    "@codemirror/view": "6.38.6",
     "@rollup/plugin-commonjs": "18.0.0",
     "@rollup/plugin-node-resolve": "11.2.1",
     "@rollup/plugin-typescript": "^11.1.6",

@@ -365,6 +365,8 @@ export const ru = {
       ntfyTopicDesc: "Имя топика для получения уведомлений в приложении ntfy",
       ntfyScheduled: "Отложенные push-уведомления",
       ntfyScheduledDesc: "Отправлять задачи на ntfy.sh при открытии Obsidian — уведомления придут в нужное время, даже если Obsidian закрыт. Работает с задачами на ближайшие 3 дня.",
+      ntfyDailyDigest: "Утренний дайджест в 6:00",
+      ntfyDailyDigestDesc: "Отправлять список задач на текущий день в ntfy.sh к 6:00. Уведомление придёт даже если Obsidian закрыт.",
       testNow: "Тест (сейчас)",
       testScheduled: "Тест (отложенный)",
       sectionDiagnostics: "Диагностика и журнал",
@@ -985,6 +987,8 @@ export const ru = {
     deadlineToday: "🎯 Дедлайн сегодня: {title}",
     deadlineExpired: "🔴 Дедлайн истёк: {title}",
     deadlineTomorrow: "⏰ Дедлайн завтра: {title}",
+    dailyDigest: "📋 Задачи на {date}\n\n{list}\n\nВсего: {count}",
+    dailyDigestEmpty: "📋 На {date} задач нет",
   },
 
   // Services - GitHub Gist

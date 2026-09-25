@@ -81,6 +81,7 @@ export interface ISettings {
   ntfyEnabled: boolean;
   ntfyTopic: string;
   ntfyScheduledEnabled: boolean;
+  ntfyDailyDigestEnabled: boolean;
 
   // Work task settings
   defaultPaymentType: "hour" | "day";
@@ -207,6 +208,7 @@ export const defaultSettings = Object.freeze({
   ntfyEnabled: false,
   ntfyTopic: "",
   ntfyScheduledEnabled: false,
+  ntfyDailyDigestEnabled: false,
 
   defaultPaymentType: "hour" as const,
   defaultRate: 0,
@@ -1747,6 +1749,19 @@ priority: medium
         });
       });
 
+    new Setting(container)
+      .setName(tRaw("settings.notifications.ntfyDailyDigest"))
+      .setDesc(tRaw("settings.notifications.ntfyDailyDigestDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.ntfyDailyDigestEnabled);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ ntfyDailyDigestEnabled: value });
+          if (value) {
+            this.plugin.notificationService?.scheduleNtfyDailyDigest();
+          }
+        });
+      });
+
     this.addNotificationDiagnostics(container);
   }
 
@@ -1809,6 +1824,12 @@ priority: medium
         tRaw("settings.notifications.ntfyScheduled"),
         this.plugin.options.ntfyScheduledEnabled ? tRaw("common.enabled") : tRaw("common.disabled"),
         this.plugin.options.ntfyScheduledEnabled ? "ok" : "muted"
+      );
+
+      addMetric(
+        tRaw("settings.notifications.ntfyDailyDigest"),
+        this.plugin.options.ntfyDailyDigestEnabled ? tRaw("common.enabled") : tRaw("common.disabled"),
+        this.plugin.options.ntfyDailyDigestEnabled ? "ok" : "muted"
       );
 
       // Test buttons

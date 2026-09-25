@@ -390,6 +390,56 @@ export class NotificationService {
     if (changed) this.saveNtfySchedule(scheduled);
   }
 
+  /** Schedule an ntfy.sh push at 06:00 with the current day's task list.
+   *  Delivery is delayed via X-Delay so it arrives even if Obsidian is closed.
+   *  Dedup key is per calendar day — reopening Obsidian won't schedule twice. */
+  scheduleNtfyDailyDigest(): void {
+    const opts: ISettings = this.plugin.options;
+    if (!opts.ntfyEnabled || !opts.ntfyDailyDigestEnabled || !opts.ntfyTopic) return;
+
+    const now = momentFn();
+    let delivery = now.clone().hour(6).minute(0).second(0).millisecond(0);
+    if (delivery.isSameOrBefore(now)) {
+      delivery = delivery.add(1, "day");
+    }
+
+    const digestDate = delivery.format("YYYY-MM-DD");
+    const dedupeKey = `daily-digest-${digestDate}`;
+    const fireUnix = Math.floor(delivery.valueOf() / 1000);
+    const scheduled = this.loadNtfySchedule();
+    if (scheduled[dedupeKey] === fireUnix) return;
+
+    const dayTasks = get(tasks)
+      .filter((t) => {
+        if (t.completed || t.status === "done" || t.status === "paused") return false;
+        const match = /^day-(\d{4}-\d{2}-\d{2})/.exec(t.dateUID);
+        return match?.[1] === digestDate;
+      })
+      .sort((a, b) => {
+        const at = a.scheduledTime || "99:99";
+        const bt = b.scheduledTime || "99:99";
+        return at.localeCompare(bt) || a.title.localeCompare(b.title);
+      });
+
+    const dateLabel = delivery.format("DD.MM.YYYY");
+    const body = dayTasks.length
+      ? tRaw("notifications.dailyDigest", {
+          date: dateLabel,
+          list: dayTasks
+            .map((t) => {
+              const time = t.scheduledTime || "—".padStart(5);
+              return `${time}  ${t.title}`;
+            })
+            .join("\n"),
+          count: String(dayTasks.length),
+        })
+      : tRaw("notifications.dailyDigestEmpty", { date: dateLabel });
+
+    this.sendNtfyDelayed(tRaw("taskStore.notificationTitle"), body, delivery.toISOString(), dedupeKey);
+    scheduled[dedupeKey] = fireUnix;
+    this.saveNtfySchedule(scheduled);
+  }
+
   private sendNtfyDelayed(title: string, body: string, deliveryIso: string, _dedupeId: string): void {
     const opts: ISettings = this.plugin.options;
     if (!opts.ntfyTopic) return;
@@ -402,6 +452,7 @@ export class NotificationService {
       method: "POST",
       headers: {
         "X-Delay": String(unixSec),
+        "X-Title": title,
         "X-Tags": "worklife",
       },
       body,

@@ -508,6 +508,10 @@ export default class CalendarPlugin extends Plugin {
     if (this.options.ntfyScheduledEnabled) {
       this.notificationService.scheduleNtfyPush();
     }
+    // Schedule 6:00 morning digest with the day's task list
+    if (this.options.ntfyDailyDigestEnabled) {
+      this.notificationService.scheduleNtfyDailyDigest();
+    }
 
     // Watch for vault sync file changes (modify + create)
     const debouncedSyncReload = () => {
