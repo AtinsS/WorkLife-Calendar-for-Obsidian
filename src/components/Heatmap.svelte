@@ -62,10 +62,10 @@
       {/each}
     </div>
     <div class="heatmap-grid">
-      {#each cells as cell}
+      {#each cells as cell, i}
         <div
           class="heatmap-cell"
-          style="background-color: {getColor(cell.level)}; grid-row: {getDayIndex(cell.date) + 1}; grid-column: {getWeekIndex(cell.date) + 1};"
+          style="background-color: {getColor(cell.level)}; grid-row: {getDayIndex(cell.date) + 1}; grid-column: {getWeekIndex(cell.date) + 1}; animation-delay: {Math.min(i * 3, 420)}ms;"
           title="{cell.date}: {cell.count} completion{cell.count !== 1 ? 's' : ''}"
         ></div>
       {/each}
@@ -131,6 +131,25 @@
     height: 13px;
     border-radius: 2px;
     cursor: default;
+    animation: heat-cell-in 0.35s ease both;
+  }
+
+  .heatmap-cell:hover {
+    transform: scale(1.35);
+    border-radius: 3px;
+    box-shadow: 0 0 0 1px var(--text-muted);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  @keyframes heat-cell-in {
+    from {
+      opacity: 0;
+      transform: scale(0.55);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   .heatmap-legend {
@@ -150,6 +169,12 @@
     width: 11px;
     height: 11px;
     cursor: default;
+    animation: none;
+  }
+
+  .heatmap-legend-cell:hover {
+    transform: none;
+    box-shadow: none;
   }
 
   @media (max-width: 768px) {

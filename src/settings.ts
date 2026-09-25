@@ -48,6 +48,8 @@ export interface ISettings {
   helloShowAnalyticsBtn?: boolean;
   helloShowFinanceBtn?: boolean;
   helloShowScheduleBtn?: boolean;
+  helloShowSearch?: boolean;
+  helloShowWeight?: boolean;
 
   // Task-Note sync settings
   syncAllTasksToNotes: boolean;
@@ -59,6 +61,9 @@ export interface ISettings {
   showHabitTracker?: boolean;
   habitTrackerMode?: "panel" | "separate" | "hidden";
   habitLogCleanupThreshold: number;
+
+  // Weight control
+  weightControlEnabled?: boolean;
 
   // Sync settings
   syncToVault: boolean;
@@ -172,6 +177,8 @@ export const defaultSettings = Object.freeze({
   helloShowAnalyticsBtn: true,
   helloShowFinanceBtn: true,
   helloShowScheduleBtn: true,
+  helloShowSearch: true,
+  helloShowWeight: true,
 
   taskTrackerCollapsed: false,
   showTaskTracker: true,
@@ -185,6 +192,7 @@ export const defaultSettings = Object.freeze({
   showHabitTracker: true,
   habitTrackerMode: "panel" as const,
   habitLogCleanupThreshold: 1000,
+  weightControlEnabled: true,
 
   syncToVault: true,
 
@@ -474,6 +482,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addShowStatusBarSetting(general);
     this.addDtwShowOnAllPagesSetting(general);
     this.addHabitTrackerModeSetting(general);
+    this.addWeightControlSetting(general);
     this.addWorkTaskSettings(general);
     this.addCarryOverOverdueSetting(general);
 
@@ -507,6 +516,20 @@ export class CalendarSettingsTab extends PluginSettingTab {
           await this.plugin.writeOptions({ dashboardShowGoals: value });
         });
       });
+
+    // Instructions for adding dashboard block
+    const dashInstructions = dashboard.createDiv({ cls: "settings-banner" });
+    new Setting(dashInstructions).setName(tRaw("settings.dashboard.blockTitle")).setHeading();
+    dashInstructions.createEl("p", {
+      text: tRaw("settings.dashboard.blockDesc"),
+    });
+    const dashCode = dashInstructions.createEl("pre");
+    dashCode.createEl("code", { text: "```dashboard\n```" });
+    dashCode.addClass("mcp-code-block");
+    dashInstructions.createEl("p", {
+      text: tRaw("settings.dashboard.blockHint"),
+    });
+
     new Setting(dashboard).setName(tRaw("settings.dashboard.sectionHello")).setHeading();
     this.addHelloButtonSettings(dashboard);
 
@@ -618,6 +641,26 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
+    new Setting(container)
+      .setName(tRaw("settings.general.showSearch"))
+      .setDesc(tRaw("settings.general.showSearchDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.helloShowSearch !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ helloShowSearch: value });
+        });
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.general.showWeight"))
+      .setDesc(tRaw("settings.general.showWeightDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.helloShowWeight !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ helloShowWeight: value });
+        });
+      });
+
     // Instructions for adding hello block
     const helloInstructions = container.createDiv({ cls: "settings-banner" });
     new Setting(helloInstructions).setName(tRaw("settings.general.helloBlockTitle")).setHeading();
@@ -670,6 +713,18 @@ export class CalendarSettingsTab extends PluginSettingTab {
         dropdown.setValue(this.plugin.options.habitTrackerMode || "panel");
         dropdown.onChange(async (value: "panel" | "separate" | "hidden") => {
           await this.plugin.writeOptions({ habitTrackerMode: value });
+        });
+      });
+  }
+
+  addWeightControlSetting(container: HTMLElement): void {
+    new Setting(container)
+      .setName(tRaw("settings.general.weightControl"))
+      .setDesc(tRaw("settings.general.weightControlDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.weightControlEnabled !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ weightControlEnabled: value });
         });
       });
   }

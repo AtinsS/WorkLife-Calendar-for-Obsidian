@@ -5,6 +5,7 @@
   import { settings } from "../ui/stores";
   import { fetchWeekWeather, type DayWeather } from "../services/weatherService";
   import { t, tArray } from "../i18n";
+  import WeightQuickInput from "../weight/WeightQuickInput.svelte";
 
   export let appInstance: App;
   export let onOpenTasks: (() => void) | undefined = undefined;
@@ -127,6 +128,9 @@
   $: showAnalyticsBtn = $settings.helloShowAnalyticsBtn !== false;
   $: showFinanceBtn = $settings.helloShowFinanceBtn !== false;
   $: showScheduleBtn = $settings.helloShowScheduleBtn !== false;
+  $: showSearch = $settings.helloShowSearch !== false;
+  $: showWeightInput =
+    $settings.weightControlEnabled !== false && $settings.helloShowWeight !== false;
   $: hour = now.hour();
   $: greetingText = hour < 6 ? $t("hello.goodNight") : hour < 12 ? $t("hello.goodMorning") : hour < 18 ? $t("hello.goodAfternoon") : $t("hello.goodEvening");
   $: greeting = userName ? `${greetingText}, ${userName}` : greetingText;
@@ -210,17 +214,26 @@
   </div>
 
   <!-- Note search -->
-  <div class="hello-search">
-    <svg class="hello-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-    <input
-      class="hello-search__input"
-      type="text"
-      placeholder={$t("hello.searchPlaceholder")}
-      bind:value={noteSearchQuery}
-      bind:this={searchInputEl}
-      on:input={searchNotes}
-    />
-  </div>
+  {#if showSearch}
+    <div class="hello-search">
+      <svg class="hello-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input
+        class="hello-search__input"
+        type="text"
+        placeholder={$t("hello.searchPlaceholder")}
+        bind:value={noteSearchQuery}
+        bind:this={searchInputEl}
+        on:input={searchNotes}
+      />
+    </div>
+  {/if}
+
+  <!-- Quick weight entry -->
+  {#if showWeightInput}
+    <div class="hello-weight">
+      <WeightQuickInput />
+    </div>
+  {/if}
 
   <!-- Nav -->
   <div class="hello-nav">
@@ -548,5 +561,11 @@
   }
   .hello-search__input::placeholder {
     color: var(--text-faint, #4b5563);
+  }
+
+  /* ═══ QUICK WEIGHT ═══════════════════════ */
+  .hello-weight {
+    max-width: 420px;
+    margin: -16px auto 20px;
   }
 </style>

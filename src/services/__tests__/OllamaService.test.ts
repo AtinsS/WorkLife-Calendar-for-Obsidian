@@ -401,13 +401,17 @@ describe("parseStructuredNote — Format A study plan", () => {
 - [ ] Event sendMessage
 `;
 
-  it("heading is ONE task, checklist items are subtasks", () => {
-    const parsed = parseStructuredNote(note);
-    expect(parsed).not.toBeNull();
-    expect(parsed!.format).toBe("study-plan");
-    expect(parsed!.tasks).toHaveLength(2);
+  function requireParsed(result: ReturnType<typeof parseStructuredNote>) {
+    if (!result) throw new Error("parseStructuredNote returned null");
+    return result;
+  }
 
-    const day1 = parsed!.tasks[0];
+  it("heading is ONE task, checklist items are subtasks", () => {
+    const parsed = requireParsed(parseStructuredNote(note));
+    expect(parsed.format).toBe("study-plan");
+    expect(parsed.tasks).toHaveLength(2);
+
+    const day1 = parsed.tasks[0];
     expect(day1.title).toBe("PostgreSQL + Prisma + Workspace");
     expect(day1.estimatedMinutes).toBe(120);
     expect(day1.dayIndex).toBe(1);
@@ -418,13 +422,13 @@ describe("parseStructuredNote — Format A study plan", () => {
     expect(day1.subtasks.map((s) => s.title).join("|")).toContain("docker-compose.yml");
     expect(day1.subtasks.map((s) => s.title).join("|")).toContain("npx prisma migrate");
     // parent must survive normalize (not collapsed into free subtasks)
-    const { tasks } = normalizeExtractedTasks({ tasks: parsed!.tasks });
+    const { tasks } = normalizeExtractedTasks({ tasks: parsed.tasks });
     expect(tasks.some((t) => t.title.includes("PostgreSQL"))).toBe(true);
     expect(tasks.filter((t) => t.title.includes("PostgreSQL"))[0].subtasks.length).toBeGreaterThanOrEqual(4);
   });
 
   it("second day is a separate parent task", () => {
-    const parsed = parseStructuredNote(note)!;
+    const parsed = requireParsed(parseStructuredNote(note));
     expect(parsed.tasks[1].title).toBe("Express + Socket.io + Rooms");
     expect(parsed.tasks[1].dayIndex).toBe(2);
     expect(parsed.tasks[1].subtasks.some((s) => s.title.includes("sendMessage"))).toBe(true);
@@ -446,24 +450,28 @@ describe("parseStructuredNote — Format B daily notes", () => {
 - [ ] 🔴 Доделать блок «Отзывы» на лендинге
 `;
 
+  function requireParsed(result: ReturnType<typeof parseStructuredNote>) {
+    if (!result) throw new Error("parseStructuredNote returned null");
+    return result;
+  }
+
   it("day headers are never tasks; each line is an independent task", () => {
-    const parsed = parseStructuredNote(note);
-    expect(parsed).not.toBeNull();
-    expect(parsed!.format).toBe("daily-list");
-    expect(parsed!.tasks).toHaveLength(7);
-    expect(parsed!.tasks.every((t) => !isTemporalTitle(t.title))).toBe(true);
-    expect(parsed!.tasks.some((t) => t.title.includes("Понедельник"))).toBe(false);
+    const parsed = requireParsed(parseStructuredNote(note));
+    expect(parsed.format).toBe("daily-list");
+    expect(parsed.tasks).toHaveLength(7);
+    expect(parsed.tasks.every((t) => !isTemporalTitle(t.title))).toBe(true);
+    expect(parsed.tasks.some((t) => t.title.includes("Понедельник"))).toBe(false);
   });
 
   it("maps 🔴🟡🟢 to priorities", () => {
-    const parsed = parseStructuredNote(note)!;
+    const parsed = requireParsed(parseStructuredNote(note));
     expect(parsed.tasks[0].priority).toBe("high"); // Созвон
     expect(parsed.tasks[1].priority).toBe("medium"); // статья
     expect(parsed.tasks[2].priority).toBe("low"); // страницы
   });
 
   it("parses times and durations from lines", () => {
-    const parsed = parseStructuredNote(note)!;
+    const parsed = requireParsed(parseStructuredNote(note));
     expect(parsed.tasks[0].scheduledTime).toBe("10:00");
     expect(parsed.tasks[0].title).toContain("Созвон");
     expect(parsed.tasks[2].estimatedMinutes).toBe(15);
@@ -471,7 +479,7 @@ describe("parseStructuredNote — Format B daily notes", () => {
   });
 
   it("binds date and weekday from day headers", () => {
-    const parsed = parseStructuredNote(note)!;
+    const parsed = requireParsed(parseStructuredNote(note));
     expect(parsed.tasks[0].date).toMatch(/\d{4}-09-21$/);
     expect(parsed.tasks[0].weekday).toBe("Понедельник");
     expect(parsed.tasks[3].date).toMatch(/-09-22$/);

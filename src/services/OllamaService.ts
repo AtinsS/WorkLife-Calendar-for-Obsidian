@@ -136,7 +136,6 @@ export type NoteFormat = "study-plan" | "daily-list" | "unknown";
 
 const DAY_NAME_RU = "понедельник|вторник|среда|четверг|пятница|суббота|воскресенье";
 const DAY_NAME_EN = "monday|tuesday|wednesday|thursday|friday|saturday|sunday";
-const DAY_ABBR = "пн|вт|ср|чт|пт|сб|вс";
 
 const WEEKDAY_TO_NUM: Record<string, number> = {
   "воскресенье": 0, "sunday": 0, "вс": 0,
@@ -162,7 +161,7 @@ export function detectNoteFormat(content: string): NoteFormat {
     ) ?? []
   ).length;
   const checkboxLines = (content.match(/^\s*[-*]\s*\[[ xX]?\]/gm) ?? []).length;
-  const emojiTasks = (content.match(/^\s*[-*]?\s*[🔴🟡🟢]/gm) ?? []).length;
+  const emojiTasks = (content.match(/^\s*[-*]?\s*[🔴🟡🟢]/gmu) ?? []).length;
   const plainList = (content.match(/^\s*[-*]\s+\S/gm) ?? []).length;
 
   if (studyDay > 0 && (checkboxLines > 0 || plainList > 0)) {
@@ -357,7 +356,7 @@ function parseDailyList(content: string): { tasks: ExtractedTask[]; weekContext:
     if (daySeq === 0) continue;
 
     const li = raw.match(listRe);
-    const body = li ? li[3] || "" : /^\s*[🔴🟡🟢]/.test(raw) ? raw.trim() : "";
+    const body = li ? li[3] || "" : /^\s*[🔴🟡🟢]/u.test(raw) ? raw.trim() : "";
     if (!body) continue;
 
     let title = cleanLineText(body);

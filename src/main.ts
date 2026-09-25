@@ -52,6 +52,7 @@ import {
 import { initHabitStores, reloadHabitStores, immediateSave as immediateHabitSave } from "./habit-tracker/stores";
 import { initFinanceStores, reloadFinanceStores, immediateFinanceSave } from "./finance/storage";
 import { initFinancialAnalyticsStores, reloadFinancialAnalyticsStores, immediateAnalyticsSave } from "./finance/financialAnalyticsStorage";
+import { initWeightStores, reloadWeightStores, immediateWeightSave } from "./weight/stores";
 import { initLocale, locale, tRaw } from "./i18n";
 import CalendarNav from "./components/CalendarNav.svelte";
 import DateTimeWeather from "./components/DateTimeWeather.svelte";
@@ -98,6 +99,7 @@ export default class CalendarPlugin extends Plugin {
     immediateHabitSave();
     void immediateFinanceSave();
     void immediateAnalyticsSave();
+    immediateWeightSave();
 
     if (this.syncReloadTimer) window.clearTimeout(this.syncReloadTimer);
     this.notificationService?.stop();
@@ -491,6 +493,9 @@ export default class CalendarPlugin extends Plugin {
     // Initialize financial analytics (must await to prevent data loss)
     await initFinancialAnalyticsStores(this);
 
+    // Initialize weight tracker
+    await initWeightStores(this);
+
     // Initialize GitHub Gist sync
     initGistSync(this);
 
@@ -513,6 +518,7 @@ export default class CalendarPlugin extends Plugin {
           reloadHabitStores(this);
           await reloadFinanceStores();
           await reloadFinancialAnalyticsStores();
+          await reloadWeightStores();
         })();
       }, 500);
     };

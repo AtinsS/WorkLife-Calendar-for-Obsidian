@@ -1,5 +1,71 @@
-import { requestUrl } from "obsidian";
+import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from "obsidian";
 import { tRaw } from "../i18n";
+
+const TRANSIENT_NET_ERRORS = [
+  "ERR_NETWORK_CHANGED",
+  "ERR_CONNECTION_RESET",
+  "ERR_CONNECTION_CLOSED",
+  "ERR_CONNECTION_TIMED_OUT",
+  "ERR_CONNECTION_REFUSED",
+  "ERR_CONNECTION_FAILED",
+  "ERR_NETWORK_IO_SUSPENDED",
+  "ERR_INTERNET_DISCONNECTED",
+  "ERR_TIMED_OUT",
+  "ERR_EMPTY_RESPONSE",
+  "ERR_ADDRESS_UNREACHABLE",
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "EAI_AGAIN",
+  "timed out",
+  "timeout",
+];
+
+function isTransientNetError(e: unknown): boolean {
+  const msg = e instanceof Error ? `${e.name} ${e.message}` : String(e);
+  return TRANSIENT_NET_ERRORS.some((code) => msg.includes(code));
+}
+
+async function requestWithRetry(
+  params: RequestUrlParam | string,
+  retries = 2,
+  delayMs = 1500,
+): Promise<RequestUrlResponse> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await requestUrl(params);
+    } catch (e) {
+      if (attempt >= retries || !isTransientNetError(e)) throw e;
+      await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+    }
+  }
+}
+
+// Main forecast API and its sibling host (same schema). Sticky index prefers the last host that worked.
+const OPEN_METEO_HOSTS = [
+  "https://api.open-meteo.com",
+  "https://historical-forecast-api.open-meteo.com",
+] as const;
+let openMeteoHostIdx = 0;
+
+async function requestOpenMeteo(pathAndQuery: string): Promise<RequestUrlResponse> {
+  let lastErr: unknown;
+  for (let i = 0; i < OPEN_METEO_HOSTS.length; i++) {
+    const idx = (openMeteoHostIdx + i) % OPEN_METEO_HOSTS.length;
+    try {
+      const res = await requestWithRetry(
+        { url: `${OPEN_METEO_HOSTS[idx]}${pathAndQuery}`, method: "GET" },
+        1,
+        800,
+      );
+      openMeteoHostIdx = idx;
+      return res;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr;
+}
 
 export type WeatherProvider = "open-meteo" | "openweathermap" | "weatherapi" | "visual-crossing";
 
@@ -269,11 +335,11 @@ export async function fetchDayDetail(
 async function fetchDayDetailOpenMeteo(
   lat: number, lon: number, date: string
 ): Promise<DayWeatherDetail | null> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}`
+  const path = `/v1/forecast?latitude=${lat}&longitude=${lon}`
     + `&hourly=temperature_2m,relative_humidity_2m,precipitation,precipitation_probability,weather_code,wind_speed_10m,wind_direction_10m,apparent_temperature,surface_pressure`
     + `&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,wind_speed_10m_max,wind_direction_10m_dominant,precipitation_sum,precipitation_probability_max`
     + `&start_date=${date}&end_date=${date}&timezone=auto`;
-  const response = await requestUrl({ url, method: "GET" });
+  const response = await requestOpenMeteo(path);
   const json = response.json as OpenMeteoResponse;
   if (!json?.daily?.time?.[0]) return null;
 
@@ -330,7 +396,7 @@ async function fetchDayDetailOWM(
   if (!apiKey) throw new Error(tRaw("weather.errorApiKey", { provider: "OpenWeatherMap" }));
   const weatherLang = tRaw("locale.weatherApiLang");
   const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=${weatherLang}`;
-  const response = await requestUrl({ url, method: "GET" });
+  const response = await requestWithRetry({ url, method: "GET" });
   const json: OpenWeatherMapResponse = response.json as OpenWeatherMapResponse;
   if (!json?.list) return null;
 
@@ -387,7 +453,7 @@ async function fetchDayDetailWeatherAPI(
   if (!apiKey) throw new Error(tRaw("weather.errorApiKey", { provider: "WeatherAPI" }));
   const weatherLang = tRaw("locale.weatherApiLang");
   const url = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${lat},${lon}&days=14&hourlytp=1&lang=${weatherLang}`;
-  const response = await requestUrl({ url, method: "GET" });
+  const response = await requestWithRetry({ url, method: "GET" });
   const json: WeatherAPIResponse = response.json as WeatherAPIResponse;
   if (json?.error) throw new Error(json.error.message ?? `WeatherAPI error ${json.error.code}`);
   const dayData = json.forecast?.forecastday?.find((d) => d.date === date);
@@ -447,7 +513,7 @@ async function fetchDayDetailVisualCrossing(
   if (!apiKey) throw new Error(tRaw("weather.errorApiKey", { provider: "Visual Crossing" }));
   const weatherLang = tRaw("locale.weatherApiLang");
   const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${lat},${lon}/${date}/${date}?key=${apiKey}&unitGroup=metric&lang=${weatherLang}&include=hours`;
-  const response = await requestUrl({ url, method: "GET" });
+  const response = await requestWithRetry({ url, method: "GET" });
   const json: VisualCrossingResponse = response.json as VisualCrossingResponse;
   const dayData = json.days?.[0];
   if (!dayData) return null;
@@ -500,8 +566,8 @@ async function fetchDayDetailVisualCrossing(
 async function fetchOpenMeteo(
   lat: number, lon: number, startDate: string, endDate: string
 ): Promise<DayWeather[]> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&start_date=${startDate}&end_date=${endDate}&timezone=auto`;
-  const response = await requestUrl({ url, method: "GET" });
+  const path = `/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&start_date=${startDate}&end_date=${endDate}&timezone=auto`;
+  const response = await requestOpenMeteo(path);
   const json = response.json as OpenMeteoResponse;
   if (!json?.daily?.time) return [];
 
@@ -544,7 +610,7 @@ async function fetchOpenWeatherMap(
   // OpenWeatherMap free tier: use forecast API (5 day / 3 hour)
   const weatherLang = tRaw("locale.weatherApiLang");
   const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric&lang=${weatherLang}`;
-  const response = await requestUrl({ url, method: "GET" });
+  const response = await requestWithRetry({ url, method: "GET" });
   const json: OpenWeatherMapResponse = response.json as OpenWeatherMapResponse;
   if (json?.cod && json.cod !== "200" && json.cod !== 200) {
     throw new Error(json.message ?? `OpenWeatherMap error ${json.cod}`);
@@ -580,7 +646,7 @@ async function fetchWeatherAPI(
 
   const weatherLang = tRaw("locale.weatherApiLang");
   const url = `https://api.weatherapi.com/v1/forecast.json?key=${apiKey}&q=${lat},${lon}&days=14&lang=${weatherLang}`;
-  const response = await requestUrl({ url, method: "GET" });
+  const response = await requestWithRetry({ url, method: "GET" });
   const json: WeatherAPIResponse = response.json as WeatherAPIResponse;
   if (json?.error) {
     throw new Error(json.error.message ?? `WeatherAPI error ${json.error.code}`);
@@ -611,7 +677,7 @@ async function fetchVisualCrossing(
 
   const weatherLang = tRaw("locale.weatherApiLang");
   const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${lat},${lon}/${startDate}/${endDate}?key=${apiKey}&unitGroup=metric&lang=${weatherLang}&include=days`;
-  const response = await requestUrl({ url, method: "GET" });
+  const response = await requestWithRetry({ url, method: "GET" });
   const json: VisualCrossingResponse = response.json as VisualCrossingResponse;
   if (json?.message && !json?.days) {
     throw new Error(json.message);

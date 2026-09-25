@@ -12,6 +12,7 @@ export const MODULES = [
   "finance",
   "financialAnalytics",
   "notifications",
+  "weight",
 ] as const;
 
 export type ModuleName = (typeof MODULES)[number];
@@ -23,6 +24,7 @@ export interface VaultData {
   habitTracker?: Record<string, unknown>;
   finance?: Record<string, unknown>;
   financialAnalytics?: Record<string, unknown>;
+  weight?: Record<string, unknown>;
   [key: string]: unknown;
 }
 

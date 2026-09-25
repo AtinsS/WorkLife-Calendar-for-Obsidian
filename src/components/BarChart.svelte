@@ -1,16 +1,30 @@
 <script lang="ts">
-  import { onMount, afterUpdate } from "svelte";
+  import { onMount, afterUpdate, onDestroy } from "svelte";
   import type { TimeLog } from "../task-tracker/types";
   import { formatDuration } from "../task-tracker/TimerManager";
   import { t, locale } from "../i18n";
+  import { animateProgress } from "../utils/visualMotion";
 
   export let logs: TimeLog[] = [];
   export let extraTimeByDate: Map<string, number> = new Map();
   export let mode: "bar" | "area" = "bar";
+  /** Optional pre-aggregated series (e.g. weight). When set, logs/extraTimeByDate are ignored. */
+  export let points: { date: string; value: number }[] | null = null;
+  /** Value formatter for labels/tooltip/summary — default is duration. */
+  export let formatValue: (v: number) => string = (v) => formatDuration(v);
+  export let maxBars = 14;
+  export let emptyText: string | null = null;
+  /** When false, Y axis is scaled to data range (needed for weight, not time-from-zero). */
+  export let zeroBased = true;
+  /** "sum" = total of values (time), "last" = latest value (weight). */
+  export let summaryMode: "sum" | "last" = "sum";
 
   let canvas: HTMLCanvasElement;
   let container: HTMLDivElement;
   let hoveredBar: number = -1;
+  let reveal = 1;
+  let cancelReveal: (() => void) | null = null;
+  let lastDataKey = "";
 
   interface DayData {
     date: string;
@@ -18,9 +32,36 @@
     totalMs: number;
   }
 
-  function aggregateByDay(logs: TimeLog[], extra: Map<string, number>, currentLocale: string): DayData[] {
+  function aggregateByDay(
+    logsArg: TimeLog[],
+    extra: Map<string, number>,
+    currentLocale: string,
+    pointsArg: { date: string; value: number }[] | null,
+    maxBarsArg: number
+  ): DayData[] {
+    const fmtDate = (date: string) => {
+      const d = new Date(date + "T12:00:00");
+      return d.toLocaleDateString(currentLocale === "ru" ? "ru-RU" : "en-US", {
+        day: "numeric",
+        month: "short",
+      });
+    };
+
+    if (pointsArg) {
+      const result: DayData[] = pointsArg.map((p) => ({
+        date: p.date,
+        label: fmtDate(p.date),
+        totalMs: p.value,
+      }));
+      result.sort((a, b) => a.date.localeCompare(b.date));
+      if (result.length > maxBarsArg) {
+        return result.slice(result.length - maxBarsArg);
+      }
+      return result;
+    }
+
     const map = new Map<string, number>();
-    for (const log of logs) {
+    for (const log of logsArg) {
       map.set(log.date, (map.get(log.date) || 0) + log.duration);
     }
     for (const [date, ms] of extra) {
@@ -29,23 +70,43 @@
 
     const result: DayData[] = [];
     for (const [date, totalMs] of map) {
-      const d = new Date(date + "T12:00:00");
-      const label = d.toLocaleDateString(currentLocale === "ru" ? "ru-RU" : "en-US", { day: "numeric", month: "short" });
-      result.push({ date, label, totalMs });
+      result.push({ date, label: fmtDate(date), totalMs });
     }
 
     result.sort((a, b) => a.date.localeCompare(b.date));
-    const maxBars = 14;
-    if (result.length > maxBars) {
-      return result.slice(result.length - maxBars);
+    if (result.length > maxBarsArg) {
+      return result.slice(result.length - maxBarsArg);
     }
     return result;
   }
 
-  $: dayData = aggregateByDay(logs, extraTimeByDate, $locale);
+  // points / maxBars must be in the reactive expression — Svelte does not
+  // track them via the function body alone.
+  $: dayData = aggregateByDay(logs, extraTimeByDate, $locale, points, maxBars);
   $: maxMs = dayData.length > 0 ? Math.max(...dayData.map((d) => d.totalMs)) : 0;
+  $: minMs = dayData.length > 0 ? Math.min(...dayData.map((d) => d.totalMs)) : 0;
+  $: summaryTotal =
+    summaryMode === "last" && dayData.length > 0
+      ? dayData[dayData.length - 1].totalMs
+      : dayData.reduce((s, d) => s + d.totalMs, 0);
+  $: summaryAvg =
+    dayData.length > 0
+      ? dayData.reduce((s, d) => s + d.totalMs, 0) / dayData.length
+      : 0;
 
   let dpr = 1;
+
+  function playReveal(dataKey: string) {
+    if (dataKey === lastDataKey) return;
+    lastDataKey = dataKey;
+    cancelReveal?.();
+    cancelReveal = animateProgress(mode === "area" ? 720 : 560, (p) => {
+      reveal = p;
+      drawChart();
+    });
+  }
+
+  $: playReveal(dayData.map((d) => `${d.date}:${d.totalMs}`).join("|"));
 
   function drawChart() {
     if (!canvas || !container || dayData.length === 0) return;
@@ -107,16 +168,30 @@
     }
     ctx.setLineDash([]);
 
+    // Y mapping: zero-based (time) or data-range (weight)
+    const yFor = (v: number): number => {
+      if (zeroBased) {
+        return paddingTop + chartHeight - (maxMs > 0 ? (v / maxMs) * chartHeight : 0);
+      }
+      const span = Math.max(maxMs - minMs, 0.5);
+      const pad = span * 0.12;
+      const lo = minMs - pad;
+      const hi = maxMs + pad;
+      return paddingTop + chartHeight - ((v - lo) / (hi - lo)) * chartHeight;
+    };
+
     if (mode === "area") {
       // ── Area / Line chart with Catmull-Rom spline ──
       const points: { x: number; y: number }[] = [];
-      const minBarHeight = 3;
 
       for (let i = 0; i < barCount; i++) {
         const d = dayData[i];
-        const barH = maxMs > 0 ? Math.max(minBarHeight, (d.totalMs / maxMs) * chartHeight) : minBarHeight;
+        const stagger = barCount <= 1 ? 1 : Math.min(1, Math.max(0, (reveal - i * 0.035) / 0.7));
+        const baseY = paddingTop + chartHeight;
+        const fullY = yFor(d.totalMs);
+        // Stagger from baseline toward the value
+        const y = baseY + (fullY - baseY) * stagger;
         const x = paddingLeft + barGap + i * (barWidth + barGap) + barWidth / 2;
-        const y = paddingTop + chartHeight - barH;
         points.push({ x, y });
       }
 
@@ -199,7 +274,7 @@
           ctx.fillStyle = textMuted;
           ctx.font = `bold 10px sans-serif`;
           ctx.textAlign = "center";
-          ctx.fillText(formatDuration(d.totalMs), p.x, p.y - 10);
+          ctx.fillText(formatValue(d.totalMs), p.x, p.y - 10);
         }
 
         // Date label
@@ -210,12 +285,13 @@
       }
     } else {
       // ── Bar chart (original) ──
-      const minBarHeight = 3;
       for (let i = 0; i < barCount; i++) {
         const d = dayData[i];
-        const barH = maxMs > 0 ? Math.max(minBarHeight, (d.totalMs / maxMs) * chartHeight) : minBarHeight;
+        const stagger = barCount <= 1 ? 1 : Math.min(1, Math.max(0, (reveal - i * 0.04) / 0.72));
+        const baseY = paddingTop + chartHeight;
+        const fullY = yFor(d.totalMs);
+        const y = baseY + (fullY - baseY) * stagger;
         const x = paddingLeft + barGap + i * (barWidth + barGap);
-        const y = paddingTop + chartHeight - barH;
 
         const isHovered = i === hoveredBar;
 
@@ -254,13 +330,15 @@
       // Duration label on top of hovered bar
       if (hoveredBar >= 0 && hoveredBar < barCount) {
         const d = dayData[hoveredBar];
-        const barH = maxMs > 0 ? Math.max(minBarHeight, (d.totalMs / maxMs) * chartHeight) : minBarHeight;
+        const stagger = barCount <= 1 ? 1 : Math.min(1, Math.max(0, (reveal - hoveredBar * 0.04) / 0.72));
+        const baseY = paddingTop + chartHeight;
+        const y = baseY + (yFor(d.totalMs) - baseY) * stagger;
         const x = paddingLeft + barGap + hoveredBar * (barWidth + barGap);
 
         ctx.fillStyle = textMuted;
         ctx.font = `bold ${Math.max(9, Math.min(11, barWidth * 0.7))}px sans-serif`;
         ctx.textAlign = "center";
-        ctx.fillText(formatDuration(d.totalMs), x + barWidth / 2, paddingTop + chartHeight - barH - 4);
+        ctx.fillText(formatValue(d.totalMs), x + barWidth / 2, y - 4);
       }
     }
   }
@@ -302,11 +380,15 @@
   afterUpdate(() => {
     drawChart();
   });
+
+  onDestroy(() => {
+    cancelReveal?.();
+  });
 </script>
 
 <div class="bar-chart-container" bind:this={container}>
   {#if dayData.length === 0}
-    <div class="bar-chart-empty">{$t("components.noChartData")}</div>
+    <div class="bar-chart-empty">{emptyText ?? $t("components.noChartData")}</div>
   {:else}
     <canvas
       bind:this={canvas}
@@ -314,8 +396,8 @@
       on:mouseleave={handleMouseLeave}
     ></canvas>
     <div class="bar-chart-summary">
-      <span class="bar-chart-total">{$t("components.total", { value: formatDuration(dayData.reduce((s, d) => s + d.totalMs, 0)) })}</span>
-      <span class="bar-chart-avg">{$t("components.average", { value: formatDuration(dayData.reduce((s, d) => s + d.totalMs, 0) / dayData.length) })}</span>
+      <span class="bar-chart-total">{$t("components.total", { value: formatValue(summaryTotal) })}</span>
+      <span class="bar-chart-avg">{$t("components.average", { value: formatValue(summaryAvg) })}</span>
     </div>
   {/if}
 </div>

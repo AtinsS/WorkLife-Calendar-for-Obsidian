@@ -114,7 +114,16 @@ export function immediateSave(): void {
 
 let lastCarryOverDate: string | null = null;
 
+/** Test helper: clear the once-per-day carry-over guard. */
+export function resetCarryOverGuardForTests(): void {
+  lastCarryOverDate = null;
+}
+
 export function carryOverOverdueTasks(): void {
+  // Single gate for every caller (init, TaskPanel, Schedule, Kanban, interval).
+  // Matches the settings toggle (truthy = on). Default is enabled.
+  if (!get(settings).carryOverOverdue) return;
+
   const now = momentFn();
   const todayStr = now.format("YYYY-MM-DD");
 
@@ -205,10 +214,8 @@ export async function initTaskStores(plugin: CalendarPlugin): Promise<void> {
   // Check for day change every 60s and carry over if enabled
   window.setInterval(() => {
     if (!loaded) return;
-    const currentSettings = get(settings);
-    if (currentSettings.carryOverOverdue) {
-      carryOverOverdueTasks();
-    }
+    // Setting is enforced inside carryOverOverdueTasks()
+    carryOverOverdueTasks();
   }, 60_000);
 }
 

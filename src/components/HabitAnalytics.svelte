@@ -1,12 +1,9 @@
 <script lang="ts">
   import { get } from "svelte/store";
-  import {
-    habits,
-    habitLogs,
-    getWeeklyStats,
-    getHabitStats,
-  } from "../habit-tracker/stores";
+  import { habits } from "../habit-tracker/stores";
   import HabitCard from "./HabitCard.svelte";
+  import HabitHistoryChart from "./HabitHistoryChart.svelte";
+  import WeightTracker from "../weight/WeightTracker.svelte";
   import BarChart from "./BarChart.svelte";
   import DonutChart from "./DonutChart.svelte";
   import ProjectAnalytics from "./ProjectAnalytics.svelte";
@@ -14,7 +11,6 @@
     timeLogs,
     tasks,
     projects,
-    calculateTaskEarnings,
   } from "../task-tracker/stores";
   import { formatDuration } from "../task-tracker/TimerManager";
   import {
@@ -31,11 +27,19 @@
   } from "../finance/financialAnalyticsStorage";
   import { VIEW_TYPE_FINANCIAL_ANALYTICS } from "../constants";
   import { t, tArray, locale } from "../i18n";
+  import { settings } from "../ui/stores";
   import { derived as derivedStore } from "svelte/store";
+  import { countUp } from "../utils/visualMotion";
 
   const numberLocale = derivedStore(locale, ($locale) => $locale === "ru" ? "ru-RU" : "en-US");
 
-  let weeklyStats = getWeeklyStats(12);
+  type AnalyticsTab = "weight" | "habits" | "time" | "earnings";
+  let activeTab: AnalyticsTab = "habits";
+
+  $: weightEnabled = $settings.weightControlEnabled !== false;
+  $: if (!weightEnabled && activeTab === "weight") {
+    activeTab = "habits";
+  }
 
   // Period selector for "Время и проекты"
   function fmtLocal(d: Date): string {
@@ -45,46 +49,7 @@
   let periodStart = fmtLocal(new Date(now.getFullYear(), now.getMonth(), 1));
   let periodEnd = fmtLocal(now);
 
-  $: {
-    $habitLogs; // re-compute when logs change
-    weeklyStats = getWeeklyStats(12);
-  }
-
   $: activeHabits = $habits.filter((h) => !h.archived);
-
-  // Calculate weekly earnings
-  $: weeklyEarnings = weeklyStats.map((week) => {
-    const weekStart = week.weekStart;
-    const weekMoment = window.moment(weekStart, "YYYY-MM-DD");
-    const weekEnd = weekMoment.clone().endOf("week");
-    let earnings = 0;
-    for (const task of $tasks) {
-      if (!task.isWorkTask || !task.rate || task.status !== "done") continue;
-      const match = task.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
-      if (!match) continue;
-      const taskDate = window.moment(match[1], "YYYY-MM-DD");
-      if (
-        taskDate.isSameOrAfter(weekStart) &&
-        taskDate.isSameOrBefore(weekEnd)
-      ) {
-        earnings += calculateTaskEarnings(task);
-      }
-    }
-    return earnings;
-  });
-
-  // Aggregate stats for "all" view
-  $: aggregateStats = {
-    totalHabits: activeHabits.length,
-    totalCompletions: activeHabits.reduce(
-      (sum, h) => sum + getHabitStats(h.id).totalCompletions,
-      0,
-    ),
-    bestStreak: Math.max(
-      ...activeHabits.map((h) => getHabitStats(h.id).currentStreak),
-      0,
-    ),
-  };
 
   // Time logs stats — filtered by period
   $: filteredTimeLogs = $timeLogs.filter((log) => {
@@ -127,19 +92,6 @@
       if (m) result.set(m[1], (result.get(m[1]) || 0) + ms);
     });
     return result;
-  })();
-
-  // Weekly deltas for trend indicators
-  $: weeklyDelta = (() => {
-    if (weeklyStats.length < 2) return { completions: 0, earnings: 0 };
-    const thisWeek = weeklyStats[weeklyStats.length - 1];
-    const lastWeek = weeklyStats[weeklyStats.length - 2];
-    const thisEarnings = weeklyEarnings[weeklyEarnings.length - 1] || 0;
-    const lastEarnings = weeklyEarnings[weeklyEarnings.length - 2] || 0;
-    return {
-      completions: thisWeek.total - lastWeek.total,
-      earnings: thisEarnings - lastEarnings,
-    };
   })();
 
   // Donut chart data — time by project (time logs + declared time from completed tasks)
@@ -262,36 +214,66 @@
     <h1>{$t("habitAnalytics.title")}</h1>
   </div>
 
+  <!-- Tabs -->
+  <div class="analytics-tabs" role="tablist">
+    {#if weightEnabled}
+      <button
+        class="analytics-tab"
+        class:active={activeTab === "weight"}
+        role="tab"
+        aria-selected={activeTab === "weight"}
+        on:click={() => (activeTab = "weight")}
+      >
+        {$t("habitAnalytics.tabWeight")}
+      </button>
+    {/if}
+    <button
+      class="analytics-tab"
+      class:active={activeTab === "habits"}
+      role="tab"
+      aria-selected={activeTab === "habits"}
+      on:click={() => (activeTab = "habits")}
+    >
+      {$t("habitAnalytics.tabHabits")}
+    </button>
+    <button
+      class="analytics-tab"
+      class:active={activeTab === "time"}
+      role="tab"
+      aria-selected={activeTab === "time"}
+      on:click={() => (activeTab = "time")}
+    >
+      {$t("habitAnalytics.tabTime")}
+    </button>
+    <button
+      class="analytics-tab"
+      class:active={activeTab === "earnings"}
+      role="tab"
+      aria-selected={activeTab === "earnings"}
+      on:click={() => (activeTab = "earnings")}
+    >
+      {$t("habitAnalytics.tabEarnings")}
+    </button>
+  </div>
+
+  <!-- Weight Control -->
+  {#if activeTab === "weight" && weightEnabled}
+    <div class="habit-analytics-section">
+      <WeightTracker />
+    </div>
+  {/if}
+
   <!-- Habits Module -->
-  {#if activeHabits.length > 0}
+  {#if activeTab === "habits" && activeHabits.length > 0}
     <div class="habits-module">
       <div class="habits-module__header">
         <span class="habits-module__icon">🔥</span>
         <h2 class="habits-module__title">{$t("habitAnalytics.habits")}</h2>
-        <span class="habits-module__count">{aggregateStats.totalHabits}</span>
+        <span class="habits-module__count">{activeHabits.length}</span>
       </div>
 
-      <div class="habits-module__summary">
-        <div class="habits-module__stat">
-          <span class="habits-module__stat-value">{aggregateStats.totalHabits}</span>
-          <span class="habits-module__stat-label">{$t("habitAnalytics.active")}</span>
-          {#if weeklyDelta.completions > 0}
-            <span class="habits-module__stat-trend trend-up">↑ +{weeklyDelta.completions}</span>
-          {/if}
-        </div>
-        <div class="habits-module__stat">
-          <span class="habits-module__stat-value">{aggregateStats.totalCompletions}</span>
-          <span class="habits-module__stat-label">{$t("habitAnalytics.completed")}</span>
-          {#if weeklyDelta.completions > 0}
-            <span class="habits-module__stat-trend trend-up">↑ +{weeklyDelta.completions}</span>
-          {/if}
-        </div>
-        <div class="habits-module__stat">
-          <span class="habits-module__stat-value">{aggregateStats.bestStreak}</span>
-          <span class="habits-module__stat-label">{$t("habitAnalytics.bestStreak")}</span>
-          <span class="habits-module__stat-trend trend-neutral">{$t("habitAnalytics.daysStreak")}</span>
-        </div>
-      </div>
+      <!-- History: how many / when -->
+      <HabitHistoryChart />
 
       <div class="habits-module__grid">
         {#each activeHabits as habit (habit.id)}
@@ -299,10 +281,15 @@
         {/each}
       </div>
     </div>
+  {:else if activeTab === "habits"}
+    <div class="habit-analytics-section">
+      <div class="time-logs-empty">{$t("habitAnalytics.noHabits")}</div>
+    </div>
   {/if}
 
   <!-- Time & Projects -->
-  <div class="habit-analytics-section">
+  {#if activeTab === "time"}
+    <div class="habit-analytics-section">
     <div class="section-header-row">
       <h3>{$t("habitAnalytics.timeAndProjects")}</h3>
       <div class="period-selector">
@@ -316,15 +303,15 @@
     {:else}
       <!-- Stats cards -->
       <div class="time-logs-stats">
-        <div class="time-stat">
+        <div class="time-stat" style="animation-delay: 0ms">
           <span class="time-stat-value">{formatDuration(combinedTimeMs)}</span>
           <span class="time-stat-label">{$t("habitAnalytics.totalTime")}</span>
         </div>
-        <div class="time-stat">
-          <span class="time-stat-value">{uniqueDays}</span>
+        <div class="time-stat" style="animation-delay: 70ms">
+          <span class="time-stat-value" use:countUp={{ value: uniqueDays, duration: 650 }}></span>
           <span class="time-stat-label">{$t("habitAnalytics.workDays")}</span>
         </div>
-        <div class="time-stat">
+        <div class="time-stat" style="animation-delay: 140ms">
           <span class="time-stat-value">{formatDuration(avgPerDay)}</span>
           <span class="time-stat-label">{$t("habitAnalytics.avgPerDay")}</span>
         </div>
@@ -355,10 +342,12 @@
         </div>
       </div>
     {/if}
-  </div>
+    </div>
+  {/if}
 
   <!-- Earnings Section -->
-  <div class="habit-analytics-section">
+  {#if activeTab === "earnings"}
+    <div class="habit-analytics-section">
     <div class="earnings-header">
       <h3>{$t("habitAnalytics.earnings")}</h3>
       <button class="earnings-detail-btn" on:click={openFinancialAnalytics}>
@@ -366,9 +355,9 @@
       </button>
     </div>
     <div class="earnings-summary">
-      <div class="earnings-card earnings-card-main">
+      <div class="earnings-card earnings-card-main" style="animation-delay: 0ms">
         <span class="earnings-value"
-          >{monthlyEarnings.toLocaleString($numberLocale)} ₽</span
+          ><span use:countUp={{ value: monthlyEarnings, duration: 800, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽</span
         >
         <span class="earnings-label">{$t("habitAnalytics.monthFact")}</span>
         {#if monthlyDelta !== 0}
@@ -377,9 +366,9 @@
           >
         {/if}
       </div>
-      <div class="earnings-card earnings-card-expected">
+      <div class="earnings-card earnings-card-expected" style="animation-delay: 80ms">
         <span class="earnings-value earnings-value-expected"
-          >{expectedMonthlyEarnings.toLocaleString($numberLocale)} ₽</span
+          ><span use:countUp={{ value: expectedMonthlyEarnings, duration: 800, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽</span
         >
         <span class="earnings-label">{$t("habitAnalytics.monthPlan")}</span>
         {#if expectedMonthlyEarnings > 0}
@@ -396,9 +385,9 @@
           </span>
         {/if}
       </div>
-      <div class="earnings-card">
+      <div class="earnings-card" style="animation-delay: 160ms">
         <span class="earnings-value"
-          >{yearlyEarnings.toLocaleString($numberLocale)} ₽</span
+          ><span use:countUp={{ value: yearlyEarnings, duration: 900, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽</span
         >
         <span class="earnings-label">{$t("habitAnalytics.yearTotal")}</span>
         {#if yearlyDelta !== 0}
@@ -437,7 +426,8 @@
     {:else}
       <div class="earnings-empty">{$t("habitAnalytics.noEarnings")}</div>
     {/if}
-  </div>
+    </div>
+  {/if}
 </div>
 
 <style>
@@ -448,6 +438,37 @@
     background: transparent;
     max-width: 1200px;
     margin: 0 auto;
+  }
+
+  .analytics-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .analytics-tab {
+    padding: 8px 14px;
+    border: 1px solid var(--mcp-glass-border);
+    border-radius: var(--mcp-radius-sm);
+    background: var(--mcp-glass-bg);
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .analytics-tab:hover {
+    color: var(--text-normal);
+    border-color: var(--mcp-accent);
+  }
+
+  .analytics-tab.active {
+    background: var(--mcp-accent);
+    border-color: var(--mcp-accent);
+    color: var(--text-on-accent, #fff);
   }
 
   .habit-analytics-header {
@@ -500,6 +521,7 @@
     border: 1px solid var(--mcp-glass-border);
     border-radius: var(--mcp-radius);
     box-shadow: var(--mcp-shadow);
+    animation: analytics-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
   .habits-module__header {
@@ -534,61 +556,6 @@
     border-radius: 10px;
   }
 
-  .habits-module__summary {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-
-  .habits-module__stat {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 14px 12px;
-    background: var(--mcp-glass-highlight);
-    border: 1px solid var(--mcp-glass-border);
-    border-radius: var(--mcp-radius-sm);
-    transition: all 0.2s ease;
-  }
-
-  .habits-module__stat:hover {
-    border-color: var(--mcp-accent);
-    transform: translateY(-2px);
-  }
-
-  .habits-module__stat-value {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--text-accent);
-    letter-spacing: -0.02em;
-  }
-
-  .habits-module__stat-label {
-    font-size: 10px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 4px;
-    font-weight: 500;
-  }
-
-  .habits-module__stat-trend {
-    font-size: 10px;
-    font-weight: 600;
-    margin-top: 4px;
-  }
-
-  .trend-up {
-    color: var(--mcp-success, rgba(34, 197, 94, 0.9));
-  }
-
-  .trend-neutral {
-    color: var(--text-muted);
-    font-weight: 400;
-    font-size: 10px;
-  }
-
   .habits-module__grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -605,6 +572,11 @@
     border: 1px solid var(--mcp-glass-border);
     border-radius: var(--mcp-radius);
     box-shadow: var(--mcp-shadow);
+    animation: analytics-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .habit-analytics-section + .habit-analytics-section {
+    animation-delay: 0.1s;
   }
 
   .habit-analytics-section:last-child {
@@ -755,6 +727,7 @@
     border: 1px solid var(--mcp-glass-border);
     border-radius: var(--mcp-radius-sm);
     transition: all 0.2s ease;
+    animation: analytics-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
   .time-stat:hover {
@@ -846,6 +819,7 @@
     border: 1px solid var(--mcp-glass-border);
     border-radius: var(--mcp-radius-sm);
     transition: all 0.2s ease;
+    animation: analytics-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
   .earnings-card:hover {
@@ -883,13 +857,23 @@
 
   .earnings-progress-fill {
     height: 100%;
-    background: var(--mcp-accent);
+    background: linear-gradient(
+      90deg,
+      var(--mcp-accent),
+      color-mix(in srgb, var(--mcp-accent) 70%, white)
+    );
     border-radius: 3px;
-    transition: width 0.5s ease;
+    transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 8px var(--mcp-accent-dim);
   }
 
   .earnings-progress-fill.over {
-    background: var(--mcp-success, rgba(34, 197, 94, 0.9));
+    background: linear-gradient(
+      90deg,
+      var(--mcp-success, rgba(34, 197, 94, 0.9)),
+      color-mix(in srgb, var(--mcp-success, rgba(34, 197, 94, 0.9)) 70%, white)
+    );
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
   }
 
   .earnings-progress-text {
@@ -974,13 +958,30 @@
     );
     border-radius: 4px 4px 0 0;
     min-height: 0;
+    transform-origin: bottom center;
+    animation: bar-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) backwards;
     transition:
       height 0.3s ease,
-      opacity 0.2s ease;
+      opacity 0.2s ease,
+      filter 0.2s ease;
   }
 
+  .earnings-bar-wrapper:nth-child(1) .earnings-bar { animation-delay: 0ms; }
+  .earnings-bar-wrapper:nth-child(2) .earnings-bar { animation-delay: 40ms; }
+  .earnings-bar-wrapper:nth-child(3) .earnings-bar { animation-delay: 80ms; }
+  .earnings-bar-wrapper:nth-child(4) .earnings-bar { animation-delay: 120ms; }
+  .earnings-bar-wrapper:nth-child(5) .earnings-bar { animation-delay: 160ms; }
+  .earnings-bar-wrapper:nth-child(6) .earnings-bar { animation-delay: 200ms; }
+  .earnings-bar-wrapper:nth-child(7) .earnings-bar { animation-delay: 240ms; }
+  .earnings-bar-wrapper:nth-child(8) .earnings-bar { animation-delay: 280ms; }
+  .earnings-bar-wrapper:nth-child(9) .earnings-bar { animation-delay: 320ms; }
+  .earnings-bar-wrapper:nth-child(10) .earnings-bar { animation-delay: 360ms; }
+  .earnings-bar-wrapper:nth-child(11) .earnings-bar { animation-delay: 400ms; }
+  .earnings-bar-wrapper:nth-child(12) .earnings-bar { animation-delay: 440ms; }
+
   .earnings-bar:hover {
-    opacity: 0.85;
+    opacity: 0.95;
+    filter: brightness(1.12);
   }
 
   .earnings-bar-label {
@@ -1033,10 +1034,6 @@
   }
 
   @media (max-width: 768px) {
-    .habits-module__summary {
-      grid-template-columns: 1fr;
-    }
-
     .habits-module__grid {
       grid-template-columns: 1fr;
     }
@@ -1055,6 +1052,54 @@
 
     .earnings-chart {
       height: 90px;
+    }
+  }
+
+  /* ── Analytics motion ───────────────────────────────── */
+  @keyframes analytics-rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes analytics-pop {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @keyframes bar-rise {
+    from {
+      transform: scaleY(0.15);
+      opacity: 0.35;
+    }
+    to {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .habits-module,
+    .habit-analytics-section,
+    .time-stat,
+    .earnings-card,
+    .earnings-bar {
+      animation: none !important;
+    }
+
+    .earnings-progress-fill {
+      transition: none !important;
     }
   }
 </style>

@@ -619,7 +619,12 @@
     border-radius: var(--mcp-radius);
     box-shadow: var(--mcp-shadow);
     transition: all 0.25s ease;
+    animation: fa-card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
+
+  .fa-summary-card:nth-child(1) { animation-delay: 0ms; }
+  .fa-summary-card:nth-child(2) { animation-delay: 70ms; }
+  .fa-summary-card:nth-child(3) { animation-delay: 140ms; }
 
   .fa-summary-card:hover {
     border-color: var(--mcp-accent);
@@ -672,6 +677,11 @@
     border: 1px solid var(--mcp-glass-border);
     border-radius: var(--mcp-radius);
     box-shadow: var(--mcp-shadow);
+    animation: fa-card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .fa-section + .fa-section {
+    animation-delay: 0.1s;
   }
 
   .fa-section:last-child {
@@ -1268,6 +1278,58 @@
     padding: 32px 16px;
     color: var(--mcp-text-muted);
     font-size: 13px;
+  }
+
+  /* ── Motion ─────────────────────────────────────────── */
+  @keyframes fa-card-in {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fa-row-in {
+    from {
+      opacity: 0;
+      transform: translateX(-6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .fa-task-item,
+  .fa-income-item,
+  .fa-project-header {
+    animation: fa-row-in 0.35s ease backwards;
+  }
+
+  .fa-project-group:nth-child(1) .fa-task-item,
+  .fa-project-group:nth-child(1) .fa-project-header { animation-delay: 0ms; }
+  .fa-project-group:nth-child(2) .fa-task-item,
+  .fa-project-group:nth-child(2) .fa-project-header { animation-delay: 40ms; }
+  .fa-project-group:nth-child(3) .fa-task-item,
+  .fa-project-group:nth-child(3) .fa-project-header { animation-delay: 80ms; }
+
+  .fa-income-item:nth-child(1) { animation-delay: 0ms; }
+  .fa-income-item:nth-child(2) { animation-delay: 35ms; }
+  .fa-income-item:nth-child(3) { animation-delay: 70ms; }
+  .fa-income-item:nth-child(4) { animation-delay: 105ms; }
+  .fa-income-item:nth-child(5) { animation-delay: 140ms; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fa-summary-card,
+    .fa-section,
+    .fa-task-item,
+    .fa-income-item,
+    .fa-project-header {
+      animation: none !important;
+    }
   }
 
   /* ── Mobile ─────────────────────────────────────────── */

@@ -548,3 +548,64 @@ export function getProcrastinationDays(): DayOfWeekStats[] {
     .filter((d) => d.productivityRate === 0 || d.completions === 0)
     .sort((a, b) => a.productivityRate - b.productivityRate);
 }
+
+// --- History series for charts ---
+
+export interface HabitDayPoint {
+  date: string;
+  count: number;
+}
+
+export interface HabitHistorySummary {
+  total: number;
+  activeDays: number;
+  bestDay: { date: string; count: number } | null;
+  avgPerDay: number;
+  maxCount: number;
+}
+
+/**
+ * Daily completion counts for the last `daysBack` days (inclusive of today).
+ * `habitId` filters to a single habit; omit for all habits.
+ */
+export function getHabitDailySeries(daysBack = 30, habitId?: string): HabitDayPoint[] {
+  const today: Moment = momentFn().startOf("day");
+  const points: HabitDayPoint[] = [];
+
+  for (let i = daysBack - 1; i >= 0; i--) {
+    const dateStr: string = today.clone().subtract(i, "days").format("YYYY-MM-DD");
+    let count = 0;
+    for (const log of cachedLogs) {
+      if (!log.completed || log.date !== dateStr) continue;
+      if (habitId && log.habitId !== habitId) continue;
+      count++;
+    }
+    points.push({ date: dateStr, count });
+  }
+
+  return points;
+}
+
+export function summarizeHabitSeries(points: HabitDayPoint[]): HabitHistorySummary {
+  let total = 0;
+  let activeDays = 0;
+  let bestDay: { date: string; count: number } | null = null;
+  let maxCount = 0;
+
+  for (const p of points) {
+    total += p.count;
+    if (p.count > 0) activeDays++;
+    if (p.count > maxCount) {
+      maxCount = p.count;
+      bestDay = { date: p.date, count: p.count };
+    }
+  }
+
+  return {
+    total,
+    activeDays,
+    bestDay,
+    avgPerDay: points.length > 0 ? total / points.length : 0,
+    maxCount,
+  };
+}
