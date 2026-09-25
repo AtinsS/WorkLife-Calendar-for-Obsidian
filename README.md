@@ -1,6 +1,6 @@
 # WorkLife Calendar for Obsidian
 
-> **All-in-one:** smart calendar, task and habit tracker, time tracking, and financial planner — connected into a single ecosystem inside Obsidian.
+> **All-in-one:** smart calendar, task and habit tracker, time tracking, weight control, and financial planner — connected into a single ecosystem inside Obsidian.
 
 <div align="center">
 
@@ -117,6 +117,22 @@ If the plugin saves your time and helps with your work, you can support the deve
 - Streaks and calendar indicators.
 - **Display modes:** in task panel (default) / separate tab / hidden. Setting: General → "Habits mode".
 - **Full CRUD** from habit panel and dashboard.
+- **Completion history** chart in analytics.
+
+# ⚖️ Weight Control
+- **Daily log** — date, weight (kg), optional note. One measurement per day (upsert).
+- **Moving averages** — MA over 7 and 30 measurements, not raw day-to-day noise.
+- **Goal & progress** — start / target weight, progress bar, remaining kg (loss or gain).
+- **Chart** — same visual style as the time & projects chart (area line, hover tooltips).
+- **Quick input on the greeting page** — log today's weight in one line.
+- **History** — collapsible list of recent measurements with delete.
+- Toggle in settings: *General → Weight control* (also hides the greeting field).
+
+# 📊 Analytics tabs
+Analytics is split into tabs: **Weight · Habits · Time · Earnings**.
+- Habits: completion history + habit cards.
+- Time & projects: totals, area chart, donut of time distribution (animated), project table.
+- Earnings: month fact/plan, year total, monthly bars.
 
 # 💰 Finance & Analytics
 - **Income:** automatic by rate from work tasks, or manual entry.
@@ -242,6 +258,9 @@ Style parameters: `color` (text), `bg` (background), `radius` (border radius), `
 
 Right-click on a page and select "Add Dashboard" or "Add greeting" to create a new dashboard or greeting on the page.
 ![alt text](image-2.png)
+
+Greeting can show quick weight input and note search — both can be toggled in *Dashboard → Greeting buttons*.
+Dashboard widgets (tasks / habits / goals) are configured in *Dashboard → Dashboard widgets*.
 
 </details>
 
