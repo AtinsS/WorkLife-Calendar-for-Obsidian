@@ -281,6 +281,12 @@ When reporting a bug, please include:
 
 ---
 
+## Credits and license
+
+Based on [obsidian-calendar-plugin](https://github.com/liamcain/obsidian-calendar-plugin) by [Liam Cain](https://github.com/liamcain) (MIT).
+
+Third-party libraries bundled in `main.js` are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 <div align="center">
   <sub>Developed with attention to detail for the Obsidian community</sub><br>
   <sub>Author: <a href="https://github.com/AtinsS">@AtinsS</a></sub><br>

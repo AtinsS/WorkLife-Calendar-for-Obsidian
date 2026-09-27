@@ -282,6 +282,12 @@ tasks:Задачи
 
 ---
 
+## Авторство и лицензия
+
+Проект основан на [obsidian-calendar-plugin](https://github.com/liamcain/obsidian-calendar-plugin) от [Liam Cain](https://github.com/liamcain) (MIT) и значительно расширен.
+
+Сторонние библиотеки, входящие в `main.js`, перечислены в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
 <div align="center">
   <sub>Разработано с вниманием к деталям для сообщества Obsidian</sub><br>
   <sub>Автор: <a href="https://github.com/AtinsS">@AtinsS</a></sub><br>
