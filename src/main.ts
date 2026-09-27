@@ -30,7 +30,7 @@ import {
   applyGlassBgColor,
   applyAllColors,
 } from "./settings";
-import { TFile } from "obsidian";
+import { TFile, TFolder, type Menu } from "obsidian";
 import CalendarView from "./view";
 import TaskView from "./views/TaskView";
 import ScheduleView from "./views/ScheduleView";
@@ -61,12 +61,17 @@ import HelloView from "./components/HelloView.svelte";
 import { NotificationService } from "./services/NotificationService";
 import { initGistSync } from "./services/GistSyncService";
 import { AIExtractModal } from "./services/AIExtractModal";
+import {
+  AISummaryModal,
+  resolveSummarySources,
+} from "./services/AISummaryModal";
 import { migrateFromSingleFile, migrateRootModuleFiles, VAULT_DATA_DIR } from "./io/vaultStorage";
+import { VIEW_SWITCHED_EVENT } from "./views/viewSwitch";
 
 declare global {
   interface Window {
     app: App;
-    moment: () => Moment;
+    // moment уже объявлен в obsidian-daily-notes-interface (typeof moment)
     _bundledLocaleWeekSpec: WeekSpec;
   }
 }
@@ -448,14 +453,69 @@ export default class CalendarPlugin extends Plugin {
     // Right-click on .md file → "Extract tasks with AI"
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
-        if (!(file instanceof TFile) || file.extension !== "md") return;
         if (!this.options.ollamaEnabled) return;
         if (window.innerWidth <= 768) return;
+
+        // Folders / notes → AI summary
+        if (
+          this.options.aiSummaryEnabled !== false &&
+          (file instanceof TFolder || (file instanceof TFile && file.extension === "md"))
+        ) {
+          const sources = resolveSummarySources(this.app, file);
+          if (sources.files.length > 0) {
+            menu.addItem((item) => {
+              item
+                .setTitle(
+                  sources.files.length > 1
+                    ? tRaw("ai.contextMenuSummaryMany", { count: String(sources.files.length) })
+                    : tRaw("ai.contextMenuSummary"),
+                )
+                .setIcon("lucide-file-text")
+                .setSection("action")
+                .onClick(() => {
+                  new AISummaryModal(
+                    this.app,
+                    sources.files,
+                    sources.folderPath,
+                    sources.title,
+                  ).open();
+                });
+            });
+          }
+        }
+
+        if (!(file instanceof TFile) || file.extension !== "md") return;
+        if (this.options.aiExtractEnabled === false) return;
         menu.addItem((item) => {
           item.setTitle(tRaw("ai.contextMenuExtract"))
             .setIcon("sparkles")
             .onClick(() => {
               new AIExtractModal(this.app, file.path).open();
+            });
+        });
+      })
+    );
+
+    // Multi-select notes (Shift+click) → AI summary of selection
+    this.registerEvent(
+      // Obsidian files-menu: multi-select in file explorer
+      (this.app.workspace as unknown as {
+        on: (name: string, cb: (...args: never[]) => void) => unknown;
+      }).on("files-menu", (menu: Menu, files: (TFile | TFolder)[]) => {
+        if (!this.options.ollamaEnabled) return;
+        if (this.options.aiSummaryEnabled === false) return;
+        if (window.innerWidth <= 768) return;
+        const mdFiles = files.filter((f): f is TFile => f instanceof TFile && f.extension === "md");
+        if (mdFiles.length < 2) return;
+        menu.addItem((item) => {
+          item
+            .setTitle(tRaw("ai.contextMenuSummaryMany", { count: String(mdFiles.length) }))
+            .setIcon("lucide-files")
+            .setSection("action")
+            .onClick(() => {
+              const folderPath = mdFiles[0]?.parent?.path ?? "";
+              const label = tRaw("ai.summarySelection", { count: String(mdFiles.length) });
+              new AISummaryModal(this.app, mdFiles.slice(0, 40), folderPath, label).open();
             });
         });
       })
@@ -565,6 +625,20 @@ export default class CalendarPlugin extends Plugin {
         }
       })
     );
+
+    // Смена view внутри одного leaf (tasks/kanban/schedule) не кидает active-leaf-change,
+    // а dtw-bar висит в DOM leaf и уничтожается — перевешиваем после переключения.
+    const onTabSwitched = () => {
+      if (this.options.dtwShowOnAllPages) {
+        this.moveDateTimeWeatherToActiveView();
+      } else {
+        this.injectDateTimeWeather();
+      }
+    };
+    document.addEventListener(VIEW_SWITCHED_EVENT, onTabSwitched);
+    this.register(() =>
+      document.removeEventListener(VIEW_SWITCHED_EVENT, onTabSwitched)
+    );
   }
 
   private isMobile(): boolean {
@@ -628,7 +702,15 @@ export default class CalendarPlugin extends Plugin {
       headerEl = mainSplit.querySelector(".view-header");
     }
 
-    if (!headerEl) return;
+    // Header может быть ещё не пересобран после setViewState — повторим
+    if (!headerEl) {
+      window.setTimeout(() => {
+        if (!this.dtwContainer && this.options.showStatusBar && !this.isMobile()) {
+          this.createDateTimeWeatherPanel();
+        }
+      }, 80);
+      return;
+    }
 
     this.dtwContainer = createDiv({ cls: "mcp-dtw-global" });
     // Prevent clicks on dtw-bar from triggering active-leaf-change
@@ -864,7 +946,7 @@ export default class CalendarPlugin extends Plugin {
 
   private updateHabitRibbonVisibility(): void {
     if (!this.habitRibbonIcon) return;
-    const habitMode = this.options.habitTrackerMode || (this.options.showHabitTracker === false ? "hidden" : "panel");
+    const habitMode = this.options.habitTrackerMode === "hidden" ? "hidden" : "separate";
     this.habitRibbonIcon.style.display = habitMode === "separate" ? "" : "none";
   }
 }

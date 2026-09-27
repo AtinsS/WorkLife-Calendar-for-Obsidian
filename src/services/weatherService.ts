@@ -13,10 +13,26 @@ const TRANSIENT_NET_ERRORS = [
   "ERR_TIMED_OUT",
   "ERR_EMPTY_RESPONSE",
   "ERR_ADDRESS_UNREACHABLE",
+  "ERR_NAME_NOT_RESOLVED",
+  "ERR_SSL_PROTOCOL_ERROR",
+  "ERR_CERT_AUTHORITY_INVALID",
   "ETIMEDOUT",
   "ECONNRESET",
   "ECONNREFUSED",
+  "ECONNABORTED",
   "EAI_AGAIN",
+  "ENOTFOUND",
+  "ENETUNREACH",
+  "ENETDOWN",
+  "EHOSTUNREACH",
+  "getaddrinfo",
+  "Could not connect",
+  "could not connect",
+  "Failed to connect",
+  "failed to connect",
+  "Network request failed",
+  "network request failed",
+  "socket hang up",
   "timed out",
   "timeout",
 ];
@@ -41,10 +57,11 @@ async function requestWithRetry(
   }
 }
 
-// Main forecast API and its sibling host (same schema). Sticky index prefers the last host that worked.
+// Primary + fallback (same schema). Sticky index prefers the last host that worked.
+// historical-forecast-api first: api.open-meteo.com often times out from some networks.
 const OPEN_METEO_HOSTS = [
-  "https://api.open-meteo.com",
   "https://historical-forecast-api.open-meteo.com",
+  "https://api.open-meteo.com",
 ] as const;
 let openMeteoHostIdx = 0;
 
@@ -56,8 +73,13 @@ async function requestOpenMeteo(pathAndQuery: string): Promise<RequestUrlRespons
       const res = await requestWithRetry(
         { url: `${OPEN_METEO_HOSTS[idx]}${pathAndQuery}`, method: "GET" },
         1,
-        800,
+        600,
       );
+      // HTTP 5xx/429 — пробуем другой хост
+      if (res.status >= 500 || res.status === 429) {
+        lastErr = new Error(`Open-Meteo HTTP ${res.status} @ ${OPEN_METEO_HOSTS[idx]}`);
+        continue;
+      }
       openMeteoHostIdx = idx;
       return res;
     } catch (e) {

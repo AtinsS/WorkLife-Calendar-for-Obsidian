@@ -1,28 +1,13 @@
 <script lang="ts">
   import type CalendarPlugin from "../main";
   import TaskPanel from "../task-tracker/TaskPanel.svelte";
-  import HabitPanel from "../habit-tracker/HabitPanel.svelte";
-  import { settings } from "../ui/stores";
-  import { VIEW_TYPE_KANBAN } from "../constants";
 
   export let plugin: CalendarPlugin;
-  $: habitMode = $settings.habitTrackerMode || ($settings.showHabitTracker === false ? "hidden" : "panel");
-  $: showHabits = habitMode === "panel";
-
-  function switchView(viewType: string) {
-    const target = viewType === "kanban" ? VIEW_TYPE_KANBAN : null;
-    if (!target) return;
-    const leaf = plugin.app.workspace.getLeaf("tab");
-    leaf.setViewState({ type: target, active: true });
-    plugin.app.workspace.revealLeaf(leaf);
-  }
 </script>
 
 <div class="mobile-tasks">
-  <TaskPanel appInstance={plugin.app} onSwitchView={switchView} />
-  {#if showHabits}
-    <HabitPanel appInstance={plugin.app} />
-  {/if}
+  <!-- Навигация — бесшовный переключатель над view -->
+  <TaskPanel appInstance={plugin.app} />
 </div>
 
 <style>
@@ -61,30 +46,5 @@
 
   .mobile-tasks :global(.task-tracker-filter-btn) {
     flex-shrink: 0;
-  }
-
-  /* Habit panel mobile styles */
-  .mobile-tasks :global(.habit-tracker-panel) {
-    padding: 12px 14px;
-    border-top: 1px solid var(--background-modifier-border, rgba(255,255,255,0.06));
-  }
-
-  .mobile-tasks :global(.habit-tracker-panel .habit-item) {
-    min-height: 44px;
-    padding: 10px 12px;
-  }
-
-  .mobile-tasks :global(.habit-tracker-panel .habit-item__toggle) {
-    min-width: 44px;
-    min-height: 44px;
-  }
-
-  .mobile-tasks :global(.habit-tracker-panel .habit-item__edit-btn),
-  .mobile-tasks :global(.habit-tracker-panel .habit-item__delete-btn) {
-    min-width: 44px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 </style>

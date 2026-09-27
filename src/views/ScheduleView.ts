@@ -1,12 +1,13 @@
 import { ItemView, WorkspaceLeaf } from "obsidian";
 import { get } from "svelte/store";
 
-import { VIEW_TYPE_SCHEDULE, VIEW_TYPE_TASKS, VIEW_TYPE_KANBAN, VIEW_TYPE_MOBILE_TASKS } from "../constants";
+import { VIEW_TYPE_SCHEDULE } from "../constants";
 import type CalendarPlugin from "../main";
 import { settings } from "../ui/stores";
 import type { ISettings } from "src/settings";
 import { tRaw } from "../i18n";
 import ScheduleCalendar from "../components/ScheduleCalendar.svelte";
+import { createViewSwitcher, markViewEnter } from "./viewSwitch";
 
 export default class ScheduleView extends ItemView {
   private plugin: CalendarPlugin;
@@ -40,16 +41,9 @@ export default class ScheduleView extends ItemView {
     const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("schedule-view-container");
+    markViewEnter(container);
 
-    // View toggle header
-    const isMobile = window.innerWidth <= 768;
-    const tasksView = isMobile ? VIEW_TYPE_MOBILE_TASKS : VIEW_TYPE_TASKS;
-    const header = container.createDiv({ cls: "view-switch-header" });
-    const btnTasks = header.createEl("button", { text: "✅", cls: "view-switch-btn", attr: { title: tRaw("tasks.panel.title") } });
-    const btnKanban = header.createEl("button", { text: "▦", cls: "view-switch-btn", attr: { title: tRaw("kanban.title") } });
-    header.createEl("button", { text: "📅", cls: "view-switch-btn active", attr: { title: tRaw("hello.navSchedule") } });
-    btnTasks.addEventListener("click", () => void this.leaf.setViewState({ type: tasksView, active: true }));
-    btnKanban.addEventListener("click", () => void this.leaf.setViewState({ type: VIEW_TYPE_KANBAN, active: true }));
+    createViewSwitcher(container, "schedule", this.leaf);
 
     const currentSettings: ISettings = get(settings);
 

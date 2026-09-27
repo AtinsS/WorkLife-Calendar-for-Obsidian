@@ -22,8 +22,6 @@
   import { t } from "../i18n";
 
   export let appInstance: App;
-  export let onOpenSchedule: (() => void) | undefined = undefined;
-  export let onSwitchView: ((viewType: string) => void) | undefined = undefined;
 
   let isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
   let mqlMobile: MediaQueryList | null = null;
@@ -307,53 +305,86 @@
   }
 
   function openProjectSettings() { new ProjectModal(appInstance).open(); }
-  function toggleMenu() { showMenu = !showMenu; }
-  function closeMenu() { showMenu = false; }
+  function toggleMenu() {
+    showMenu = !showMenu;
+    if (!showMenu) {
+      showRecurringRoot = false;
+      recurringPanel = null;
+    }
+  }
+  function closeMenu() {
+    showMenu = false;
+    showRecurringRoot = false;
+    recurringPanel = null;
+  }
   function openAIExtract() { closeMenu(); new AIExtractModal(appInstance).open(); }
   function toggleSearch() { showSearch = !showSearch; if (!showSearch) searchQuery = ""; }
 
-  let showRecurringMenu = false;
+  /** Вложенное меню повторяющихся: root → clear | edit */
+  let showRecurringRoot = false;
+  let recurringPanel: "clear" | "edit" | null = null;
 
-  function handleClearRecurring() {
-    const allTasksList = get(tasks);
-    const recurringParents = allTasksList.filter((t) => t.recurrence && !t.isRecurringInstance);
-    const recurringInstances = allTasksList.filter((t) => t.isRecurringInstance);
-    const total = recurringParents.length + recurringInstances.length;
-    if (total === 0) { alert($t("tasks.panel.noRecurring")); return; }
-    showRecurringMenu = true;
+  function toggleRecurringRoot() {
+    showRecurringRoot = !showRecurringRoot;
+    if (!showRecurringRoot) recurringPanel = null;
+  }
+
+  function showRecurringClear() {
+    recurringPanel = recurringPanel === "clear" ? null : "clear";
+  }
+
+  function showRecurringEdit() {
+    recurringPanel = recurringPanel === "edit" ? null : "edit";
+  }
+
+  function getRecurringParents(): ITask[] {
+    return get(tasks).filter((t) => t.recurrence && !t.isRecurringInstance);
   }
 
   function clearRecurringAll() {
     const result = clearAllRecurringTasks();
-    showRecurringMenu = false;
+    closeMenu();
     alert($t("tasks.panel.recurringCleared", { count: String(result.parentCount + result.instanceCount) }));
   }
 
   function clearRecurringByProj(projectId: string) {
     const result = clearRecurringByProject(projectId);
-    showRecurringMenu = false;
+    closeMenu();
     alert($t("tasks.panel.recurringCleared", { count: String(result.parentCount + result.instanceCount) }));
   }
 
   function clearRecurringByTitle(title: string) {
     const result = clearRecurringByName(title);
-    showRecurringMenu = false;
+    closeMenu();
     alert($t("tasks.panel.recurringCleared", { count: String(result.parentCount + result.instanceCount) }));
   }
 
+  function editRecurringTask(task: ITask) {
+    closeMenu();
+    const modal = new TaskModal(
+      appInstance,
+      async (data) => {
+        updateTask(task.id, data);
+        const updated = get(tasks).find((t) => t.id === task.id);
+        if (updated && appInstance) await syncTaskToNote(updated, appInstance);
+      },
+      task,
+    );
+    modal.open();
+  }
+
   function getRecurringProjects(): IProject[] {
-    const allTasksList = get(tasks);
-    const recurringParents = allTasksList.filter((t) => t.recurrence && !t.isRecurringInstance);
+    const recurringParents = getRecurringParents();
     const projIds = new Set(recurringParents.map((t) => t.projectId).filter(Boolean));
     return get(projects).filter((p) => projIds.has(p.id));
   }
 
   function getRecurringNames(): string[] {
-    const allTasksList = get(tasks);
-    const recurringParents = allTasksList.filter((t) => t.recurrence && !t.isRecurringInstance);
-    return [...new Set(recurringParents.map((t) => t.title))];
+    return [...new Set(getRecurringParents().map((t) => t.title))];
   }
 </script>
+
+<svelte:window on:click={closeMenu} />
 
 <div class="task-tracker-panel" role="region" aria-label={$t("tasks.panel.title")}>
   <!-- ═══════ MOBILE HEADER ═══════ -->
@@ -403,21 +434,32 @@
         {#if showMenu}
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
           <div class="task-tracker-dropdown" on:click|stopPropagation on:keydown|stopPropagation role="menu" tabindex="-1">
-            <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { onSwitchView?.("kanban"); closeMenu(); }}>▦ {$t("tasks.panel.viewKanban")}</button>
-            <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { onOpenSchedule?.(); closeMenu(); }}>{$t("tasks.panel.menuSchedule")}</button>
+            <!-- Канбан/Расписание/Привычки — в бесшовном переключателе, не в меню -->
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { openProjectSettings(); closeMenu(); }}>{$t("tasks.panel.menuProjects")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { showTimeLogs = true; closeMenu(); }}>{$t("tasks.panel.menuTimeLogs")}</button>
             <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { clearCompletedTasks(); closeMenu(); }}>{$t("tasks.panel.menuCleanDone")}</button>
-            <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={handleClearRecurring}>{$t("tasks.panel.menuCleanRecurring")} ▸</button>
-            {#if showRecurringMenu}
+            <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={toggleRecurringRoot} aria-expanded={showRecurringRoot}>{$t("tasks.panel.menuRecurringActions")} <span class="submenu-arrow" class:rotated={showRecurringRoot}>▸</span></button>
+            {#if showRecurringRoot}
               <div class="task-tracker-submenu">
-                <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={clearRecurringAll}>{$t("tasks.panel.recurringAll")}</button>
-                {#each getRecurringProjects() as proj}
-                  <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByProj(proj.id)}>{proj.icon} {proj.name}</button>
-                {/each}
-                {#each getRecurringNames() as name}
-                  <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByTitle(name)}>📝 {name}</button>
-                {/each}
+                <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={showRecurringClear}>{$t("tasks.panel.menuCleanRecurring")} <span class="submenu-arrow" class:rotated={recurringPanel === "clear"}>▸</span></button>
+                <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={showRecurringEdit}>{$t("tasks.panel.menuEditRecurring")} <span class="submenu-arrow" class:rotated={recurringPanel === "edit"}>▸</span></button>
+                {#if recurringPanel === "clear"}
+                  <div class="task-tracker-submenu task-tracker-submenu-nested">
+                    <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={clearRecurringAll}>{$t("tasks.panel.recurringAll")}</button>
+                    {#each getRecurringProjects() as proj (proj.id)}
+                      <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByProj(proj.id)}>{proj.icon} {proj.name}</button>
+                    {/each}
+                    {#each getRecurringNames() as name (name)}
+                      <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByTitle(name)}>📝 {name}</button>
+                    {/each}
+                  </div>
+                {:else if recurringPanel === "edit"}
+                  <div class="task-tracker-submenu task-tracker-submenu-nested">
+                    {#each getRecurringParents() as rtask (rtask.id)}
+                      <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => editRecurringTask(rtask)}>🔄 {rtask.title}</button>
+                    {/each}
+                  </div>
+                {/if}
               </div>
             {/if}
             {#if $settings.ollamaEnabled && !isMobile}
@@ -469,10 +511,7 @@
         <button class="task-tracker-btn all-tasks-btn" class:active={!currentDate}
           on:click|stopPropagation={() => { currentDate ? selectedDate.set(null) : goToday(); }}
           title={currentDate ? $t("tasks.panel.allTasks") : $t("tasks.panel.today")}>📋</button>
-        <div class="task-tracker-view-toggle">
-          <button class="task-tracker-btn view-toggle-btn" on:click|stopPropagation={() => onSwitchView?.("kanban")} title={$t("tasks.panel.viewKanban")}>▦</button>
-          <button class="task-tracker-btn view-toggle-btn" on:click|stopPropagation={() => onSwitchView?.("schedule")} title={$t("tasks.panel.viewSchedule")}>📅</button>
-        </div>
+        <!-- Переключение Канбан/Расписание — только мобильные; на десктопе через меню -->
         <button class="task-tracker-btn sort-btn" class:active={sortMode === "priority"}
           on:click|stopPropagation={toggleSortMode}
           title={sortMode === "time" ? $t("tasks.panel.sortByTime") : $t("tasks.panel.sortByPriority")}>
@@ -488,16 +527,28 @@
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { openProjectSettings(); closeMenu(); }}>{$t("tasks.panel.menuProjects")}</button>
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { showTimeLogs = true; closeMenu(); }}>{$t("tasks.panel.menuTimeLogs")}</button>
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { clearCompletedTasks(); closeMenu(); }}>{$t("tasks.panel.menuCleanDone")}</button>
-              <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={handleClearRecurring}>{$t("tasks.panel.menuCleanRecurring")} ▸</button>
-              {#if showRecurringMenu}
+              <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={toggleRecurringRoot} aria-expanded={showRecurringRoot}>{$t("tasks.panel.menuRecurringActions")} <span class="submenu-arrow" class:rotated={showRecurringRoot}>▸</span></button>
+              {#if showRecurringRoot}
                 <div class="task-tracker-submenu">
-                  <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={clearRecurringAll}>{$t("tasks.panel.recurringAll")}</button>
-                  {#each getRecurringProjects() as proj}
-                    <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByProj(proj.id)}>{proj.icon} {proj.name}</button>
-                  {/each}
-                  {#each getRecurringNames() as name}
-                    <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByTitle(name)}>📝 {name}</button>
-                  {/each}
+                  <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={showRecurringClear}>{$t("tasks.panel.menuCleanRecurring")} <span class="submenu-arrow" class:rotated={recurringPanel === "clear"}>▸</span></button>
+                  <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={showRecurringEdit}>{$t("tasks.panel.menuEditRecurring")} <span class="submenu-arrow" class:rotated={recurringPanel === "edit"}>▸</span></button>
+                  {#if recurringPanel === "clear"}
+                    <div class="task-tracker-submenu task-tracker-submenu-nested">
+                      <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={clearRecurringAll}>{$t("tasks.panel.recurringAll")}</button>
+                      {#each getRecurringProjects() as proj (proj.id)}
+                        <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByProj(proj.id)}>{proj.icon} {proj.name}</button>
+                      {/each}
+                      {#each getRecurringNames() as name (name)}
+                        <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => clearRecurringByTitle(name)}>📝 {name}</button>
+                      {/each}
+                    </div>
+                  {:else if recurringPanel === "edit"}
+                    <div class="task-tracker-submenu task-tracker-submenu-nested">
+                      {#each getRecurringParents() as rtask (rtask.id)}
+                        <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => editRecurringTask(rtask)}>🔄 {rtask.title}</button>
+                      {/each}
+                    </div>
+                  {/if}
                 </div>
               {/if}
               {#if $settings.ollamaEnabled && !isMobile}

@@ -55,24 +55,24 @@
     gap: 6px;
     width: 100%;
     padding: 2px 2px 2px 10px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.02);
     border-radius: 10px;
     transition: border-color 0.2s, background 0.2s;
     box-sizing: border-box;
   }
 
   .wqi:focus-within {
-    border-color: rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   .wqi.ok {
-    border-color: var(--mcp-success, rgba(34, 197, 94, 0.5));
+    border-color: var(--mcp-success, rgba(34, 197, 94, 0.35));
   }
 
   .wqi.err {
-    border-color: var(--mcp-danger, rgba(220, 100, 100, 0.6));
+    border-color: var(--mcp-danger, rgba(220, 100, 100, 0.4));
   }
 
   .wqi-icon {
@@ -82,16 +82,26 @@
     flex-shrink: 0;
   }
 
+  /* Гасим глобальные input-стили Obsidian (рамка/фокус) */
   .wqi-input {
     flex: 1;
     min-width: 0;
-    border: none;
-    background: transparent;
+    border: none !important;
+    background: transparent !important;
     color: var(--text-normal, #e8ecf0);
     font-size: 13px;
     padding: 8px 0;
-    outline: none;
+    outline: none !important;
+    box-shadow: none !important;
     font-family: inherit;
+  }
+
+  .wqi-input:focus,
+  .wqi-input:focus-visible {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
   }
 
   .wqi-input::placeholder {

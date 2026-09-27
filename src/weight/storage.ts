@@ -1,6 +1,10 @@
 import type CalendarPlugin from "src/main";
 import type { WeightData } from "./types";
-import { createEmptyWeightData, WEIGHT_DATA_VERSION } from "./types";
+import {
+  createEmptyWeightData,
+  nextEntryId,
+  WEIGHT_DATA_VERSION,
+} from "./types";
 import { loadModuleData, saveModuleData } from "../io/vaultStorage";
 
 export async function loadWeightData(plugin: CalendarPlugin): Promise<WeightData> {
@@ -22,6 +26,11 @@ function normalizeWeightData(raw: Partial<WeightData>): WeightData {
       ? raw.entries
           .filter((e) => e && typeof e.date === "string" && typeof e.weight === "number" && isFinite(e.weight))
           .map((e) => ({
+            id:
+              typeof (e as { id?: unknown }).id === "string" &&
+              (e as { id: string }).id
+                ? (e as { id: string }).id
+                : nextEntryId(e.date),
             date: e.date,
             weight: e.weight,
             note: typeof e.note === "string" ? e.note : undefined,

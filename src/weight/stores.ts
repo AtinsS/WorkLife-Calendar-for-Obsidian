@@ -1,7 +1,11 @@
 import { writable, get } from "svelte/store";
 import type CalendarPlugin from "src/main";
 import type { WeightData, WeightEntry, WeightGoal } from "./types";
-import { createEmptyWeightData, WEIGHT_DATA_VERSION } from "./types";
+import {
+  createEmptyWeightData,
+  nextEntryId,
+  WEIGHT_DATA_VERSION,
+} from "./types";
 import { loadWeightData, saveWeightData } from "./storage";
 import {
   buildWeightSeries,
@@ -53,7 +57,7 @@ export function immediateWeightSave(): void {
   void saveWeightData(pluginInstance, get(weightData));
 }
 
-/** Insert or update a measurement for a date. */
+/** Append a measurement. Multiple entries per day are kept in the list. */
 export function setWeightEntry(
   date: string,
   weight: number,
@@ -61,21 +65,17 @@ export function setWeightEntry(
 ): void {
   if (!date || !isFinite(weight) || weight <= 0) return;
   weightData.update((data) => {
-    const existing = data.entries.find((e) => e.date === date);
     const updatedAt = Date.now();
-    let entries: WeightEntry[];
-    if (existing) {
-      entries = data.entries.map((e) =>
-        e.date === date
-          ? { ...e, weight, note: note?.trim() || undefined, updatedAt }
-          : e
-      );
-    } else {
-      entries = [
-        ...data.entries,
-        { date, weight, note: note?.trim() || undefined, updatedAt },
-      ];
-    }
+    const entries: WeightEntry[] = [
+      ...data.entries,
+      {
+        id: nextEntryId(date),
+        date,
+        weight,
+        note: note?.trim() || undefined,
+        updatedAt,
+      },
+    ];
     const goal = { ...data.goal };
     // Auto-fill start weight from first measurement if unset
     if (goal.startWeight == null && entries.length > 0) {
@@ -87,10 +87,11 @@ export function setWeightEntry(
   persist();
 }
 
-export function removeWeightEntry(date: string): void {
+/** Remove a single measurement by id. */
+export function removeWeightEntry(id: string): void {
   weightData.update((data) => ({
     ...data,
-    entries: data.entries.filter((e) => e.date !== date),
+    entries: data.entries.filter((e) => e.id !== id),
   }));
   persist();
 }

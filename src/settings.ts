@@ -59,8 +59,12 @@ export interface ISettings {
 
   // Habit Tracker settings
   showHabitTracker?: boolean;
-  habitTrackerMode?: "panel" | "separate" | "hidden";
+  /** "separate" — вкладка в переключателе; "hidden" — скрыть */
+  habitTrackerMode?: "separate" | "hidden";
   habitLogCleanupThreshold: number;
+
+  /** Видимость переключателя Задачи/Канбан/Расписание/Привычки */
+  viewSwitcherMode?: "everywhere" | "desktop" | "mobile" | "hidden";
 
   // Weight control
   weightControlEnabled?: boolean;
@@ -152,6 +156,16 @@ export interface ISettings {
   ollamaUrl: string;
   ollamaModel: string;
   ollamaContextSize: number;
+  /** Извлечение задач из заметок (ПКМ → заметка) */
+  aiExtractEnabled: boolean;
+  /** Саммари заметок (ПКМ → папка / выделение) */
+  aiSummaryEnabled: boolean;
+  /** Разбить задачу на подзадачи (ПКМ → задача) */
+  aiSubtasksEnabled: boolean;
+  /** Стиль саммари заметок */
+  aiSummaryStyle?: "brief" | "detailed" | "bullets" | "executive";
+  /** Доп. инструкции к промпту саммари */
+  aiSummaryPrompt?: string;
 }
 
 export const defaultSettings = Object.freeze({
@@ -191,9 +205,10 @@ export const defaultSettings = Object.freeze({
   timeLogCleanupThreshold: 180,
 
   showHabitTracker: true,
-  habitTrackerMode: "panel" as const,
+  habitTrackerMode: "separate" as const,
   habitLogCleanupThreshold: 1000,
   weightControlEnabled: true,
+  viewSwitcherMode: "everywhere" as const,
 
   syncToVault: true,
 
@@ -262,7 +277,12 @@ export const defaultSettings = Object.freeze({
   ollamaEnabled: false,
   ollamaUrl: "http://localhost:11434",
   ollamaModel: "llama3.1",
-  ollamaContextSize: 0, // 0 = unlimited
+  ollamaContextSize: 0,
+  aiExtractEnabled: true,
+  aiSummaryEnabled: true,
+  aiSubtasksEnabled: true,
+  aiSummaryStyle: "detailed" as const,
+  aiSummaryPrompt: "", // 0 = unlimited
 });
 
 export function applyAccentColor(hex: string): void {
@@ -484,6 +504,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addShowStatusBarSetting(general);
     this.addDtwShowOnAllPagesSetting(general);
     this.addHabitTrackerModeSetting(general);
+    this.addViewSwitcherModeSetting(general);
     this.addWeightControlSetting(general);
     this.addWorkTaskSettings(general);
     this.addCarryOverOverdueSetting(general);
@@ -709,12 +730,40 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .setName(tRaw("settings.general.habitTrackerMode"))
       .setDesc(tRaw("settings.general.habitTrackerModeDesc"))
       .addDropdown((dropdown) => {
-        dropdown.addOption("panel", tRaw("settings.general.habitModePanel"));
         dropdown.addOption("separate", tRaw("settings.general.habitModeSeparate"));
         dropdown.addOption("hidden", tRaw("settings.general.habitModeHidden"));
-        dropdown.setValue(this.plugin.options.habitTrackerMode || "panel");
-        dropdown.onChange(async (value: "panel" | "separate" | "hidden") => {
-          await this.plugin.writeOptions({ habitTrackerMode: value });
+        // Старый режим "panel" → "separate" (привычки больше не в панели задач)
+        const raw = this.plugin.options.habitTrackerMode;
+        const current = raw === "hidden" ? "hidden" : "separate";
+        dropdown.setValue(current);
+        dropdown.onChange(async (value: string) => {
+          await this.plugin.writeOptions({
+            habitTrackerMode: value === "hidden" ? "hidden" : "separate",
+          });
+        });
+      });
+  }
+
+  addViewSwitcherModeSetting(container: HTMLElement): void {
+    new Setting(container)
+      .setName(tRaw("settings.general.viewSwitcherMode"))
+      .setDesc(tRaw("settings.general.viewSwitcherModeDesc"))
+      .addDropdown((dropdown) => {
+        dropdown.addOption("everywhere", tRaw("settings.general.viewSwitcherEverywhere"));
+        dropdown.addOption("desktop", tRaw("settings.general.viewSwitcherDesktop"));
+        dropdown.addOption("mobile", tRaw("settings.general.viewSwitcherMobile"));
+        dropdown.addOption("hidden", tRaw("settings.general.viewSwitcherHidden"));
+        const raw = this.plugin.options.viewSwitcherMode;
+        dropdown.setValue(
+          raw === "desktop" || raw === "mobile" || raw === "hidden" ? raw : "everywhere",
+        );
+        dropdown.onChange(async (value: string) => {
+          await this.plugin.writeOptions({
+            viewSwitcherMode:
+              value === "desktop" || value === "mobile" || value === "hidden"
+                ? value
+                : "everywhere",
+          });
         });
       });
   }
@@ -2032,8 +2081,13 @@ priority: medium
         });
       });
 
-    if (!this.plugin.options.ollamaEnabled) return;
+    if (!this.plugin.options.ollamaEnabled) {
+      const hint = container.createDiv({ cls: "setting-item-description" });
+      hint.setText(tRaw("settings.ai.howToSteps"));
+      return;
+    }
 
+    // ── Connection / model ────────────────────────────────────────────────
     new Setting(container)
       .setName(tRaw("settings.ai.url"))
       .setDesc(tRaw("settings.ai.urlDesc"))
@@ -2176,5 +2230,86 @@ priority: medium
         }, 8000);
       })();
     });
+
+    // ── Per-action toggles + help ─────────────────────────────────────────
+    new Setting(container).setName(tRaw("settings.ai.sectionActions")).setHeading();
+    const actionsDesc = container.createDiv({ cls: "setting-item-description" });
+    actionsDesc.setText(tRaw("settings.ai.sectionActionsDesc"));
+
+    new Setting(container)
+      .setName(tRaw("settings.ai.extractEnabled"))
+      .setDesc(tRaw("settings.ai.extractEnabledDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.aiExtractEnabled !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ aiExtractEnabled: value });
+        });
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.ai.summaryEnabled"))
+      .setDesc(tRaw("settings.ai.summaryEnabledDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.aiSummaryEnabled !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ aiSummaryEnabled: value });
+          this.display();
+        });
+      });
+
+    if (this.plugin.options.aiSummaryEnabled !== false) {
+      new Setting(container)
+        .setName(tRaw("settings.ai.summaryStyle"))
+        .setDesc(tRaw("settings.ai.summaryStyleDesc"))
+        .addDropdown((dropdown) => {
+          dropdown.addOption("brief", tRaw("settings.ai.summaryStyleBrief"));
+          dropdown.addOption("detailed", tRaw("settings.ai.summaryStyleDetailed"));
+          dropdown.addOption("bullets", tRaw("settings.ai.summaryStyleBullets"));
+          dropdown.addOption("executive", tRaw("settings.ai.summaryStyleExecutive"));
+          const raw = this.plugin.options.aiSummaryStyle;
+          dropdown.setValue(
+            raw === "brief" || raw === "bullets" || raw === "executive"
+              ? raw
+              : "detailed",
+          );
+          dropdown.onChange(async (value: string) => {
+            await this.plugin.writeOptions({
+              aiSummaryStyle:
+                value === "brief" || value === "bullets" || value === "executive"
+                  ? value
+                  : "detailed",
+            });
+          });
+        });
+
+      new Setting(container)
+        .setName(tRaw("settings.ai.summaryPrompt"))
+        .setDesc(tRaw("settings.ai.summaryPromptDesc"))
+        .addTextArea((area) => {
+          area
+            .setPlaceholder(tRaw("settings.ai.summaryPromptPlaceholder"))
+            .setValue(this.plugin.options.aiSummaryPrompt || "")
+            .onChange(async (value) => {
+              await this.plugin.writeOptions({ aiSummaryPrompt: value });
+            });
+          area.inputEl.rows = 3;
+          area.inputEl.addClass("mcp-input-xl");
+        });
+    }
+
+    new Setting(container)
+      .setName(tRaw("settings.ai.subtasksEnabled"))
+      .setDesc(tRaw("settings.ai.subtasksEnabledDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.aiSubtasksEnabled !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ aiSubtasksEnabled: value });
+        });
+      });
+
+    // How-to
+    new Setting(container).setName(tRaw("settings.ai.howToTitle")).setHeading();
+    const howTo = container.createDiv({ cls: "setting-item-description" });
+    howTo.setText(tRaw("settings.ai.howToSteps"));
   }
 }

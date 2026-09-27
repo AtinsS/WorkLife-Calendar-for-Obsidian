@@ -5,20 +5,20 @@ import type { Moment } from "moment";
 // but at runtime it's the callable moment function. Cast once here.
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Obsidian types moment as namespace, runtime is callable
 const momentFn = moment as unknown as (inp?: unknown, format?: string, strict?: boolean) => Moment;
-import { VIEW_TYPE_TASKS, VIEW_TYPE_SCHEDULE, VIEW_TYPE_MOBILE_SCHEDULE, VIEW_TYPE_KANBAN } from "../constants";
+import { VIEW_TYPE_TASKS } from "../constants";
 import TaskPanel from "../task-tracker/TaskPanel.svelte";
-import HabitPanel from "../habit-tracker/HabitPanel.svelte";
 import { get } from "svelte/store";
 import { tRaw } from "../i18n";
 import { selectedDate, projects, taskFilter } from "../task-tracker/stores";
 import type { IProject } from "../task-tracker/types";
-import { settings } from "../ui/stores";
-import type { ISettings } from "src/settings";
 import { getDateUID } from "obsidian-daily-notes-interface";
+import {
+  createViewSwitcher,
+  markViewEnter,
+} from "./viewSwitch";
 
 export default class TaskView extends ItemView {
   private taskPanel: TaskPanel;
-  private habitPanel: HabitPanel;
   private projectSidebar: HTMLElement | null = null;
   private panelsContainer: HTMLElement | null = null;
   private tasksUnsub: (() => void) | null = null;
@@ -44,16 +44,18 @@ export default class TaskView extends ItemView {
     if (this.tasksUnsub) { this.tasksUnsub(); this.tasksUnsub = null; }
     if (this.projectsUnsub) { this.projectsUnsub(); this.projectsUnsub = null; }
     if (this.taskPanel) { this.taskPanel.$destroy(); }
-    if (this.habitPanel) { this.habitPanel.$destroy(); }
     return Promise.resolve();
   }
 
   onOpen(): Promise<void> {
     this.contentEl.empty();
     this.contentEl.addClass("task-view");
+    markViewEnter(this.contentEl);
 
     selectedDate.set(getDateUID(momentFn(), "day"));
-    const currentSettings: ISettings = get(settings);
+
+    // Единый переключатель Tasks / Kanban / Schedule / Habits
+    createViewSwitcher(this.contentEl, "tasks", this.leaf);
 
     // Main layout: sidebar + panels
     const body = this.contentEl.createDiv({ cls: "task-view-body" });
@@ -68,24 +70,13 @@ export default class TaskView extends ItemView {
     const panelsCard = mainContent.createDiv({ cls: "task-view-panels" });
     this.panelsContainer = panelsCard.createDiv({ cls: "panels-container" });
 
-    // Task panel
+    // Task panel (навигация — только через бесшовный переключатель)
     this.taskPanel = new TaskPanel({
       target: this.panelsContainer,
       props: {
         appInstance: this.app,
-        onOpenSchedule: () => this.openSchedule(),
-        onSwitchView: (viewType: string) => this.switchView(viewType),
       },
     });
-
-    // Habit panel — show in "panel" mode (default) or when habitTrackerMode is not set
-    const habitMode = currentSettings.habitTrackerMode || (currentSettings.showHabitTracker === false ? "hidden" : "panel");
-    if (habitMode === "panel") {
-      this.habitPanel = new HabitPanel({
-        target: this.panelsContainer,
-        props: { appInstance: this.app },
-      });
-    }
 
     // Project sidebar
     this.renderProjectSidebar();
@@ -136,30 +127,5 @@ export default class TaskView extends ItemView {
         }
       });
     });
-  }
-
-  private openSchedule(): void {
-    const { workspace } = this.app;
-    const isMobile = window.innerWidth <= 768;
-    const viewType = isMobile ? VIEW_TYPE_MOBILE_SCHEDULE : VIEW_TYPE_SCHEDULE;
-
-    const existing = workspace.getLeavesOfType(viewType);
-    if (existing.length) {
-      void workspace.revealLeaf(existing[0]);
-      return;
-    }
-    const leaf = workspace.getLeaf("tab");
-    if (leaf) {
-      void leaf.setViewState({ type: viewType, active: true });
-      void workspace.revealLeaf(leaf);
-    }
-  }
-
-  private switchView(viewType: string): void {
-    const target = viewType === "kanban" ? VIEW_TYPE_KANBAN
-      : viewType === "schedule" ? (window.innerWidth <= 768 ? VIEW_TYPE_MOBILE_SCHEDULE : VIEW_TYPE_SCHEDULE)
-      : null;
-    if (!target) return;
-    void this.leaf.setViewState({ type: target, active: true });
   }
 }

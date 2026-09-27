@@ -4,6 +4,7 @@ import { VIEW_TYPE_MOBILE_SCHEDULE } from "../constants";
 import type CalendarPlugin from "../main";
 import MobileSchedule from "../components/MobileSchedule.svelte";
 import { tRaw } from "../i18n";
+import { createViewSwitcher, markViewEnter } from "./viewSwitch";
 
 export default class MobileScheduleView extends ItemView {
   private plugin: CalendarPlugin;
@@ -31,6 +32,9 @@ export default class MobileScheduleView extends ItemView {
     const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("mobile-schedule-view-container");
+    markViewEnter(container);
+
+    createViewSwitcher(container, "schedule", this.leaf);
 
     this.svelteComponent = new MobileSchedule({
       target: container,

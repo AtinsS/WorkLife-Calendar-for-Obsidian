@@ -1119,3 +1119,63 @@ export function distributeByDays(
 
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// AI: split a task into checklist subtasks
+// ---------------------------------------------------------------------------
+
+const SUBTASKS_SYSTEM = `You break a task into clear, actionable checklist subtasks.
+Return ONLY valid JSON: {"subtasks":[{"title":"string"}]}
+Rules:
+- 3–8 short subtasks (unless the task is trivial — then 2–3).
+- Same language as the task title/description.
+- No numbering, no markdown in titles.
+- Concrete verbs: "Написать…", "Проверить…", "Собрать…".
+- Do not repeat the parent title.`;
+
+export async function generateSubtasks(
+  url: string,
+  model: string,
+  taskTitle: string,
+  taskDescription?: string | null,
+  opts: StreamChatOptions = {},
+): Promise<string[]> {
+  const user = [
+    `Task: ${taskTitle}`,
+    taskDescription ? `Description: ${taskDescription}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const raw = await streamOllamaChat(
+    url,
+    model,
+    [
+      { role: "system", content: SUBTASKS_SYSTEM },
+      { role: "user", content: user },
+    ],
+    { ...opts, temperature: 0.2 },
+  );
+
+  return parseSubtasks(raw);
+}
+
+export function parseSubtasks(raw: string): string[] {
+  const text = raw.trim();
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const candidate = jsonMatch ? jsonMatch[0] : text;
+  try {
+    const parsed = JSON.parse(candidate) as { subtasks?: Array<{ title?: string } | string> };
+    const list = Array.isArray(parsed.subtasks) ? parsed.subtasks : [];
+    return list
+      .map((s) => (typeof s === "string" ? s : s?.title ?? ""))
+      .map((t) => t.trim())
+      .filter(Boolean);
+  } catch {
+    // Fallback: markdown bullets
+    return text
+      .split("\n")
+      .map((l) => l.replace(/^\s*[-*•]\s+/, "").replace(/^\s*\d+[.)]\s+/, "").trim())
+      .filter((l) => l && !l.startsWith("{") && !l.startsWith("```"));
+  }
+}

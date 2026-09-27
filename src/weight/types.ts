@@ -1,6 +1,8 @@
 export const WEIGHT_DATA_VERSION = 1;
 
 export interface WeightEntry {
+  /** Stable id — multiple measurements per day are allowed */
+  id: string;
   /** YYYY-MM-DD */
   date: string;
   /** Weight in kg */
@@ -36,4 +38,10 @@ export function toDateKey(d: Date): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+let idSeq = 0;
+export function nextEntryId(date: string): string {
+  idSeq += 1;
+  return `${date}-${Date.now()}-${idSeq}`;
 }

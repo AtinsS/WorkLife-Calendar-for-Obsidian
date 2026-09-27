@@ -49,7 +49,7 @@
 
   // Widget settings
   $: showTasksWidget = $settings.dashboardShowTasks !== false;
-  $: showHabitsWidget = $settings.dashboardShowHabits !== false && ($settings.habitTrackerMode || ($settings.showHabitTracker === false ? "hidden" : "panel")) !== "hidden";
+  $: showHabitsWidget = $settings.dashboardShowHabits !== false && $settings.habitTrackerMode !== "hidden";
   $: showGoalsWidget = $settings.dashboardShowGoals !== false;
 
   // Widget expand state
@@ -106,9 +106,14 @@
 
   // Tasks widget data — react to `now` so day rollover works
   $: todayStr = now.format("YYYY-MM-DD");
-  $: todayDateUID = `day-${now.clone().startOf("day").format()}`;
+  $: todayDateUID = getDateUID(now, "day");
   $: todayAllTasks = $tasks
-    .filter((t) => t.dateUID === todayDateUID)
+    .filter((t) => {
+      if (t.dateUID === todayDateUID) return true;
+      // Fallback: match by calendar day (legacy / timezone-shifted UIDs)
+      const d = t.dateUID?.match(/^day-(\d{4}-\d{2}-\d{2})/)?.[1];
+      return d === todayStr;
+    })
     .sort((a, b) => {
       if (a.status === "done" && b.status !== "done") return 1;
       if (a.status !== "done" && b.status === "done") return -1;
@@ -153,12 +158,15 @@
   }
 
   function cycleTaskStatus(task: { id: string; status: string }) {
-    const newStatus = task.status === "done" ? "todo" : "done";
-    updateTaskStatus(task.id, newStatus as any);
+    const next = task.status === "done" ? "todo" : "done";
+    updateTaskStatus(task.id, next as "todo" | "done");
+    // Ensure completed flag stays in sync even if timer paths skip it
+    if (next === "done") updateTask(task.id, { completed: true });
   }
 
-  function statusIcon(s: string): string {
-    return s === "progress" ? "◐" : s === "done" ? "✓" : "";
+  async function aiSplitTask(task: ITask) {
+    const { splitTaskIntoSubtasks } = await import("../services/aiSubtasks");
+    await splitTaskIntoSubtasks(appInstance, task);
   }
 
   // Task CRUD
@@ -298,26 +306,52 @@
     <!-- Tasks widget -->
     {#if showTasksWidget}
       <div class="dash-widget-wrap">
-        <button class="dash-widget dash-widget--tasks" class:expanded={tasksExpanded} on:click={() => tasksExpanded = !tasksExpanded}>
-          <span class="dash-widget__icon">✅</span>
-          <span class="dash-widget__label">{$t("dashboard.tasks")}</span>
+        <div class="dash-widget dash-widget--tasks" class:expanded={tasksExpanded} role="button" tabindex="0" on:click={() => tasksExpanded = !tasksExpanded} on:keydown={(e) => e.key === "Enter" && (tasksExpanded = !tasksExpanded)}>
+          <span class="dash-widget__icon-wrap" data-kind="tasks">
+            <span class="dash-widget__icon">✅</span>
+          </span>
+          <span class="dash-widget__body">
+            <span class="dash-widget__label">{$t("dashboard.tasks")}</span>
+            {#if todayTotal > 0}
+              <div class="dash-widget__bar"><div class="dash-widget__bar-fill" class:complete={todayProgress >= 100} style="width:{todayProgress}%"></div></div>
+            {/if}
+          </span>
           {#if todayTotal > 0}
-            <div class="dash-widget__bar"><div class="dash-widget__bar-fill" style="width:{todayProgress}%"></div></div>
-            <span class="dash-widget__count">{todayDone}/{todayTotal}</span>
+            <span class="dash-widget__count" class:done={todayDone === todayTotal}>{todayDone}/{todayTotal}</span>
           {/if}
           <button class="dash-widget__add-btn" on:click|stopPropagation={openCreateTask} title={$t("dashboard.addCard")}>+</button>
           {#if todayTotal > 0}<span class="dash-widget__chevron" class:open={tasksExpanded}>›</span>{/if}
-        </button>
+        </div>
         {#if tasksExpanded && todayTotal > 0}
           <div class="dash-widget__dropdown">
             {#each todayAllTasks as task (task.id)}
               {@const project = $projects.find(p => p.id === task.projectId)}
-              <div class="dash-task" class:done={task.status === "done"}>
-                <button class="dash-task-check" class:checked={task.status === "done"} class:in-progress={task.status === "progress"} on:click|stopPropagation={() => cycleTaskStatus(task)}>{statusIcon(task.status)}</button>
-                <span class="dash-task-title" class:strike={task.status === "done"}>{task.title}</span>
-                {#if task.scheduledTime}<span class="dash-task-time">{task.scheduledTime}</span>{/if}
-                {#if project}<span class="dash-task-project" style="color:{project.color}">{project.icon || "📁"}</span>{/if}
+              <div
+                class="dash-task"
+                class:done={task.status === "done"}
+                class:progress={task.status === "progress"}
+                data-status={task.status}
+                role="button"
+                tabindex="0"
+                on:click={() => cycleTaskStatus(task)}
+                on:keydown={(e) => e.key === "Enter" && cycleTaskStatus(task)}
+              >
+                <button class="dash-task-check" class:checked={task.status === "done"} class:in-progress={task.status === "progress"} on:click|stopPropagation={() => cycleTaskStatus(task)} aria-label={$t("tasks.item.markDone")}>
+                  {#if task.status === "done"}
+                    <svg class="dash-check-svg" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  {:else if task.status === "progress"}
+                    <span class="dash-check-icon">◐</span>
+                  {/if}
+                </button>
+                <div class="dash-task-main">
+                  <span class="dash-task-title" class:strike={task.status === "done"}>{task.title}</span>
+                  <div class="dash-task-meta">
+                    {#if task.scheduledTime}<span class="dash-task-time">🕐 {task.scheduledTime}</span>{/if}
+                    {#if project}<span class="dash-task-project" style="--pc:{project.color}"><span class="dash-task-project-dot"></span>{project.icon || "📁"} {project.name}</span>{/if}
+                  </div>
+                </div>
                 <div class="dash-task-actions">
+                  <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => aiSplitTask(task)} title={$t("ai.contextMenuSubtasks")}>✨</button>
                   <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => openEditTask(task)} title={$t("common.edit")}>✎</button>
                   <button class="dash-btn dash-btn--sm dash-btn--danger" on:click|stopPropagation={() => deleteTask(task.id)} title={$t("common.delete")}>✕</button>
                 </div>
@@ -331,25 +365,44 @@
     <!-- Habits widget -->
     {#if showHabitsWidget}
       <div class="dash-widget-wrap">
-        <button class="dash-widget dash-widget--habits" class:expanded={habitsExpanded} on:click={() => habitsExpanded = !habitsExpanded}>
-          <span class="dash-widget__icon">🔥</span>
-          <span class="dash-widget__label">{$t("dashboard.habits")}</span>
+        <div class="dash-widget dash-widget--habits" class:expanded={habitsExpanded} role="button" tabindex="0" on:click={() => habitsExpanded = !habitsExpanded} on:keydown={(e) => e.key === "Enter" && (habitsExpanded = !habitsExpanded)}>
+          <span class="dash-widget__icon-wrap" data-kind="habits">
+            <span class="dash-widget__icon">🔥</span>
+          </span>
+          <span class="dash-widget__body">
+            <span class="dash-widget__label">{$t("dashboard.habits")}</span>
+            {#if habitTotalCount > 0}
+              <div class="dash-widget__bar"><div class="dash-widget__bar-fill habit-fill" class:complete={habitDoneCount >= habitTotalCount} style="width:{habitTotalCount > 0 ? Math.round(habitDoneCount / habitTotalCount * 100) : 0}%"></div></div>
+            {/if}
+          </span>
           {#if habitTotalCount > 0}
-            <div class="dash-widget__bar"><div class="dash-widget__bar-fill" style="width:{habitTotalCount > 0 ? Math.round(habitDoneCount / habitTotalCount * 100) : 0}%"></div></div>
-            <span class="dash-widget__count">{habitDoneCount}/{habitTotalCount}</span>
+            <span class="dash-widget__count" class:done={habitDoneCount >= habitTotalCount}>{habitDoneCount}/{habitTotalCount}</span>
           {/if}
           <button class="dash-widget__add-btn" on:click|stopPropagation={openCreateHabit} title={$t("dashboard.addCard")}>+</button>
           {#if habitTotalCount > 0}<span class="dash-widget__chevron" class:open={habitsExpanded}>›</span>{/if}
-        </button>
+        </div>
         {#if habitsExpanded && habitTotalCount > 0}
           <div class="dash-widget__dropdown">
             {#each todayHabits as habit (habit.id)}
-              <div class="dash-habit" class:done={habit.progress === 2} style="--hc:{habit.color}">
-                <button class="dash-habit-check" class:checked={habit.progress === 2} on:click|stopPropagation={() => toggleHabitCompletion(habit.id, todayStr, habit.targetCount || 1)}>
-                  {#if habit.progress === 2}<svg class="dash-check-svg" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="2" fill="none"/></svg>{/if}
+              <div
+                class="dash-habit"
+                class:done={habit.progress === 2}
+                style="--hc:{habit.color}"
+                role="button"
+                tabindex="0"
+                on:click={() => toggleHabitCompletion(habit.id, todayStr, habit.targetCount || 1)}
+                on:keydown={(e) => e.key === "Enter" && toggleHabitCompletion(habit.id, todayStr, habit.targetCount || 1)}
+              >
+                <button class="dash-habit-check" class:checked={habit.progress === 2} on:click|stopPropagation={() => toggleHabitCompletion(habit.id, todayStr, habit.targetCount || 1)} aria-label={$t("tasks.item.markDone")}>
+                  {#if habit.progress === 2}<svg class="dash-check-svg" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>{/if}
                 </button>
                 <span class="dash-habit-icon">{habit.icon}</span>
-                <span class="dash-habit-name" class:strike={habit.progress === 2}>{habit.title}</span>
+                <div class="dash-habit-main">
+                  <span class="dash-habit-name" class:strike={habit.progress === 2}>{habit.title}</span>
+                  {#if habit.targetCount && habit.targetCount > 1}
+                    <span class="dash-habit-target">{habit.progress}/{habit.targetCount}</span>
+                  {/if}
+                </div>
                 <div class="dash-habit-actions">
                   <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => openEditHabit(habit)} title={$t("common.edit")}>✎</button>
                   <button class="dash-btn dash-btn--sm dash-btn--danger" on:click|stopPropagation={() => deleteHabit(habit.id)} title={$t("common.delete")}>✕</button>
@@ -554,133 +607,354 @@
 
 <style>
   /* Widgets */
-  .dashboard__widgets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .dashboard__widgets { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
 
-  .dash-widget-wrap { display: flex; flex-direction: column; flex: 1; min-width: 200px; }
+  .dash-widget-wrap { display: flex; flex-direction: column; flex: 1; min-width: 220px; }
 
   .dash-widget {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px;
-    background: var(--background-secondary);
-    border: 1px solid rgba(255,255,255,0.04);
-    border-radius: 10px;
+    padding: 12px 14px;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015));
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
     cursor: pointer; font-family: inherit; color: inherit;
-    transition: all 0.2s ease; text-align: left; width: 100%;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease, background 0.2s ease;
+    text-align: left; width: 100%;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    box-sizing: border-box;
+    min-height: 56px;
+    outline: none;
+    user-select: none;
   }
-  .dash-widget:hover { background: var(--background-modifier-hover); border-color: rgba(255,255,255,0.08); }
-  .dash-widget.expanded { border-radius: 10px 10px 0 0; border-color: rgba(255,255,255,0.08); }
+  .dash-widget:focus-visible {
+    border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 45%, transparent);
+  }
+  .dash-widget:hover {
+    border-color: rgba(255,255,255,0.12);
+    background: linear-gradient(135deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+    box-shadow: 0 4px 18px rgba(0,0,0,0.14);
+  }
+  .dash-widget:active { transform: scale(0.99); }
+  .dash-widget.expanded {
+    border-radius: 14px 14px 0 0;
+    box-shadow: 0 -2px 16px rgba(0,0,0,0.1);
+  }
 
-  .dash-widget__icon { font-size: 18px; flex-shrink: 0; }
-  .dash-widget__label { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text-normal); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dash-widget__icon-wrap {
+    width: 36px; height: 36px;
+    border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  }
+  .dash-widget__icon-wrap[data-kind="tasks"] {
+    background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 16%, transparent);
+    border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 28%, transparent);
+  }
+  .dash-widget__icon-wrap[data-kind="habits"] {
+    background: rgba(255, 140, 60, 0.14);
+    border-color: rgba(255, 140, 60, 0.28);
+  }
+  .dash-widget__icon { font-size: 16px; line-height: 1; }
 
-  .dash-widget__bar { width: 52px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
-  .dash-widget__bar-fill { height: 100%; background: var(--interactive-accent); border-radius: 2px; transition: width 0.4s ease; }
-  .dash-widget__bar-fill.goal-fill { background: linear-gradient(90deg, var(--interactive-accent), #3dd68c); }
+  .dash-widget__body {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .dash-widget__label {
+    font-size: 13px; font-weight: 650; color: var(--text-normal);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    letter-spacing: 0.01em;
+  }
 
-  .dash-widget__count { font-size: 11px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; white-space: nowrap; }
-  .dash-widget__chevron { font-size: 16px; color: var(--text-faint); transition: transform 0.2s ease; flex-shrink: 0; }
-  .dash-widget__chevron.open { transform: rotate(90deg); }
+  .dash-widget__bar {
+    width: 100%; max-width: 120px; height: 4px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 999px; overflow: hidden;
+  }
+  .dash-widget__bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--interactive-accent), color-mix(in srgb, var(--interactive-accent) 60%, #fff 20%));
+    border-radius: 999px;
+    transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
+  }
+  .dash-widget__bar-fill.habit-fill {
+    background: linear-gradient(90deg, #ff8c3c, #ffb35c);
+    box-shadow: 0 0 8px rgba(255, 140, 60, 0.35);
+  }
+  .dash-widget__bar-fill.goal-fill {
+    background: linear-gradient(90deg, var(--interactive-accent), #3dd68c);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--interactive-accent) 35%, transparent);
+  }
+  .dash-widget__bar-fill.complete {
+    background: linear-gradient(90deg, #3dd68c, #6eebb0);
+    box-shadow: 0 0 8px rgba(61, 214, 140, 0.35);
+  }
+
+  .dash-widget__count {
+    font-size: 11px; font-weight: 700;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.05);
+    padding: 3px 8px; border-radius: 999px;
+    flex-shrink: 0; white-space: nowrap;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .dash-widget__count.done {
+    color: #3dd68c;
+    background: rgba(61, 214, 140, 0.12);
+    border-color: rgba(61, 214, 140, 0.25);
+  }
+
+  .dash-widget__chevron {
+    font-size: 16px; color: var(--text-faint);
+    transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    flex-shrink: 0;
+  }
+  .dash-widget__chevron.open { transform: rotate(90deg); color: var(--text-muted); }
 
   .dash-widget__add-btn {
-    width: 20px;
-    height: 20px;
-    border-radius: 5px;
-    border: none;
-    background: rgba(255,255,255,0.04);
-    color: var(--text-faint);
-    font-size: 14px;
+    width: 24px; height: 24px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.05);
+    color: var(--text-muted);
+    font-size: 15px;
     line-height: 1;
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     flex-shrink: 0;
-    transition: background 0.15s, color 0.15s;
+    transition: background 0.15s, color 0.15s, transform 0.12s, box-shadow 0.15s;
   }
   .dash-widget__add-btn:hover {
     background: var(--interactive-accent);
+    border-color: transparent;
     color: var(--text-on-accent);
+    box-shadow: 0 3px 12px color-mix(in srgb, var(--interactive-accent) 40%, transparent);
   }
+  .dash-widget__add-btn:active { transform: scale(0.92); }
 
   .dash-widget__dropdown {
-    background: var(--background-secondary);
-    border: 1px solid rgba(255,255,255,0.04);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent), var(--background-secondary);
+    border: 1px solid rgba(255,255,255,0.06);
     border-top: none;
-    border-radius: 0 0 10px 10px;
-    padding: 4px 8px 8px;
-    display: flex; flex-direction: column; gap: 1px;
-    animation: dd-open 0.15s ease;
+    border-radius: 0 0 14px 14px;
+    padding: 6px 8px 10px;
+    display: flex; flex-direction: column; gap: 4px;
+    animation: dd-open 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   }
-  @keyframes dd-open { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes dd-open { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
 
   /* Task rows */
   .dash-task {
-    display: flex; align-items: center; gap: 8px;
-    padding: 6px 8px; background: transparent; border: none;
-    border-radius: 6px; cursor: pointer; transition: all 0.15s ease;
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 10px;
+    cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
     width: 100%; text-align: left; color: var(--text-normal); font-family: inherit; font-size: 13px;
   }
-  .dash-task:hover { background: rgba(255,255,255,0.03); }
-  .dash-task.done { opacity: 0.45; }
+  .dash-task:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.08);
+  }
+  .dash-task:active { transform: scale(0.99); }
+  .dash-task.done { opacity: 0.55; }
+  .dash-task.progress {
+    border-left: 2px solid color-mix(in srgb, var(--interactive-accent, #7c5cfc) 70%, transparent);
+    padding-left: 8px;
+  }
 
   .dash-task-check {
-    width: 16px; height: 16px; border-radius: 4px;
-    border: 1.5px solid rgba(255,255,255,0.15); background: transparent;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: all 0.2s ease; color: transparent; font-size: 10px;
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+    max-width: 18px;
+    max-height: 18px;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    margin: 0;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.16);
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 18px;
+    overflow: hidden;
+    transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+    color: transparent;
+    font-size: 10px;
+    line-height: 1;
+    vertical-align: middle;
   }
-  .dash-task-check.checked { background: var(--interactive-accent); border-color: var(--interactive-accent); color: #fff; }
-  .dash-task-check.in-progress { border-color: var(--interactive-accent); color: var(--interactive-accent); }
+  .dash-task-check:hover { border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 55%, transparent); }
+  .dash-task-check.checked {
+    background: linear-gradient(135deg, var(--interactive-accent, #7c5cfc), color-mix(in srgb, var(--interactive-accent, #7c5cfc) 70%, #fff 15%));
+    border-color: transparent; color: #fff;
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 35%, transparent);
+  }
+  .dash-task-check.in-progress {
+    border-color: var(--interactive-accent, #7c5cfc);
+    color: var(--interactive-accent, #7c5cfc);
+    background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 12%, transparent);
+  }
 
-  .dash-task-title { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: 12.5px; }
+  .dash-task-main {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .dash-task-title {
+    font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0; font-size: 12.5px; line-height: 1.3;
+  }
   .dash-task-title.strike { text-decoration: line-through; color: var(--text-faint); }
-  .dash-task-time { font-size: 10px; font-weight: 600; color: var(--text-faint); background: rgba(255,255,255,0.03); padding: 1px 5px; border-radius: 4px; flex-shrink: 0; }
-  .dash-task-project { font-size: 12px; flex-shrink: 0; }
+  .dash-task-meta {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    min-width: 0;
+  }
+  .dash-task-time {
+    font-size: 10px; font-weight: 600; color: var(--text-muted);
+    background: rgba(255,255,255,0.04);
+    padding: 1px 6px; border-radius: 999px; flex-shrink: 0;
+  }
+  .dash-task-project {
+    font-size: 10px; font-weight: 600;
+    color: var(--text-muted);
+    display: inline-flex; align-items: center; gap: 4px;
+    background: color-mix(in srgb, var(--pc, #888) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--pc, #888) 28%, transparent);
+    padding: 1px 6px; border-radius: 999px;
+    max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .dash-task-project-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--pc, #888); flex-shrink: 0;
+    box-shadow: 0 0 6px color-mix(in srgb, var(--pc, #888) 50%, transparent);
+  }
 
   .dash-task-actions {
-    display: flex;
-    gap: 2px;
+    display: flex; gap: 2px;
     opacity: 0;
     transition: opacity 0.15s;
     flex-shrink: 0;
   }
   .dash-task:hover .dash-task-actions { opacity: 1; }
   @media (max-width: 768px) {
-    .dash-task-actions { opacity: 0.6; }
+    .dash-task-actions { opacity: 0.55; }
   }
 
   /* Habit rows */
   .dash-habit {
-    display: flex; align-items: center; gap: 7px;
-    padding: 6px 8px; background: transparent; border: none;
-    border-radius: 6px; cursor: pointer; transition: all 0.15s ease;
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 10px;
+    cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
     width: 100%; text-align: left; color: var(--text-normal); font-family: inherit; font-size: 13px;
   }
-  .dash-habit:hover { background: rgba(255,255,255,0.03); }
-  .dash-habit.done { opacity: 0.45; }
+  .dash-habit:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: color-mix(in srgb, var(--hc, #3dd68c) 22%, transparent);
+  }
+  .dash-habit:active { transform: scale(0.99); }
+  .dash-habit.done {
+    opacity: 0.6;
+    border-color: color-mix(in srgb, var(--hc, #3dd68c) 20%, transparent);
+  }
 
   .dash-habit-check {
-    width: 16px; height: 16px; border-radius: 50%;
-    border: 1.5px solid rgba(255,255,255,0.12); background: transparent;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; transition: all 0.2s ease; color: transparent;
+    box-sizing: border-box;
+    width: 18px;
+    height: 18px;
+    min-width: 18px;
+    min-height: 18px;
+    max-width: 18px;
+    max-height: 18px;
+    aspect-ratio: 1 / 1;
+    padding: 0;
+    margin: 0;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--hc, #3dd68c) 35%, transparent);
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 18px;
+    overflow: hidden;
+    transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    color: transparent;
+    line-height: 1;
+    vertical-align: middle;
   }
-  .dash-habit-check.checked { background: var(--hc, #3DD68C); border-color: var(--hc, #3DD68C); color: #fff; }
-  .dash-check-svg { width: 8px; height: 8px; }
-  .dash-habit-icon { font-size: 13px; flex-shrink: 0; line-height: 1; }
-  .dash-habit-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; font-size: 12.5px; }
+  .dash-habit-check:hover {
+    background: color-mix(in srgb, var(--hc, #3dd68c) 12%, transparent);
+  }
+  .dash-habit-check.checked {
+    background: var(--hc, #3DD68C);
+    border-color: var(--hc, #3DD68C); color: #fff;
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--hc, #3DD68C) 40%, transparent);
+  }
+  .dash-check-icon {
+    display: block;
+    width: 10px;
+    height: 10px;
+    line-height: 1;
+    font-size: 9px;
+    overflow: hidden;
+    text-align: center;
+    pointer-events: none;
+    flex-shrink: 0;
+  }
+  .dash-check-svg {
+    width: 9px;
+    height: 9px;
+    display: block;
+    flex-shrink: 0;
+    pointer-events: none;
+  }
+  .dash-habit-icon {
+    width: 26px; height: 26px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; line-height: 1; flex-shrink: 0;
+    background: color-mix(in srgb, var(--hc, #3dd68c) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--hc, #3dd68c) 20%, transparent);
+  }
+  .dash-habit-main {
+    flex: 1; min-width: 0;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .dash-habit-name {
+    font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0; font-size: 12.5px; line-height: 1.3; flex: 1;
+  }
   .dash-habit-name.strike { text-decoration: line-through; color: var(--text-faint); }
+  .dash-habit-target {
+    font-size: 10px; font-weight: 700;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.05);
+    padding: 2px 7px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0;
+  }
 
   .dash-habit-actions {
-    display: flex;
-    gap: 2px;
+    display: flex; gap: 2px;
     opacity: 0;
     transition: opacity 0.15s;
     flex-shrink: 0;
   }
   .dash-habit:hover .dash-habit-actions { opacity: 1; }
   @media (max-width: 768px) {
-    .dash-habit-actions { opacity: 0.6; }
+    .dash-habit-actions { opacity: 0.55; }
   }
 
   /* Goal rows */

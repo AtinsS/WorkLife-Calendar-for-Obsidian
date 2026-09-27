@@ -30,7 +30,7 @@
   } from "../task-tracker/noteTasks";
   import { TaskModal } from "../task-tracker/TaskModal";
   import { getDateUID } from "obsidian-daily-notes-interface";
-  import { tasksToEvents } from "./scheduleUtils";
+  import { tasksToEvents, getStatusColor } from "./scheduleUtils";
   import {
     fetchWeekWeather,
     type DayWeather,
@@ -132,6 +132,75 @@
   const SWIPE_THRESHOLD = 60;
   const SWIPE_DIRECTION_RATIO = 1.2;
 
+  /** Ключ снапшота событий — чтобы не перерисовывать календарь без изменений */
+  function computeEventsKey(
+    events: ReturnType<typeof tasksToEvents>,
+  ): string {
+    const taskById = new Map(get(tasks).map((t) => [t.id, t]));
+    return JSON.stringify({
+      loc: get(locale),
+      d: [
+        scheduleDisplay.scheduleShowTime,
+        scheduleDisplay.scheduleShowStatus,
+        scheduleDisplay.scheduleShowPriority,
+        scheduleDisplay.scheduleShowWorkBadge,
+        scheduleDisplay.scheduleShowNoteBadge,
+        scheduleDisplay.scheduleShowDeadline,
+        scheduleDisplay.scheduleShowOverdue,
+        scheduleDisplay.scheduleShowDescription,
+        scheduleDisplay.scheduleShowDeadlineEvents,
+      ],
+      e: events.map((ev) => {
+        const t = taskById.get(ev.extendedProps?.taskId || ev.id);
+        return [
+          ev.id,
+          ev.title,
+          ev.start,
+          ev.end,
+          ev.allDay,
+          ev.backgroundColor,
+          ev.extendedProps?.isDeadlineEvent ? 1 : 0,
+          t?.status,
+          t?.scheduledTime,
+          t?.endTime,
+          t?.priority,
+          t?.isWorkTask,
+          t?.boundNotePath,
+          t?.deadline,
+          t?.deadlineTime,
+          t?.description,
+          t?.estimatedTime,
+          t?.recurrence
+            ? `${t.recurrence.type}:${t.recurrence.until || ""}`
+            : "",
+        ];
+      }),
+    });
+  }
+
+  let lastEventsKey = "";
+
+  /** Применить события: refetch только если данные действительно изменились */
+  function applyEventsUpdate(): void {
+    if (destroyed || !calendar || suppressRefetch) return;
+    try {
+      const allTasks = get(tasks);
+      const allProjects = get(projects);
+      let events = tasksToEvents(allTasks, allProjects);
+      if (scheduleDisplay.scheduleShowDeadlineEvents === false) {
+        events = events.filter((e) => !e.extendedProps?.isDeadlineEvent);
+      }
+      const key = computeEventsKey(events);
+      if (key === lastEventsKey) return;
+      lastEventsKey = key;
+      calendar.batchRendering(() => {
+        calendar.refetchEvents();
+      });
+    } catch (e) {
+      console.error("[ScheduleCalendar] applyEventsUpdate error:", e);
+    }
+  }
+
   /** Debounced refetch — предотвращает каскадное обновление */
   function scheduleRefetch(): void {
     if (destroyed) return;
@@ -144,10 +213,8 @@
     if (refetchTimer) clearTimeout(refetchTimer);
     refetchTimer = setTimeout(() => {
       refetchTimer = null;
-      if (!destroyed && calendar && !suppressRefetch) {
-        calendar.refetchEvents();
-      }
-    }, 150);
+      applyEventsUpdate();
+    }, 250);
   }
 
   async function loadWeather(
@@ -462,6 +529,18 @@
       selectMirror: true,
       select: handleCalendarSelect,
       dayMaxEvents: true,
+      moreLinkClassNames: ["sch-more-link"],
+      moreLinkContent: (arg: { num: number; shortText: string }) => ({
+        html: `<span class="sch-more-pill"><span class="sch-more-count">${arg.shortText}</span><span class="sch-more-label">${tRaw("schedule.more")}</span></span>`,
+      }),
+      moreLinkHint: (count: number) =>
+        tRaw("schedule.moreHint", { count: String(count) }),
+      moreLinkClick: () => (isSmallPhone ? "timeGridDay" : "popover"),
+      dayPopoverFormat: {
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      },
       weekends: true,
       firstDay: Number(tRaw("locale.startOfWeek")),
       height: "100%",
@@ -822,13 +901,29 @@
   function handleEventDidMount(info: any): void {
     const el = info.el;
     el.setAttribute("data-event-id", info.event.id);
-    const task = resolveTask(info.event);
-    if (!task) return;
+
     const projectColor = info.event.extendedProps?.projectColor as
       | string
       | null;
     const isDeadlineEvent = info.event.extendedProps
       ?.isDeadlineEvent as boolean;
+    const task = resolveTask(info.event);
+
+    // Цвет всегда до early return: CSS :has() с !important иначе
+    // перекрывает backgroundColor и задачи визуально «теряют» окраску.
+    if (isDeadlineEvent) {
+      el.style.setProperty("--event-project-color", "#b43c3c");
+      el.style.backgroundColor = "rgba(180, 60, 60, 0.85)";
+    } else {
+      const accent =
+        projectColor ||
+        (info.event.backgroundColor as string) ||
+        getStatusColor(task?.status || "todo");
+      el.style.setProperty("--event-project-color", accent);
+      el.style.backgroundColor = projectColor || accent;
+    }
+
+    if (!task) return;
 
     if (isDeadlineEvent) {
       const deadlineDateStr = info.event.start
@@ -839,11 +934,6 @@
         `${tRaw("schedule.deadlineTask", {title: task.title})}\n${tRaw("schedule.dateLabel", {date: deadlineDateStr})}${task.deadlineTime ? " " + task.deadlineTime : ""}\n${tRaw("components.clickToFindTask")}`,
       );
       return;
-    }
-
-    if (projectColor) {
-      el.style.setProperty("--event-project-color", projectColor);
-      el.style.backgroundColor = projectColor;
     }
 
     // Completed task strikethrough
@@ -1319,9 +1409,7 @@
         }
 
         suppressRefetch = false;
-        if (!destroyed && calendar) {
-          calendar.refetchEvents();
-        }
+        applyEventsUpdate();
       },
       undefined,
       initialDate,
@@ -1408,6 +1496,11 @@
             },
           ]
         : []),
+      { divider: true },
+      {
+        label: tRaw("ai.contextMenuSubtasks"),
+        action: () => void contextAiSubtasks(),
+      },
       { divider: true },
       {
         label: ` ${tRaw("schedule.deleteEvent")}`,
@@ -1501,6 +1594,15 @@
       }
     }
     closeContextMenu();
+  }
+
+  async function contextAiSubtasks(): Promise<void> {
+    const task = contextMenuTask;
+    closeContextMenu();
+    if (!task) return;
+    const { splitTaskIntoSubtasks } = await import("../services/aiSubtasks");
+    await splitTaskIntoSubtasks(plugin.app, task);
+    scheduleRefetch();
   }
 
   async function contextDeleteTask(): Promise<void> {
@@ -1601,12 +1703,17 @@
     position: fixed;
     z-index: 9999;
     min-width: 200px;
+    max-width: min(320px, calc(100vw - 24px));
+    max-height: min(70vh, 480px);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     background: var(--background-primary, #1e1e2e);
     border: 1px solid
       var(--background-modifier-border, rgba(255, 255, 255, 0.08));
-    border-radius: 8px;
+    border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
-    padding: 4px;
+    padding: 6px;
     font-family: var(--font-interface);
     font-size: 13px;
   }
@@ -1967,9 +2074,177 @@
     background: var(--mcp-accent-ultra-dim);
   }
 
+  /* ===== +N more — пилюля и поповер ===== */
   :global(.fc .fc-daygrid-more-link) {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    margin-top: 2px;
+    padding: 0;
     color: var(--mcp-text-muted, var(--text-muted));
     font-size: 11px;
+    text-decoration: none;
+    border-radius: 999px;
+    transition:
+      transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+      filter 0.18s ease,
+      opacity 0.18s ease;
+    animation: sch-more-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  :global(.fc .fc-daygrid-more-link:hover) {
+    background: transparent;
+    transform: translateY(-1px);
+    filter: brightness(1.08);
+  }
+
+  :global(.fc .fc-daygrid-more-link:active) {
+    transform: translateY(0) scale(0.97);
+  }
+
+  :global(.sch-more-pill) {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    padding: 1px 7px 1px 5px;
+    border-radius: 999px;
+    border: 1px solid var(--mcp-glass-border, rgba(255, 255, 255, 0.1));
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.08),
+      rgba(255, 255, 255, 0.03)
+    );
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    line-height: 1.35;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  :global(.sch-more-count) {
+    font-weight: 700;
+    font-size: 10px;
+    color: var(--mcp-accent, var(--interactive-accent, #5f99e1));
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+
+  :global(.sch-more-label) {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--mcp-text-muted, var(--text-muted));
+    overflow: hidden;
+    text-overflow: ellipsis;
+    opacity: 0.9;
+  }
+
+  @keyframes sch-more-in {
+    from {
+      opacity: 0;
+      transform: translateY(3px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  /* Поповер «+N more» — glassmorphism + плавное появление */
+  :global(.fc .fc-popover) {
+    min-width: 220px;
+    max-width: min(320px, calc(100vw - 24px));
+    background: var(--mcp-glass-bg, rgba(30, 30, 46, 0.92));
+    border: 1px solid var(--mcp-glass-border, rgba(255, 255, 255, 0.1));
+    border-radius: 12px;
+    box-shadow:
+      0 12px 40px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+    backdrop-filter: blur(16px) saturate(1.2);
+    -webkit-backdrop-filter: blur(16px) saturate(1.2);
+    overflow: hidden;
+    animation: sch-popover-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+    transform-origin: top center;
+  }
+
+  :global(.fc .fc-popover-header) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px 8px;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.06),
+      transparent
+    );
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  :global(.fc .fc-popover-title) {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--mcp-text, var(--text-normal));
+    letter-spacing: 0.01em;
+  }
+
+  :global(.fc .fc-popover-close) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    color: var(--mcp-text-muted, var(--text-muted));
+    cursor: pointer;
+    opacity: 0.75;
+    transition:
+      background 0.15s ease,
+      opacity 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  :global(.fc .fc-popover-close:hover) {
+    background: rgba(255, 255, 255, 0.08);
+    opacity: 1;
+    transform: scale(1.06);
+  }
+
+  :global(.fc .fc-popover-body) {
+    padding: 6px 8px 8px;
+    max-height: min(320px, 50vh);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  :global(.fc .fc-popover .fc-event) {
+    margin: 3px 2px;
+    border-radius: 8px !important;
+  }
+
+  :global(.fc .fc-popover .sch-event),
+  :global(.fc .fc-popover .sch-event-compact) {
+    padding: 4px 8px;
+  }
+
+  @keyframes sch-popover-in {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.fc .fc-daygrid-more-link),
+    :global(.fc .fc-popover) {
+      animation: none;
+      transition: none;
+    }
   }
 
   /* ===== Glassmorphism события ===== */
@@ -1998,6 +2273,17 @@
   }
 
   :global(.fc .fc-event:has(.sch-event-compact)) {
+    background-color: var(
+      --event-project-color,
+      rgba(110, 130, 160, 0.8)
+    ) !important;
+    box-shadow:
+      inset 3px 0 0 var(--event-project-color, rgba(120, 145, 175, 1)),
+      0 2px 8px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  /* Месячный вид — .sch-event-inline, иначе цвета из CSS не применяются */
+  :global(.fc .fc-event:has(.sch-event-inline)) {
     background-color: var(
       --event-project-color,
       rgba(110, 130, 160, 0.8)
@@ -2722,7 +3008,16 @@
 
     :global(.fc .fc-daygrid-more-link) {
       font-size: 10px;
-      padding: 2px 4px;
+      padding: 0;
+    }
+
+    :global(.sch-more-pill) {
+      padding: 1px 6px 1px 4px;
+    }
+
+    :global(.sch-more-count),
+    :global(.sch-more-label) {
+      font-size: 9px;
     }
 
     /* List view */
@@ -2756,6 +3051,11 @@
     }
 
     :global(.fc .fc-daygrid-more-link) {
+      font-size: 9px;
+    }
+
+    :global(.sch-more-count),
+    :global(.sch-more-label) {
       font-size: 9px;
     }
   }
@@ -2808,7 +3108,16 @@
 
     :global(.fc .fc-daygrid-more-link) {
       font-size: 9px;
-      padding: 1px 4px;
+      padding: 0;
+      color: var(--mcp-accent);
+    }
+
+    :global(.sch-more-pill) {
+      padding: 1px 5px 1px 4px;
+      border-color: rgba(95, 153, 225, 0.25);
+    }
+
+    :global(.sch-more-count) {
       color: var(--mcp-accent);
     }
 
@@ -2890,7 +3199,12 @@
 
     :global(.fc .fc-daygrid-more-link) {
       font-size: 8px;
-      padding: 1px 3px;
+      padding: 0;
+    }
+
+    :global(.sch-more-pill) {
+      padding: 1px 4px;
+      gap: 2px;
     }
 
     :global(.fc .fc-timegrid-event) {
@@ -3016,7 +3330,16 @@
     }
 
     :global(.fc .fc-daygrid-more-link) {
-      padding: 4px 8px;
+      padding: 0;
+    }
+
+    :global(.sch-more-pill) {
+      padding: 4px 10px 4px 8px;
+    }
+
+    :global(.sch-more-count),
+    :global(.sch-more-label) {
+      font-size: 11px;
     }
 
     /* Убираем hover-эффекты на тач */

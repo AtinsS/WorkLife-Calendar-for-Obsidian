@@ -4,6 +4,7 @@ import { VIEW_TYPE_MOBILE_TASKS } from "../constants";
 import type CalendarPlugin from "../main";
 import MobileTasks from "../components/MobileTasks.svelte";
 import { tRaw } from "../i18n";
+import { createViewSwitcher, markViewEnter } from "./viewSwitch";
 
 export default class MobileTaskTrackerView extends ItemView {
   private plugin: CalendarPlugin;
@@ -31,6 +32,9 @@ export default class MobileTaskTrackerView extends ItemView {
     const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("mobile-tasks-view-container");
+    markViewEnter(container);
+
+    createViewSwitcher(container, "tasks", this.leaf);
 
     this.svelteComponent = new MobileTasks({
       target: container,

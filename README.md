@@ -59,7 +59,11 @@ Analytics (charts and reports)
 
 ## 📦 Installation
 
-### Via BRAT (Recommended)
+### Community plugins (after store review)
+1. Open *Settings → Community plugins* in Obsidian.
+2. Browse **WorkLife Calendar** and click **Install**, then **Enable**.
+
+### Via BRAT (Recommended for beta)
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin.
 2. Open BRAT settings → **Add Beta Plugin**.
 3. Paste the link: `https://github.com/AtinsS/obsidian-calendar-plugin-remastered`
@@ -115,12 +119,12 @@ If the plugin saves your time and helps with your work, you can support the deve
 - Flexible frequency (days of week, day of month).
 - Quantitative goals.
 - Streaks and calendar indicators.
-- **Display modes:** in task panel (default) / separate tab / hidden. Setting: General → "Habits mode".
+- **Display modes:** separate tab (default) / hidden. Setting: General → "Habits mode".
 - **Full CRUD** from habit panel and dashboard.
 - **Completion history** chart in analytics.
 
 # ⚖️ Weight Control
-- **Daily log** — date, weight (kg), optional note. One measurement per day (upsert).
+- **Daily log** — date, weight (kg), optional note. **Multiple measurements per day** (append to history).
 - **Moving averages** — MA over 7 and 30 measurements, not raw day-to-day noise.
 - **Goal & progress** — start / target weight, progress bar, remaining kg (loss or gain).
 - **Chart** — same visual style as the time & projects chart (area line, hover tooltips).
@@ -157,15 +161,18 @@ Analytics is split into tabs: **Weight · Habits · Time · Earnings**.
 - **Weather in week view** — easier weekly planning.
 - **Provider choice:** Open-Meteo, OpenWeatherMap, WeatherApi, Visual Crossing.
 
-# 🤖 AI Task Extraction (Ollama)
-- **Local AI** — extract tasks from `.md` notes using an Ollama model. No data leaves your machine.
-- **Smart parsing** — understands weeks (`## Week 1`), days (`### Day 3`), headers, checkboxes, time estimates.
-- **Project binding** for extracted tasks.
-- **Time scheduling** — AI suggests start time; manual end-time editing; auto-schedule toggle.
-- **Subtasks** — checkboxes become checklist items.
-- **Right-click** on a `.md` file → "Extract tasks with AI".
-- **Settings** — Ollama URL, model, context limit, connection test, live AI test.
-- **Desktop only** — AI extraction is disabled on mobile.
+# 🤖 AI (Ollama) — local, private
+- **Extract tasks** from a `.md` note — projects, priorities, times, subtasks.
+- **Note summary** — right-click a folder or multi-select notes (Shift) → markdown summary → new note (custom title before create).
+- **Split task into subtasks** — right-click a task → 3–8 checklist items.
+- **Per-action toggles** in Settings → AI, with short explanations.
+- **Local only** — requests go to your Ollama server; nothing is uploaded.
+- **Desktop only** — AI menus are hidden on mobile.
+
+# 🧭 View switcher
+- Seamless tabs: **Tasks · Kanban · Schedule · Habits** with smooth transitions.
+- Visibility: everywhere / desktop only / mobile only / hidden (Settings → General).
+- Habits as a separate tab (or hidden) — no longer embedded in the task panel.
 
 </details>
 

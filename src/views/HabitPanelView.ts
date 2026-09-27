@@ -3,6 +3,8 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import type CalendarPlugin from "../main";
 import HabitPanel from "../habit-tracker/HabitPanel.svelte";
 import { tRaw } from "../i18n";
+import { VIEW_TYPE_HABIT_PANEL } from "../constants";
+import { createViewSwitcher, markViewEnter } from "./viewSwitch";
 
 export default class HabitPanelView extends ItemView {
   private plugin: CalendarPlugin;
@@ -14,7 +16,7 @@ export default class HabitPanelView extends ItemView {
   }
 
   getViewType(): string {
-    return "calendar-habit-panel";
+    return VIEW_TYPE_HABIT_PANEL;
   }
 
   getDisplayText(): string {
@@ -33,6 +35,9 @@ export default class HabitPanelView extends ItemView {
     const container: HTMLElement = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("habit-panel-view-container");
+    markViewEnter(container);
+
+    createViewSwitcher(container, "habits", this.leaf);
 
     this.svelteComponent = new HabitPanel({
       target: container,

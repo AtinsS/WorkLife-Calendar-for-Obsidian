@@ -8,7 +8,7 @@ import {
 import type { WeightEntry, WeightGoal } from "../types";
 
 function entry(date: string, weight: number, updatedAt = 1): WeightEntry {
-  return { date, weight, updatedAt };
+  return { id: `${date}-${updatedAt}-${weight}`, date, weight, updatedAt };
 }
 
 describe("collapseByDate", () => {

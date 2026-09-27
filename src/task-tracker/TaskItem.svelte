@@ -8,6 +8,7 @@
   import { TaskModal } from "./TaskModal";
   import { syncTaskToNote } from "./noteTasks";
   import { t } from "../i18n";
+  import { settings } from "../ui/stores";
 
   export let task: ITask;
   export let appInstance: App;
@@ -120,35 +121,57 @@
   // Actions menu
   let showActionsMenu = false;
   let actionsMenuEl: HTMLDivElement | null = null;
+  let splittingSubtasks = false;
 
-  function toggleActionsMenu(e: MouseEvent) {
+  function optsAiSubtasksEnabled(): boolean {
+    const opts = get(settings) as { ollamaEnabled?: boolean; aiSubtasksEnabled?: boolean };
+    return opts.ollamaEnabled === true && opts.aiSubtasksEnabled !== false;
+  }
+
+  async function handleAiSubtasks() {
+    if (splittingSubtasks) return;
+    splittingSubtasks = true;
+    try {
+      const { splitTaskIntoSubtasks } = await import("../services/aiSubtasks");
+      await splitTaskIntoSubtasks(appInstance, task);
+    } catch (e) {
+      alert(get(t)("ai.summaryError", { error: e instanceof Error ? e.message : String(e) }));
+    } finally {
+      splittingSubtasks = false;
+    }
+  }
+
+  function openContextMenu(e: MouseEvent) {
+    e.preventDefault();
     e.stopPropagation();
-    if (showActionsMenu) { closeActionsMenu(); return; }
-    showActionsMenu = true;
+    toggleActionsMenuAt(e.clientX, e.clientY);
+  }
 
-    const btn = e.currentTarget as HTMLElement;
-    const rect = btn.getBoundingClientRect();
+  function toggleActionsMenuAt(x: number, y: number) {
+    closeActionsMenu();
+    showActionsMenu = true;
 
     const el = document.createElement("div");
     el.className = "sch-ctx-overlay";
-    el.addEventListener("click", closeActionsMenu);
-    el.style.zIndex = "9998";
+    const close = (e?: Event) => {
+      e?.preventDefault();
+      e?.stopPropagation();
+      closeActionsMenu();
+    };
+    el.addEventListener("mousedown", close);
+    el.addEventListener("click", close);
+    el.addEventListener("contextmenu", close);
 
     const menu = document.createElement("div");
-    menu.className = "task-actions-menu";
+    menu.className = "task-actions-menu sch-float-menu";
     menu.style.position = "fixed";
     menu.style.zIndex = "9999";
-    menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
-    menu.style.right = `${window.innerWidth - rect.right}px`;
-    menu.style.background = "var(--mcp-surface-2)";
-    menu.style.border = "1px solid rgba(255,255,255,0.06)";
-    menu.style.borderRadius = "10px";
-    menu.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)";
-    menu.style.minWidth = "160px";
-    menu.style.overflow = "hidden";
-    menu.style.padding = "4px";
-    menu.style.fontFamily = "var(--font-interface)";
-    menu.style.fontSize = "13px";
+    menu.style.top = `${Math.min(y, Math.max(8, window.innerHeight - 240))}px`;
+    menu.style.left = `${Math.min(x, Math.max(8, window.innerWidth - 200))}px`;
+    menu.style.bottom = "auto";
+    menu.style.right = "auto";
+    menu.style.maxHeight = "min(70vh, 480px)";
+    menu.style.overflowY = "auto";
 
     const translate = get(t);
     type MenuItem = { label: string; action?: () => void; danger?: boolean } | { divider: true };
@@ -168,6 +191,10 @@
         items.push({ label: translate("tasks.item.continue"), action: () => { quickStatus("progress"); } });
       items.push({ label: translate("tasks.item.markDone"), action: () => { dispatch("complete", { task }); } });
       items.push({ divider: true });
+      if (optsAiSubtasksEnabled()) {
+        items.push({ label: translate("ai.contextMenuSubtasks"), action: () => { void handleAiSubtasks(); } });
+        items.push({ divider: true });
+      }
       items.push({ label: translate("tasks.item.edit"), action: () => { handleEdit(); } });
       items.push({ label: translate("tasks.item.delete"), action: () => { handleDelete(); }, danger: true });
     }
@@ -187,7 +214,7 @@
         btn.style.padding = "8px 12px";
         btn.style.border = "none";
         btn.style.background = "none";
-        btn.style.color = item.danger ? "var(--mcp-danger)" : "var(--mcp-text)";
+        btn.style.color = item.danger ? "var(--mcp-danger)" : "var(--text-normal, var(--mcp-text))";
         btn.style.cursor = "pointer";
         btn.style.borderRadius = "6px";
         btn.style.transition = "background 0.15s";
@@ -203,6 +230,14 @@
     actionsMenuEl = el;
   }
 
+  function toggleActionsMenu(e: MouseEvent) {
+    e.stopPropagation();
+    if (showActionsMenu) { closeActionsMenu(); return; }
+    const btn = e.currentTarget as HTMLElement;
+    const rect = btn.getBoundingClientRect();
+    toggleActionsMenuAt(rect.right - 8, rect.bottom + 4);
+  }
+
   function closeActionsMenu() {
     showActionsMenu = false;
     if (actionsMenuEl) {
@@ -214,7 +249,18 @@
   }
 </script>
 
-<div class="task-item" class:completed={task.status === "done"} class:carried-over={isCarriedOver} data-status={task.status} draggable="true" role="listitem" aria-label={task.title} style="--task-color: {task.projectId ? ($projects.find(p => p.id === task.projectId)?.color || 'var(--mcp-accent)') : 'var(--mcp-accent)'}" on:dragstart>
+<div
+  class="task-item"
+  class:completed={task.status === "done"}
+  class:carried-over={isCarriedOver}
+  data-status={task.status}
+  draggable="true"
+  role="listitem"
+  aria-label={task.title}
+  style="--task-color: {task.projectId ? ($projects.find(p => p.id === task.projectId)?.color || 'var(--mcp-accent)') : 'var(--mcp-accent)'}"
+  on:dragstart
+  on:contextmenu={openContextMenu}
+>
   <div class="task-item-row-main">
     <button class="task-status-btn status-{task.status}" disabled={task.status === "done"} on:click|stopPropagation={() => { if (task.status !== "done") quickStatus("done"); }}>
       {#if task.status === "todo"}

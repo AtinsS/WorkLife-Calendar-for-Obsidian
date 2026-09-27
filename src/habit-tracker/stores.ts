@@ -586,6 +586,36 @@ export function getHabitDailySeries(daysBack = 30, habitId?: string): HabitDayPo
   return points;
 }
 
+/**
+ * Daily completion counts for a date range [fromDate, toDate] inclusive (YYYY-MM-DD).
+ * `habitId` filters to a single habit; omit for all habits.
+ */
+export function getHabitSeriesBetween(
+  fromDate: string,
+  toDate: string,
+  habitId?: string,
+): HabitDayPoint[] {
+  const start = momentFn(fromDate, "YYYY-MM-DD").startOf("day");
+  const end = momentFn(toDate, "YYYY-MM-DD").startOf("day");
+  const points: HabitDayPoint[] = [];
+  if (!start.isValid() || !end.isValid() || end.isBefore(start)) return points;
+
+  const cursor = start.clone();
+  const maxDays = 370;
+  for (let i = 0; i < maxDays && !cursor.isAfter(end); i++) {
+    const dateStr = cursor.format("YYYY-MM-DD");
+    let count = 0;
+    for (const log of cachedLogs) {
+      if (!log.completed || log.date !== dateStr) continue;
+      if (habitId && log.habitId !== habitId) continue;
+      count++;
+    }
+    points.push({ date: dateStr, count });
+    cursor.add(1, "day");
+  }
+  return points;
+}
+
 export function summarizeHabitSeries(points: HabitDayPoint[]): HabitHistorySummary {
   let total = 0;
   let activeDays = 0;
