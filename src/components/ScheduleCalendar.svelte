@@ -1497,11 +1497,15 @@
           ]
         : []),
       { divider: true },
-      {
-        label: tRaw("ai.contextMenuSubtasks"),
-        action: () => void contextAiSubtasks(),
-      },
-      { divider: true },
+      ...(!isMobile
+        ? [
+            {
+              label: tRaw("ai.contextMenuSubtasks"),
+              action: () => void contextAiSubtasks(),
+            },
+            { divider: true },
+          ]
+        : []),
       {
         label: ` ${tRaw("schedule.deleteEvent")}`,
         action: () => contextDeleteTask(),

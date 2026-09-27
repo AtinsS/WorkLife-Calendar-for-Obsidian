@@ -4412,9 +4412,11 @@ body > .task-actions-menu {
     font-size: 14px;
     min-width: 0;
     flex: 1 1 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     line-height: 1.3;
   }
 
@@ -10372,6 +10374,7 @@ body > .task-actions-menu {
   .task-tracker-list .task-item-row-main {
     gap: 10px;
     min-height: 28px;
+    align-items: flex-start;
   }
 
   .task-tracker-list .task-status-btn {
@@ -10386,6 +10389,20 @@ body > .task-actions-menu {
     font-weight: 550;
     line-height: 1.35;
     letter-spacing: 0.01em;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .task-tracker-list .task-status-btn,
+  .task-tracker-list .task-descr-toggle,
+  .task-tracker-list .task-priority,
+  .task-tracker-list .checklist-toggle,
+  .task-tracker-list .task-actions-dropdown {
+    flex-shrink: 0;
+    margin-top: 2px;
   }
 
   .task-tracker-list .task-item-row-meta {

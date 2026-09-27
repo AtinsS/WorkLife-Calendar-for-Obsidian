@@ -164,11 +164,6 @@
     if (next === "done") updateTask(task.id, { completed: true });
   }
 
-  async function aiSplitTask(task: ITask) {
-    const { splitTaskIntoSubtasks } = await import("../services/aiSubtasks");
-    await splitTaskIntoSubtasks(appInstance, task);
-  }
-
   // Task CRUD
   function openCreateTask() {
     const todayDateUID = getDateUID(now, "day");
@@ -351,7 +346,6 @@
                   </div>
                 </div>
                 <div class="dash-task-actions">
-                  <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => aiSplitTask(task)} title={$t("ai.contextMenuSubtasks")}>✨</button>
                   <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => openEditTask(task)} title={$t("common.edit")}>✎</button>
                   <button class="dash-btn dash-btn--sm dash-btn--danger" on:click|stopPropagation={() => deleteTask(task.id)} title={$t("common.delete")}>✕</button>
                 </div>

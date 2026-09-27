@@ -15,6 +15,26 @@
 
   const dispatch = createEventDispatcher();
 
+  let isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+  let mqlMobile: MediaQueryList | null = null;
+  let mqlHandler: ((e: MediaQueryListEvent) => void) | null = null;
+
+  onMount(() => {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      mqlMobile = window.matchMedia("(max-width: 768px)");
+      isMobile = mqlMobile.matches;
+      mqlHandler = (e: MediaQueryListEvent) => { isMobile = e.matches; };
+      mqlMobile.addEventListener("change", mqlHandler);
+    }
+    timerInterval = setInterval(updateTimerDisplay, 1000);
+    updateTimerDisplay();
+  });
+
+  onDestroy(() => {
+    if (timerInterval) clearInterval(timerInterval);
+    if (mqlMobile && mqlHandler) mqlMobile.removeEventListener("change", mqlHandler);
+  });
+
   // Checklist
   $: taskChecklistItems = $checklists.filter((c) => c.taskId === task.id).sort((a, b) => a.sortOrder - b.sortOrder);
   $: checklistDone = taskChecklistItems.filter((c) => c.checked).length;
@@ -51,9 +71,6 @@
       timerDisplay = "";
     }
   }
-
-  onMount(() => { timerInterval = setInterval(updateTimerDisplay, 1000); updateTimerDisplay(); });
-  onDestroy(() => { if (timerInterval) clearInterval(timerInterval); });
 
   // Computed
   $: hasDeadline = !!task.deadline;
@@ -124,6 +141,7 @@
   let splittingSubtasks = false;
 
   function optsAiSubtasksEnabled(): boolean {
+    if (typeof window !== "undefined" && window.innerWidth <= 768) return false;
     const opts = get(settings) as { ollamaEnabled?: boolean; aiSubtasksEnabled?: boolean };
     return opts.ollamaEnabled === true && opts.aiSubtasksEnabled !== false;
   }
@@ -176,11 +194,28 @@
     const translate = get(t);
     type MenuItem = { label: string; action?: () => void; danger?: boolean } | { divider: true };
     const items: MenuItem[] = [];
+    const mobile = typeof window !== "undefined" && window.innerWidth <= 768;
+
+    const pushDetailActions = () => {
+      if (!mobile) return;
+      if (task.description) {
+        items.push({
+          label: showDescription ? translate("tasks.item.hideDescription") : translate("tasks.item.description"),
+          action: () => { showDescription = !showDescription; },
+        });
+      }
+      items.push({
+        label: showChecklist ? translate("tasks.item.hideSubtasks") : translate("tasks.item.subtasks"),
+        action: () => { showChecklist = !showChecklist; },
+      });
+      items.push({ divider: true });
+    };
 
     if (task.status === "done") {
       items.push({ label: translate("tasks.item.returnToTodo"), action: () => { quickStatus("todo"); } });
       items.push({ label: translate("tasks.item.returnToWork"), action: () => { quickStatus("progress"); } });
       items.push({ divider: true });
+      pushDetailActions();
       items.push({ label: translate("tasks.item.delete"), action: () => { handleDelete(); }, danger: true });
     } else {
       if (task.status !== "progress" && task.status !== "paused")
@@ -195,6 +230,7 @@
         items.push({ label: translate("ai.contextMenuSubtasks"), action: () => { void handleAiSubtasks(); } });
         items.push({ divider: true });
       }
+      pushDetailActions();
       items.push({ label: translate("tasks.item.edit"), action: () => { handleEdit(); } });
       items.push({ label: translate("tasks.item.delete"), action: () => { handleDelete(); }, danger: true });
     }
@@ -280,7 +316,7 @@
       <span class="task-title" class:strikethrough={task.status === "done"}>{task.title}</span>
     {/if}
 
-    {#if task.description}
+    {#if task.description && !isMobile}
       <button class="task-descr-toggle" on:click|stopPropagation={() => showDescription = !showDescription} title={showDescription ? $t("tasks.item.hide") : $t("tasks.item.description")}>
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><line x1="3" y1="4" x2="9" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="3" y1="6.5" x2="7.5" y2="6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
       </button>
@@ -292,10 +328,12 @@
       <span class="task-priority medium">~</span>
     {/if}
 
-    <button class="checklist-toggle" on:click|stopPropagation={() => showChecklist = !showChecklist} title={$t("tasks.item.checklist")}>
-      <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 6l1.5 1.5L8.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      {#if checklistTotal > 0}{checklistDone}/{checklistTotal}{:else}+{/if}
-    </button>
+    {#if !isMobile}
+      <button class="checklist-toggle" on:click|stopPropagation={() => showChecklist = !showChecklist} title={$t("tasks.item.checklist")}>
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 6l1.5 1.5L8.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        {#if checklistTotal > 0}{checklistDone}/{checklistTotal}{:else}+{/if}
+      </button>
+    {/if}
 
     <div class="task-actions-dropdown">
       <button class="task-actions-toggle" on:click={toggleActionsMenu}>⋮</button>
