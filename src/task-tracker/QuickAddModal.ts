@@ -347,7 +347,7 @@ export class QuickAddModal extends Modal {
           : seg.type === "time" ? "qa-hl qa-hl-time"
           : seg.type === "project" ? "qa-hl qa-hl-project"
           : "qa-title";
-        const s = preview.createEl("span", { cls });
+        const s = preview.createSpan({ cls });
         s.textContent = seg.text;
       }
     });

@@ -116,9 +116,9 @@ export class ProjectModal extends CustomModal {
     const section = container.createDiv("pm-new-project");
 
     const header = section.createDiv("pm-section-header pm-section-toggle");
-    header.createEl("span", { text: "+", cls: "pm-section-icon" });
-    header.createEl("span", { text: tRaw("tasks.project.newProject"), cls: "pm-section-title" });
-    const chevron = header.createEl("span", { text: "▾", cls: "pm-chevron" });
+    header.createSpan({ text: "+", cls: "pm-section-icon" });
+    header.createSpan({ text: tRaw("tasks.project.newProject"), cls: "pm-section-title" });
+    const chevron = header.createSpan({ text: "▾", cls: "pm-chevron" });
 
     const body = section.createDiv("pm-section-body pm-section-collapsed");
     chevron.textContent = "▸";
@@ -141,7 +141,7 @@ export class ProjectModal extends CustomModal {
       cls: "pm-input",
       attr: { type: "text", placeholder: tRaw("tasks.project.namePlaceholder"), maxlength: "60" },
     });
-    const charCount = nameField.createEl("span", { text: "0/60", cls: "pm-char-count" });
+    const charCount = nameField.createSpan({ text: "0/60", cls: "pm-char-count" });
     nameInput.addEventListener("input", () => {
       newName = nameInput.value;
       charCount.textContent = `${newName.length}/60`;
@@ -222,8 +222,8 @@ export class ProjectModal extends CustomModal {
   private renderProjectList(container: HTMLElement): void {
     const section = container.createDiv("pm-existing");
     const header = section.createDiv("pm-section-header");
-    header.createEl("span", { text: "🗂", cls: "pm-section-icon" });
-    header.createEl("span", { text: tRaw("tasks.project.existingProjects"), cls: "pm-section-title" });
+    header.createSpan({ text: "🗂", cls: "pm-section-icon" });
+    header.createSpan({ text: tRaw("tasks.project.existingProjects"), cls: "pm-section-title" });
 
     const allProjects = get(projects);
     const allTasks = get(tasks);
@@ -248,16 +248,16 @@ export class ProjectModal extends CustomModal {
       const left = item.createDiv("pm-project-left");
       const dot = left.createDiv("pm-project-dot");
       dot.style.setProperty("--dot-color", project.color);
-      left.createEl("span", { text: project.icon, cls: "pm-project-icon" });
+      left.createSpan({ text: project.icon, cls: "pm-project-icon" });
       const info = left.createDiv("pm-project-info");
-      info.createEl("span", { text: project.name, cls: "pm-project-name" });
+      info.createSpan({ text: project.name, cls: "pm-project-name" });
 
       const stats = info.createDiv("pm-project-stats");
       if (taskCount > 0) {
-        stats.createEl("span", { text: tRaw("tasks.project.activeCount", {count: taskCount}), cls: "pm-stat pm-stat-active" });
+        stats.createSpan({ text: tRaw("tasks.project.activeCount", {count: taskCount}), cls: "pm-stat pm-stat-active" });
       }
       if (doneCount > 0) {
-        stats.createEl("span", { text: tRaw("tasks.project.doneCount", {count: doneCount}), cls: "pm-stat pm-stat-done" });
+        stats.createSpan({ text: tRaw("tasks.project.doneCount", {count: doneCount}), cls: "pm-stat pm-stat-done" });
       }
 
       const actions = item.createDiv("pm-project-actions");
@@ -278,8 +278,8 @@ export class ProjectModal extends CustomModal {
 
     // Footer tip
     const footer = container.createDiv("pm-footer-tip");
-    footer.createEl("span", { cls: "pm-footer-tip-icon", text: "💡" });
-    footer.createEl("span", { text: tRaw("tasks.project.footerTip") });
+    footer.createSpan({ cls: "pm-footer-tip-icon", text: "💡" });
+    footer.createSpan({ text: tRaw("tasks.project.footerTip") });
   }
 
   private openEditProject(project: IProject): void {

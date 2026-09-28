@@ -129,7 +129,7 @@ export class AISummaryModal extends CustomModal {
     this.contentEl.addClass("ai-summary-modal");
     const head = this.contentEl.createDiv({ cls: "ai-summary-head" });
     head.createEl("h2", { text: tRaw("ai.summaryTitle"), cls: "ai-title" });
-    head.createEl("div", {
+    head.createDiv({
       cls: "ai-summary-sources",
       text: tRaw("ai.summarySources", {
         count: String(this.files.length),

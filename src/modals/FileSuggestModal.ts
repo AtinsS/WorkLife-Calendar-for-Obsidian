@@ -29,11 +29,11 @@ export class FileSuggestModal extends SuggestModal<FileSuggestion> {
 
   renderSuggestion(suggestion: FileSuggestion, el: HTMLElement): void {
     const div = el.createDiv({ cls: "file-suggest-item" });
-    div.createEl("span", {
+    div.createSpan({
       text: suggestion.file.basename,
       cls: "file-suggest-name",
     });
-    div.createEl("span", {
+    div.createSpan({
       text: suggestion.path,
       cls: "file-suggest-path",
     });

@@ -592,13 +592,13 @@ export class AIExtractModal extends CustomModal {
       // Day header
       const dayHeader = dayCard.createDiv({ cls: "ai-day-card-header" });
       const dayTitle = dayHeader.createDiv({ cls: "ai-day-card-title" });
-      dayTitle.createEl("span", {
+      dayTitle.createSpan({
         text: tRaw("ai.dayLabel", { n: String(dayIdx) }),
         cls: "ai-day-num",
       });
       const m = momentFn(date, "YYYY-MM-DD", true);
       if (m.isValid()) {
-        dayTitle.createEl("span", { text: m.format("dddd, D MMMM"), cls: "ai-day-date-label" });
+        dayTitle.createSpan({ text: m.format("dddd, D MMMM"), cls: "ai-day-date-label" });
       }
 
       // Tasks in this day
@@ -671,7 +671,7 @@ export class AIExtractModal extends CustomModal {
         });
         guardTyping(timeInput);
 
-        meta.createEl("span", { text: "—", cls: "ai-task-time-sep" });
+        meta.createSpan({ text: "—", cls: "ai-task-time-sep" });
 
         // End time input
         let endTimeValue = "";
@@ -705,12 +705,12 @@ export class AIExtractModal extends CustomModal {
           const estH = Math.floor(task.estimatedMinutes / 60);
           const estM = task.estimatedMinutes % 60;
           const estLabel = estH > 0 ? `${estH}ч${estM > 0 ? ` ${estM}м` : ""}` : `${estM}м`;
-          meta.createEl("span", { text: estLabel, cls: "ai-task-est" });
+          meta.createSpan({ text: estLabel, cls: "ai-task-est" });
         }
 
         // Subtasks badge
         if (task.subtasks.length > 0) {
-          const stBadge = meta.createEl("span", {
+          const stBadge = meta.createSpan({
             text: `☐ ${task.subtasks.length} ${tRaw("ai.subtasks")}`,
             cls: "ai-subtasks-badge",
           });

@@ -1830,7 +1830,7 @@ priority: medium
         : "unavailable";
 
       const toolbar = panel.createDiv({ cls: "mcp-notif-toolbar" });
-      toolbar.createEl("div", {
+      toolbar.createDiv({
         text: tRaw("settings.notifications.diagnosticsChannels"),
         cls: "setting-item-name",
       });
@@ -1919,7 +1919,7 @@ priority: medium
         });
       }
 
-      panel.createEl("div", {
+      panel.createDiv({
         text: tRaw("settings.notifications.diagnosticsHistory"),
         cls: "setting-item-name mcp-notif-history-heading",
       });

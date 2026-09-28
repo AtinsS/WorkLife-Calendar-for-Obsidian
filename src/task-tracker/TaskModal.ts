@@ -143,7 +143,7 @@ export class TaskModal extends CustomModal {
     }) ;
     this.descriptionInputEl.value = this.descriptionInput;
     this.descriptionInputEl.rows = 3;
-    this.descCounterEl = descWrap.createEl("span", { cls: "tm-char-counter" });
+    this.descCounterEl = descWrap.createSpan({ cls: "tm-char-counter" });
     this.updateDescCounter();
     this.descriptionInputEl.addEventListener("input", () => {
       this.descriptionInput = this.descriptionInputEl?.value ?? "";
@@ -187,8 +187,8 @@ export class TaskModal extends CustomModal {
 
     // ═══ 4. Планирование: Дата + Время ═══
     const planHeader = this.contentEl.createDiv({ cls: "tm-section-header" });
-    planHeader.createEl("span", { text: "📅", cls: "tm-section-icon" });
-    planHeader.createEl("span", { text: tRaw("tasks.modal.scheduling"), cls: "tm-section-title" });
+    planHeader.createSpan({ text: "📅", cls: "tm-section-icon" });
+    planHeader.createSpan({ text: tRaw("tasks.modal.scheduling"), cls: "tm-section-title" });
 
     const dateRow = this.contentEl.createDiv({ cls: "tm-row-2" });
 
@@ -259,8 +259,8 @@ export class TaskModal extends CustomModal {
     // ═══ 6. Дополнительные параметры ═══
     const advWrap = this.contentEl.createDiv({ cls: "tm-advanced" });
     const advToggle = advWrap.createDiv({ cls: "tm-adv-toggle" });
-    advToggle.createEl("span", { text: "▾", cls: "tm-adv-chevron" });
-    advToggle.createEl("span", { text: tRaw("tasks.modal.extra"), cls: "tm-adv-label" });
+    advToggle.createSpan({ text: "▾", cls: "tm-adv-chevron" });
+    advToggle.createSpan({ text: tRaw("tasks.modal.extra"), cls: "tm-adv-label" });
     this.advancedBody = advWrap.createDiv({ cls: "tm-adv-body" });
     this.advancedBody.addClass("mcp-hidden");
 
@@ -280,8 +280,8 @@ export class TaskModal extends CustomModal {
     // --- Дедлайн ---
     const dlRow = this.advancedBody.createDiv({ cls: "tm-adv-row" });
     const dlLabel = dlRow.createDiv({ cls: "tm-adv-label-item" });
-    dlLabel.createEl("span", { cls: "tm-adv-label-item-icon", text: "📅" });
-    dlLabel.createEl("span", { text: tRaw("tasks.modal.deadline") });
+    dlLabel.createSpan({ cls: "tm-adv-label-item-icon", text: "📅" });
+    dlLabel.createSpan({ text: tRaw("tasks.modal.deadline") });
     const dlInput = dlRow.createEl("input", {
       type: "date", cls: "tm-input tm-adv-input", value: this.deadlineDateValue,
     });
@@ -296,8 +296,8 @@ export class TaskModal extends CustomModal {
     // --- Повторение ---
     const recRow = this.advancedBody.createDiv({ cls: "tm-adv-row" });
     const recLabel = recRow.createDiv({ cls: "tm-adv-label-item" });
-    recLabel.createEl("span", { cls: "tm-adv-label-item-icon", text: "🔄" });
-    recLabel.createEl("span", { text: tRaw("tasks.modal.recurrence") });
+    recLabel.createSpan({ cls: "tm-adv-label-item-icon", text: "🔄" });
+    recLabel.createSpan({ text: tRaw("tasks.modal.recurrence") });
     const recSelect = recRow.createEl("select", { cls: "tm-select tm-adv-input" });
     recSelect.createEl("option", { value: "none", text: tRaw("tasks.modal.recurrenceNone") });
     recSelect.createEl("option", { value: "daily", text: tRaw("tasks.modal.recurrenceDaily") });
@@ -315,7 +315,7 @@ export class TaskModal extends CustomModal {
     // Интервал
     const intRow = this.recurrenceSubEl.createDiv({ cls: "tm-adv-row" });
     const intLabel = intRow.createDiv({ cls: "tm-adv-label-item" });
-    intLabel.createEl("span", { text: tRaw("tasks.modal.interval") });
+    intLabel.createSpan({ text: tRaw("tasks.modal.interval") });
     const intInput = intRow.createEl("input", {
       type: "number", cls: "tm-input tm-adv-input tm-input-narrow-80", value: String(this.recurrenceInterval), attr: { min: "1" },
     }) ;
@@ -324,7 +324,7 @@ export class TaskModal extends CustomModal {
     // Дни недели
     const daysRow = this.recurrenceSubEl.createDiv({ cls: "tm-adv-row tm-adv-row-days" });
     const daysLabel = daysRow.createDiv({ cls: "tm-adv-label-item" });
-    daysLabel.createEl("span", { text: tRaw("tasks.modal.days") });
+    daysLabel.createSpan({ text: tRaw("tasks.modal.days") });
     const daysContainer = daysRow.createDiv({ cls: "tm-days-btns" });
     const rawLabels = tRaw("common.weekdays.short").split(", ");
     const sow = get(settings).startOfWeek || "system";
@@ -349,7 +349,7 @@ export class TaskModal extends CustomModal {
     // Повторять до
     const untilRow = this.recurrenceSubEl.createDiv({ cls: "tm-adv-row" });
     const untilLabel = untilRow.createDiv({ cls: "tm-adv-label-item" });
-    untilLabel.createEl("span", { text: tRaw("tasks.modal.repeatUntil") });
+    untilLabel.createSpan({ text: tRaw("tasks.modal.repeatUntil") });
     const untilInput = untilRow.createEl("input", {
       type: "date", cls: "tm-input tm-adv-input", value: this.recurrenceUntilDateValue,
     });
@@ -366,8 +366,8 @@ export class TaskModal extends CustomModal {
     // --- Связать с заметкой ---
     const noteRow = this.advancedBody.createDiv({ cls: "tm-adv-row" });
     const noteLabel = noteRow.createDiv({ cls: "tm-adv-label-item" });
-    noteLabel.createEl("span", { cls: "tm-adv-label-item-icon", text: "🔗" });
-    noteLabel.createEl("span", { text: tRaw("tasks.modal.linkNote") });
+    noteLabel.createSpan({ cls: "tm-adv-label-item-icon", text: "🔗" });
+    noteLabel.createSpan({ text: tRaw("tasks.modal.linkNote") });
     const noteInput = noteRow.createEl("input", {
       type: "text", cls: "tm-input tm-adv-input", placeholder: tRaw("tasks.modal.notePlaceholder"),
       value: this.notePathInput,
@@ -408,15 +408,15 @@ export class TaskModal extends CustomModal {
     // --- Рабочая задача ---
     const workRow = this.advancedBody.createDiv({ cls: "tm-adv-row tm-adv-row-toggle" });
     const workLabelWrap = workRow.createDiv({ cls: "tm-adv-label-item" });
-    workLabelWrap.createEl("span", { cls: "tm-adv-label-item-icon", text: "💎" });
-    const workLabel = workLabelWrap.createEl("span");
-    workLabel.createEl("span", { text: tRaw("tasks.modal.isWorkTask") });
+    workLabelWrap.createSpan({ cls: "tm-adv-label-item-icon", text: "💎" });
+    const workLabel = workLabelWrap.createSpan();
+    workLabel.createSpan({ text: tRaw("tasks.modal.isWorkTask") });
     workLabel.createEl("br");
-    workLabel.createEl("span", { text: "Задача будет учитываться в статистике и планировании", cls: "tm-adv-sublabel" });
+    workLabel.createSpan({ text: "Задача будет учитываться в статистике и планировании", cls: "tm-adv-sublabel" });
     const workToggle = workRow.createEl("label", { cls: "tm-toggle" });
     const workCheckbox = workToggle.createEl("input", { type: "checkbox", cls: "tm-toggle-input" }) ;
     workCheckbox.checked = this.isWorkTask;
-    workToggle.createEl("span", { cls: "tm-toggle-slider" });
+    workToggle.createSpan({ cls: "tm-toggle-slider" });
     workCheckbox.addEventListener("change", () => { this.isWorkTask = workCheckbox.checked; this.updateWorkTaskSettings(); });
 
     // --- Work task sub-fields (raw DOM — no Setting class) ---
@@ -425,7 +425,7 @@ export class TaskModal extends CustomModal {
     // Тип оплаты
     const payRow = this.workTaskSubEl.createDiv({ cls: "tm-adv-row" });
     const payLabel = payRow.createDiv({ cls: "tm-adv-label-item" });
-    payLabel.createEl("span", { text: tRaw("tasks.modal.paymentType") });
+    payLabel.createSpan({ text: tRaw("tasks.modal.paymentType") });
     const paySelect = payRow.createEl("select", { cls: "tm-select tm-adv-input" });
     paySelect.createEl("option", { value: "hour", text: tRaw("tasks.modal.paymentHour") });
     paySelect.createEl("option", { value: "day", text: tRaw("tasks.modal.paymentDay") });
@@ -435,7 +435,7 @@ export class TaskModal extends CustomModal {
     // Ставка
     const rateRow = this.workTaskSubEl.createDiv({ cls: "tm-adv-row" });
     const rateLabel = rateRow.createDiv({ cls: "tm-adv-label-item" });
-    rateLabel.createEl("span", { text: tRaw("tasks.modal.rate", { currency: "₽" }) });
+    rateLabel.createSpan({ text: tRaw("tasks.modal.rate", { currency: "₽" }) });
     const rateInput = rateRow.createEl("input", {
       type: "number", cls: "tm-input tm-adv-input tm-input-narrow-120", value: this.rate, placeholder: "0", attr: { min: "0" },
     }) ;
@@ -444,7 +444,7 @@ export class TaskModal extends CustomModal {
     // Переработки с
     const otStartRow = this.workTaskSubEl.createDiv({ cls: "tm-adv-row" });
     const otStartLabel = otStartRow.createDiv({ cls: "tm-adv-label-item" });
-    otStartLabel.createEl("span", { text: tRaw("tasks.modal.overtimeFrom") });
+    otStartLabel.createSpan({ text: tRaw("tasks.modal.overtimeFrom") });
     const otStartInput = otStartRow.createEl("input", {
       type: "number", cls: "tm-input tm-adv-input tm-input-narrow-60", value: this.overtimeStart, placeholder: "8", attr: { min: "1", max: "24" },
     }) ;
@@ -453,7 +453,7 @@ export class TaskModal extends CustomModal {
     // Множитель
     const otMulRow = this.workTaskSubEl.createDiv({ cls: "tm-adv-row" });
     const otMulLabel = otMulRow.createDiv({ cls: "tm-adv-label-item" });
-    otMulLabel.createEl("span", { text: tRaw("tasks.modal.multiplier") });
+    otMulLabel.createSpan({ text: tRaw("tasks.modal.multiplier") });
     const otMulInput = otMulRow.createEl("input", {
       type: "number", cls: "tm-input tm-adv-input tm-input-narrow-80", value: this.overtimeMultiplier, placeholder: "1.5", attr: { min: "1", max: "10", step: "0.1" },
     }) ;
@@ -467,8 +467,8 @@ export class TaskModal extends CustomModal {
     const cancelBtn = footer.createEl("button", { text: tRaw("common.cancel"), cls: "tm-btn tm-cancel" });
     cancelBtn.addEventListener("click", () => this.close());
     const submitBtn = footer.createEl("button", { cls: "tm-btn tm-submit" });
-    submitBtn.createEl("span", { text: "✓" });
-    submitBtn.createEl("span", { text: this.task ? tRaw("common.save") : tRaw("tasks.modal.create") });
+    submitBtn.createSpan({ text: "✓" });
+    submitBtn.createSpan({ text: this.task ? tRaw("common.save") : tRaw("tasks.modal.create") });
     submitBtn.addEventListener("click", () => this.handleSubmit());
   }
 

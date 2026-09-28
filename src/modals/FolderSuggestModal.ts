@@ -23,7 +23,7 @@ export class FolderSuggestModal extends SuggestModal<FolderSuggestion> {
   }
 
   renderSuggestion(suggestion: FolderSuggestion, el: HTMLElement): void {
-    el.createEl("div", { text: suggestion.folder });
+    el.createDiv({ text: suggestion.folder });
   }
 
   onChooseSuggestion(suggestion: FolderSuggestion): void {
