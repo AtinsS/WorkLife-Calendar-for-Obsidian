@@ -162,16 +162,16 @@ export default class CalendarView extends ItemView {
   };
 
   private updateActiveFile(): void {
-    const leaf = this.app.workspace.activeLeaf;
+    const leaf = this.app.workspace.getMostRecentLeaf();
     if (!leaf) return;
     const { view } = leaf;
-    let file = null;
-    if (view instanceof FileView) file = view.file;
-    activeFile.setFile(file);
+    if (view instanceof FileView && view.file) {
+      activeFile.setFile(view.file);
+    }
   }
 
   public revealActiveNote(): void {
-    const activeLeaf = this.app.workspace.activeLeaf;
+    const activeLeaf = this.app.workspace.getMostRecentLeaf();
     if (!activeLeaf) return;
     if (activeLeaf.view instanceof FileView) {
       let date: Moment | null = getDateFromFile(activeLeaf.view.file, "day");

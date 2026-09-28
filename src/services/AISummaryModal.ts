@@ -229,19 +229,20 @@ export class AISummaryModal extends CustomModal {
     if (!this.progressFillEl || !this.progressEl) return;
     if (ratio == null) {
       this.progressEl.classList.add("indeterminate", "active");
-      this.progressFillEl.style.width = "35%";
+      // Clear dynamic width so the .indeterminate class controls the bar
+      this.progressFillEl.setCssStyles({ width: "" });
       return;
     }
     this.progressEl.classList.remove("indeterminate");
     this.progressEl.classList.add("active");
     const pct = Math.max(0, Math.min(1, ratio)) * 100;
-    this.progressFillEl.style.width = `${pct}%`;
+    this.progressFillEl.setCssStyles({ width: `${pct}%` });
   }
 
   private clearProgress(): void {
     if (!this.progressFillEl || !this.progressEl) return;
     this.progressEl.classList.remove("active", "indeterminate");
-    this.progressFillEl.style.width = "0%";
+    this.progressFillEl.setCssStyles({ width: "" });
   }
 
   private async readSources(): Promise<string> {

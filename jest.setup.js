@@ -47,6 +47,39 @@ function ensureObsidianDomHelpers() {
   proto.createSpan = function (opts) {
     return this.createEl("span", opts);
   };
+  proto.instanceOf = function (type) {
+    return this instanceof type;
+  };
+  proto.setCssStyles = function (styles) {
+    if (!styles) return;
+    for (const [k, v] of Object.entries(styles)) {
+      if (v == null || v === "") this.style.removeProperty(k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()));
+      else this.style.setProperty(k.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase()), String(v));
+    }
+  };
+  proto.setCssProps = function (props) {
+    if (!props) return;
+    for (const [k, v] of Object.entries(props)) this.style.setProperty(k, String(v));
+  };
 }
 
 ensureObsidianDomHelpers();
+
+// Global create helpers (Obsidian exposes these as globals)
+if (typeof globalThis.createDiv !== "function") {
+  globalThis.createDiv = function (opts) {
+    const el = document.createElement("div");
+    if (typeof opts === "string") el.className = opts;
+    else if (opts && typeof opts === "object") {
+      if (opts.cls) el.className = Array.isArray(opts.cls) ? opts.cls.join(" ") : opts.cls;
+      if (opts.text != null) el.textContent = opts.text;
+      if (opts.attr) for (const [k, v] of Object.entries(opts.attr)) el.setAttribute(k, String(v));
+    }
+    return el;
+  };
+}
+if (typeof globalThis.createFragment !== "function") {
+  globalThis.createFragment = function () {
+    return document.createDocumentFragment();
+  };
+}

@@ -728,8 +728,12 @@ export async function streamOllamaChat(
   opts.onProgress?.("connecting");
 
   try {
+    // fetch is required: requestUrl cannot stream NDJSON chunks or honor AbortSignal.
+    // Falls back to requestUrl below when streaming is unavailable.
+    // eslint-disable-next-line no-restricted-globals
     if (typeof fetch !== "function") throw new Error("fetch unavailable");
 
+    // eslint-disable-next-line no-restricted-globals
     const resp = await fetch(`${url}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

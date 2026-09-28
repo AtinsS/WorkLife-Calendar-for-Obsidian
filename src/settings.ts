@@ -383,6 +383,10 @@ export class CalendarSettingsTab extends PluginSettingTab {
   }
 
   display(): void {
+    this.render();
+  }
+
+  private render(): void {
     this.containerEl.empty();
 
     // Coffee banner
@@ -477,7 +481,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           await this.plugin.writeOptions({ language: value });
           initLocale(value);
           // Re-render settings to reflect new language
-          this.display();
+          this.render();
           new Notice(tRaw("settings.language.restartNotice"));
         });
       });
@@ -886,7 +890,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         dropdown.setValue(opts.weatherProvider || "open-meteo");
         dropdown.onChange(async (value) => {
           await this.plugin.writeOptions({ weatherProvider: value });
-          this.display(); // refresh to show/hide API key field
+          this.render(); // refresh to show/hide API key field
         });
       });
 
@@ -1122,7 +1126,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           const defaultColor = "#5f99e1";
           await this.plugin.writeOptions({ accentColor: defaultColor });
           applyAccentColor(defaultColor);
-          this.display();
+          this.render();
         }),
     );
   }
@@ -1152,7 +1156,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
             glassOpacity: 55,
           });
           applyGlassBgColor(defaultColor, 55);
-          this.display();
+          this.render();
         }),
     );
 
@@ -1163,7 +1167,6 @@ export class CalendarSettingsTab extends PluginSettingTab {
         slider
           .setLimits(0, 100, 5)
           .setValue(currentOpacity)
-          .setDynamicTooltip()
           .onChange(async (value) => {
             await this.plugin.writeOptions({ glassOpacity: value });
             applyGlassBgColor(
@@ -1305,7 +1308,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addButton((btn) =>
         btn
           .setButtonText(tRaw("settings.appearance.resetAllColors"))
-          .setWarning()
+          .setDestructive()
           .onClick(async () => {
             await this.plugin.writeOptions({
               bgColor: "#0E0F13",
@@ -1322,7 +1325,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
               textMutedColor: "#b7b8bb",
               textFaintColor: "#3A3F4B",
             });
-            this.display();
+            this.render();
           }),
       );
   }
@@ -1352,7 +1355,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           .onClick(async () => {
             await this.plugin.writeOptions({ [key]: defaultValue });
             applyAllColors(this.plugin.options);
-            this.display();
+            this.render();
           })
       );
   }
@@ -1437,7 +1440,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         dropdown.onChange(async (value) => {
           if (value === "__custom") {
             const modal = new FolderSuggestModal(this.app, (folder) => {
-              void this.plugin.writeOptions({ tasksFolderPath: folder }).then(() => this.display());
+              void this.plugin.writeOptions({ tasksFolderPath: folder }).then(() => this.render());
             });
             modal.open();
           } else {
@@ -1626,7 +1629,7 @@ priority: medium
             if (result.success) {
               const status = get(gistSyncStatus);
               // Re-render settings to show the URL field
-              this.display();
+              this.render();
               new Notice(
                 tRaw("settings.sync.gistSyncComplete", { url: status.rawUrl }),
               );
@@ -1977,7 +1980,7 @@ priority: medium
   }
 
   addNavPanelInstructions(container: HTMLElement): void {
-    const frag = document.createDocumentFragment();
+    const frag = createFragment();
     const wrapper = frag.createDiv({ cls: "mcp-nav-instructions" });
 
     wrapper.createEl("p", { text: tRaw("settings.appearance.navInstructions1") });
@@ -2077,7 +2080,7 @@ priority: medium
         toggle.setValue(this.plugin.options.ollamaEnabled);
         toggle.onChange(async (value) => {
           await this.plugin.writeOptions({ ollamaEnabled: value });
-          this.display(); // refresh to show/hide fields
+          this.render(); // refresh to show/hide fields
         });
       });
 
@@ -2113,8 +2116,8 @@ priority: medium
     const currentModel = this.plugin.options.ollamaModel || "llama3.1";
     modelSelect.createEl("option", { value: currentModel, text: currentModel });
     modelSelect.value = currentModel;
-    modelSelect.addEventListener("change", async () => {
-      await this.plugin.writeOptions({ ollamaModel: modelSelect.value });
+    modelSelect.addEventListener("change", () => {
+      void this.plugin.writeOptions({ ollamaModel: modelSelect.value });
     });
 
     // "Find models" button
@@ -2253,7 +2256,7 @@ priority: medium
         toggle.setValue(this.plugin.options.aiSummaryEnabled !== false);
         toggle.onChange(async (value) => {
           await this.plugin.writeOptions({ aiSummaryEnabled: value });
-          this.display();
+          this.render();
         });
       });
 

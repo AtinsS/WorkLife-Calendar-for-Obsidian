@@ -90,7 +90,7 @@ export class AIExtractModal extends CustomModal {
       attr: { title: tRaw("ai.selectNote") },
     });
     noteBtn.addEventListener("click", () => {
-      new FileSuggestModal(this.app, async (filePath) => {
+      new FileSuggestModal(this.app, (filePath) => {
         this.notePath = filePath;
         noteInput.value = filePath;
       }).open();
@@ -385,7 +385,7 @@ export class AIExtractModal extends CustomModal {
   }
 
   private renderChatEntry(entry: ChatEntry): HTMLElement {
-    if (!this.chatLogEl) return document.createElement("div");
+    if (!this.chatLogEl) return createDiv();
     // Drop the initial hint once real chat starts
     this.chatLogEl.querySelector(".ai-chat-hint")?.remove();
 
@@ -429,7 +429,7 @@ export class AIExtractModal extends CustomModal {
     const assistantEntry: ChatEntry = { role: "assistant", text: tRaw("ai.applying"), streaming: true };
     this.chatHistory.push(assistantEntry);
     const assistantRow = this.renderChatEntry(assistantEntry);
-    const bubbleEl = assistantRow.querySelector(".ai-chat-bubble") as HTMLElement | null;
+    const bubbleEl = assistantRow.querySelector(".ai-chat-bubble");
 
     this.askAbort?.abort();
     this.askAbort = new AbortController();
@@ -788,7 +788,7 @@ export class AIExtractModal extends CustomModal {
     this.autoScheduleToggleEl = toggleLabel.createEl("input", { type: "checkbox", cls: "ai-toggle-cb" });
     this.autoScheduleToggleEl.checked = this.autoScheduleTime;
     this.autoScheduleToggleEl.addEventListener("change", () => {
-      this.autoScheduleTime = (this.autoScheduleToggleEl as HTMLInputElement | null)?.checked ?? false;
+      this.autoScheduleTime = this.autoScheduleToggleEl?.checked ?? false;
       if (!this.autoScheduleTime) {
         for (let i = 0; i < this.tasks.length; i++) {
           if (this.originalTasks[i]) {

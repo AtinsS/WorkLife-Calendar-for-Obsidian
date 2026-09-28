@@ -36,13 +36,13 @@ export function animateProgress(
     if (cancelled) return;
     const t = Math.min(1, (now - start) / duration);
     onFrame(easing(t));
-    if (t < 1) raf = requestAnimationFrame(tick);
+    if (t < 1) raf = window.requestAnimationFrame(tick);
   };
 
-  raf = requestAnimationFrame(tick);
+  raf = window.requestAnimationFrame(tick);
   return () => {
     cancelled = true;
-    cancelAnimationFrame(raf);
+    window.cancelAnimationFrame(raf);
   };
 }
 

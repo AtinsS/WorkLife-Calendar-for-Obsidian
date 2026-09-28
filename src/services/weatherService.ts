@@ -52,7 +52,7 @@ async function requestWithRetry(
       return await requestUrl(params);
     } catch (e) {
       if (attempt >= retries || !isTransientNetError(e)) throw e;
-      await new Promise((r) => setTimeout(r, delayMs * (attempt + 1)));
+      await new Promise((r) => window.setTimeout(r, delayMs * (attempt + 1)));
     }
   }
 }

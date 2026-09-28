@@ -283,7 +283,7 @@ export async function deleteNoteTask(
 ): Promise<void> {
   const file = app.vault.getAbstractFileByPath(notePath);
   if (file instanceof TFile) {
-    await app.vault.delete(file);
+    await app.fileManager.trashFile(file);
   }
 }
 

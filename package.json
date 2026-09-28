@@ -1,6 +1,6 @@
 {
   "name": "worklife-calendar",
-  "version": "2.21.0",
+  "version": "2.21.1",
   "description": "Calendar, task tracker, habit tracker, and financial planner for Obsidian",
   "author": "AtinsS",
   "main": "main.js",

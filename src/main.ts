@@ -1,5 +1,5 @@
 import "moment/locale/ru";
-import { moment, App, Plugin, WorkspaceLeaf, MarkdownView, View } from "obsidian";
+import { moment, App, Plugin, WorkspaceLeaf, View } from "obsidian";
 import type { Moment, WeekSpec } from "moment";
 import type { IconName } from "obsidian";
 import { get } from "svelte/store";
@@ -407,44 +407,32 @@ export default class CalendarPlugin extends Plugin {
 
     // Right-click menu: insert blocks
     this.registerEvent(
-      this.app.workspace.on("editor-menu", (menu) => {
+      this.app.workspace.on("editor-menu", (menu, editor) => {
         menu.addItem((item) => {
           item.setTitle(tRaw("main.contextMenu.insertDateTimeWeather"))
             .setIcon("calendar-range")
             .onClick(() => {
-              const view = this.app.workspace.activeLeaf?.view;
-              if (view && "editor" in view) {
-                const editor = (view as MarkdownView).editor;
-                const cursor = editor.getCursor();
-                editor.replaceRange("```datetime-weather\n```", cursor);
-                editor.setCursor({ line: cursor.line + 1, ch: 0 });
-              }
+              const cursor = editor.getCursor();
+              editor.replaceRange("```datetime-weather\n```", cursor);
+              editor.setCursor({ line: cursor.line + 1, ch: 0 });
             });
         });
         menu.addItem((item) => {
           item.setTitle(tRaw("main.contextMenu.insertDashboard"))
             .setIcon("layout-grid")
             .onClick(() => {
-              const view = this.app.workspace.activeLeaf?.view;
-              if (view && "editor" in view) {
-                const editor = (view as MarkdownView).editor;
-                const cursor = editor.getCursor();
-                editor.replaceRange("```dashboard\n```", cursor);
-                editor.setCursor({ line: cursor.line + 1, ch: 0 });
-              }
+              const cursor = editor.getCursor();
+              editor.replaceRange("```dashboard\n```", cursor);
+              editor.setCursor({ line: cursor.line + 1, ch: 0 });
             });
         });
         menu.addItem((item) => {
           item.setTitle(tRaw("main.contextMenu.insertHello"))
             .setIcon("hand")
             .onClick(() => {
-              const view = this.app.workspace.activeLeaf?.view;
-              if (view && "editor" in view) {
-                const editor = (view as MarkdownView).editor;
-                const cursor = editor.getCursor();
-                editor.replaceRange("```hello\n```", cursor);
-                editor.setCursor({ line: cursor.line + 1, ch: 0 });
-              }
+              const cursor = editor.getCursor();
+              editor.replaceRange("```hello\n```", cursor);
+              editor.setCursor({ line: cursor.line + 1, ch: 0 });
             });
         });
       })
@@ -666,7 +654,7 @@ export default class CalendarPlugin extends Plugin {
       return;
     }
 
-    const activeLeaf = this.app.workspace.activeLeaf;
+    const activeLeaf = this.app.workspace.getMostRecentLeaf();
     if (!activeLeaf) return;
 
     // Don't move to sidebar leaves — only main content area
@@ -690,7 +678,7 @@ export default class CalendarPlugin extends Plugin {
     if (!mainSplit) return;
 
     // Find the active leaf's view-header
-    const activeLeaf = this.app.workspace.activeLeaf;
+    const activeLeaf = this.app.workspace.getMostRecentLeaf();
     let headerEl: Element | null = null;
 
     if (activeLeaf?.view?.containerEl) {

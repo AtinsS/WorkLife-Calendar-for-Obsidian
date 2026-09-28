@@ -2,7 +2,7 @@ import type { App } from "obsidian";
 
 export function isEditableTarget(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement)) return false;
-  if (target instanceof HTMLInputElement && target.disabled) return false;
+  if (target.instanceOf(HTMLInputElement) && target.disabled) return false;
   const tag = target.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable === true;
 }
@@ -111,9 +111,9 @@ export function guardTyping(
     (e: KeyboardEvent) => {
       if (e.isComposing) return;
       if (e.key === "Escape") return;
-      if (tryEnter(e as SpaceEvent, el)) return;
+      if (tryEnter(e, el)) return;
       if (isSpaceKey(e)) {
-        claimSpace(e as SpaceEvent, el);
+        claimSpace(e, el);
         return;
       }
       e.stopPropagation();
@@ -138,11 +138,11 @@ function onGlobalKeydown(e: KeyboardEvent): void {
     const el = resolveEditable(e, host._wlRoot, host.lastEditable);
     if (!el) continue;
     if (isSpaceKey(e)) {
-      claimSpace(e as SpaceEvent, el);
+      claimSpace(e, el);
       return;
     }
     // Enter must reach submit ("Выполнить") even though we hide keys from hotkeys
-    if (tryEnter(e as SpaceEvent, el)) return;
+    if (tryEnter(e, el)) return;
     e.stopPropagation();
     return;
   }
@@ -240,7 +240,7 @@ export abstract class CustomModal {
       if (isSpaceKey(e)) {
         const el = resolveEditable(e, this.containerEl, this.lastEditable);
         if (el) {
-          claimSpace(e as SpaceEvent, el);
+          claimSpace(e, el);
           return;
         }
         const target = e.target as HTMLElement | null;

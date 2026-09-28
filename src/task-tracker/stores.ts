@@ -1,5 +1,5 @@
 import { writable, get } from "svelte/store";
-import { moment } from "obsidian";
+import { moment, TFile } from "obsidian";
 import type { Moment } from "moment";
 
 // Obsidian's type defs export moment as `typeof Moment` (the module namespace),
@@ -51,8 +51,8 @@ function autoCleanupCompleted(): void {
     for (const task of toRemove) {
       if (task.notePath && task.notePath.startsWith(tasksFolderPath + "/")) {
         const file = pluginInstance.app.vault.getAbstractFileByPath(task.notePath);
-        if (file) {
-          pluginInstance.app.vault.delete(file).catch(() => {
+        if (file instanceof TFile) {
+          pluginInstance.app.fileManager.trashFile(file).catch(() => {
             // Игнорируем ошибки удаления
           });
         }
@@ -317,7 +317,7 @@ function startTaskTimer(id: string): void {
         t.id === id
           ? {
               ...t,
-              status: "progress" as TaskStatus,
+              status: "progress",
               completed: false,
               timerStartedAt: Date.now(),
               pausedAt: undefined,
@@ -335,7 +335,7 @@ function startTaskTimer(id: string): void {
   tasks.update((current) =>
     current.map((t) =>
       t.id === id
-        ? { ...t, status: "progress" as TaskStatus, completed: false, timerStartedAt: Date.now(), totalWorkTime: 0, updatedAt: Date.now() }
+        ? { ...t, status: "progress", completed: false, timerStartedAt: Date.now(), totalWorkTime: 0, updatedAt: Date.now() }
         : t
     )
   );
@@ -392,7 +392,7 @@ function pauseTaskTimer(id: string): void {
         t.id === id
           ? {
               ...t,
-              status: "paused" as TaskStatus,
+              status: "paused",
               completed: false,
               totalWorkTime: (t.totalWorkTime || 0) + log.duration,
               pausedWorkTime: (t.totalWorkTime || 0) + log.duration,
@@ -409,7 +409,7 @@ function pauseTaskTimer(id: string): void {
         t.id === id
           ? {
               ...t,
-              status: "paused" as TaskStatus,
+              status: "paused",
               completed: false,
               pausedAt: Date.now(),
               pausedWorkTime: t.totalWorkTime,
@@ -485,7 +485,7 @@ export function resetTaskTimer(id: string): void {
       t.id === id
         ? {
             ...t,
-            status: "todo" as TaskStatus,
+            status: "todo",
             completed: false,
             totalWorkTime: 0,
             timerStartedAt: undefined,
@@ -752,7 +752,7 @@ export function reorderProjects(orderedIds: string[]): void {
         if (p) return { ...p, sortOrder: i };
         return null;
       })
-      .filter(Boolean) as IProject[];
+      .filter((p): p is IProject => p !== null);
   });
   debouncedSave();
 }
