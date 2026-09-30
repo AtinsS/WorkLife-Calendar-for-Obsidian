@@ -34,9 +34,13 @@ export class WeightEntryModal extends CustomModal {
       value: this.initial,
       placeholder: "0.0",
       cls: "weight-entry-input",
-    }) as HTMLInputElement;
-    input.step = "0.1";
-    input.min = "1";
+      attr: {
+        step: "0.1",
+        min: "1",
+        inputmode: "decimal",
+      },
+    });
+    if (!(input instanceof HTMLInputElement)) return;
     row.createEl("span", {
       text: tRaw("weight.unit"),
       cls: "weight-entry-unit",

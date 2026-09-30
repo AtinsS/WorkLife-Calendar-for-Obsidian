@@ -51,7 +51,8 @@ export class AIExpenseParseModal extends CustomModal {
     if (!this.statusEl) return;
     this.statusEl.textContent = text;
     this.statusEl.classList.toggle("is-error", isError);
-    this.statusEl.style.display = text ? "" : "none";
+    this.statusEl.classList.toggle("is-hidden", !text);
+    this.statusEl.setCssStyles({ display: text ? "" : "none" });
   }
 
   private render(): void {
@@ -76,8 +77,8 @@ export class AIExpenseParseModal extends CustomModal {
     });
     run.addEventListener("click", () => void this.runParse());
 
-    this.statusEl = root.createDiv({ cls: "ai-finance-status" });
-    this.statusEl.style.display = "none";
+    this.statusEl = root.createDiv({ cls: "ai-finance-status is-hidden" });
+    this.statusEl.setCssStyles({ display: "none" });
 
     this.listEl = root.createDiv({ cls: "ai-finance-result" });
 
@@ -139,11 +140,17 @@ export class AIExpenseParseModal extends CustomModal {
     const list = box.createDiv({ cls: "ai-finance-list" });
     for (const item of this.parsed) {
       const row = list.createDiv({ cls: "ai-finance-row" });
-      const check = row.createEl("input", { type: "checkbox" }) as HTMLInputElement;
-      check.checked = item.selected;
-      check.addEventListener("change", () => {
-        item.selected = check.checked;
+      const check = row.createEl("input", {
+        type: "checkbox",
+        cls: "ai-finance-row-check",
+        attr: { "aria-label": item.name },
       });
+      if (check instanceof HTMLInputElement) {
+        check.checked = item.selected;
+        check.addEventListener("change", () => {
+          item.selected = check.checked;
+        });
+      }
       row.createEl("span", { text: item.icon, cls: "ai-finance-row-icon" });
       row.createEl("span", { text: item.name, cls: "ai-finance-row-name" });
       row.createEl("span", {

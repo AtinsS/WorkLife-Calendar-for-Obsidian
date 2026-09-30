@@ -379,9 +379,16 @@ export class CalendarSettingsTab extends PluginSettingTab {
   }
 
   getSettingDefinitions(): SettingDefinitionItem[] {
+    // Custom imperative UI; see display() fallback below.
     return [];
   }
 
+  /**
+   * Imperative settings UI.
+   * Obsidian 1.13+ prefers getSettingDefinitions(); this tab needs a rich custom
+   * layout (tabs, banners, color pickers) so it implements the display() fallback
+   * documented in the SettingTab API.
+   */
   display(): void {
     this.render();
   }

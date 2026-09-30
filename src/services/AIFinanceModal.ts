@@ -54,7 +54,8 @@ export class AIFinanceModal extends CustomModal {
     if (!this.statusEl) return;
     this.statusEl.textContent = text;
     this.statusEl.classList.toggle("is-error", isError);
-    this.statusEl.style.display = text ? "" : "none";
+    this.statusEl.classList.toggle("is-hidden", !text);
+    this.statusEl.setCssStyles({ display: text ? "" : "none" });
   }
 
   private render(): void {
@@ -71,8 +72,8 @@ export class AIFinanceModal extends CustomModal {
       btn.addEventListener("click", () => this.setMode(m));
     }
 
-    this.statusEl = root.createDiv({ cls: "ai-finance-status" });
-    this.statusEl.style.display = "none";
+    this.statusEl = root.createDiv({ cls: "ai-finance-status is-hidden" });
+    this.statusEl.setCssStyles({ display: "none" });
     this.resultEl = root.createDiv({ cls: "ai-finance-result" });
 
     if (this.mode === "forecast") this.renderForecast();
