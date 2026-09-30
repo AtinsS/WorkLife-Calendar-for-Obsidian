@@ -1272,6 +1272,10 @@
       grid-template-columns: 1fr;
     }
 
+    .finance-overview {
+      grid-template-columns: 1fr;
+    }
+
     .earnings-summary {
       grid-template-columns: 1fr;
     }

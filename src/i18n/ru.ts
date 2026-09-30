@@ -1008,6 +1008,7 @@ export const ru = {
     },
     preview: {
       sunny: "Солнечно",
+      partly: "Малооблачно",
       cloudy: "Облачно",
       overcast: "Пасмурно",
       fog: "Туман",

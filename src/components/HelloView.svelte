@@ -158,8 +158,10 @@
   $: weatherAnim = (() => {
     if (!weather) return "";
     const code = weather.weatherCode;
-    // Clear / mostly clear: 0, 1
-    if (code === 0 || code === 1) return "weather-sun";
+    // Clear: 0
+    if (code === 0) return "weather-sun";
+    // Mainly clear / partly cloudy: 1
+    if (code === 1) return "weather-partly";
     // Snow: 71-77, 85-86
     if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "weather-snow";
     // Rain: 51-67, 80-82
@@ -185,6 +187,13 @@
         {#each Array(40) as _, __}
           <div class="raindrop" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 2}s; animation-duration: {0.5 + Math.random() * 0.5}s"></div>
         {/each}
+      {:else if weatherAnim === "weather-partly"}
+        <div class="sun sun--minimal">
+          <div class="sun-core"></div>
+        </div>
+        {#each Array(3) as _, i}
+          <div class="cloud" style="top: {18 + i * 22}%; animation-delay: {i * 4}s; opacity: {0.12 + Math.random() * 0.12}"></div>
+        {/each}
       {:else if weatherAnim === "weather-clouds"}
         {#each Array(5) as _, i}
           <div class="cloud" style="top: {10 + i * 15}%; animation-delay: {i * 3}s; opacity: {0.15 + Math.random() * 0.2}"></div>
@@ -204,11 +213,8 @@
           <div class="snowflake" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 5}s; animation-duration: {3 + Math.random() * 4}s; font-size: {8 + Math.random() * 10}px; opacity: {0.4 + Math.random() * 0.4}">*</div>
         {/each}
       {:else if weatherAnim === "weather-sun"}
-        <div class="sun">
+        <div class="sun sun--minimal">
           <div class="sun-core"></div>
-          {#each Array(8) as _, i}
-            <div class="sun-ray" style="transform: rotate({i * 45}deg)"></div>
-          {/each}
         </div>
       {/if}
     </div>
@@ -423,7 +429,7 @@
     96% { opacity: 0.85; }
   }
 
-  /* Sun — realistic disc + soft atmospheric glow */
+  /* Sun — minimal soft disc */
   .sun {
     position: absolute;
     top: -28px;
@@ -437,61 +443,33 @@
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 64px;
-    height: 64px;
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
-    /* Soft realistic sun body */
     background: radial-gradient(
-      circle at 42% 38%,
-      #fff7d6 0%,
-      #ffe9a0 18%,
-      #ffd56e 38%,
-      #ffb84d 58%,
-      rgba(255, 170, 70, 0.55) 72%,
-      rgba(255, 150, 50, 0.15) 86%,
+      circle at 45% 40%,
+      rgba(255, 236, 180, 0.55) 0%,
+      rgba(255, 210, 120, 0.28) 45%,
+      rgba(255, 190, 80, 0.08) 75%,
       transparent 100%
     );
-    box-shadow:
-      0 0 18px rgba(255, 214, 120, 0.45),
-      0 0 48px rgba(255, 190, 80, 0.28),
-      0 0 90px rgba(255, 160, 50, 0.16),
-      0 0 140px rgba(255, 140, 40, 0.08);
-    animation: sun-breathe 7s ease-in-out infinite;
+    box-shadow: 0 0 40px rgba(255, 200, 100, 0.18);
+    animation: sun-breathe 8s ease-in-out infinite;
   }
 
-  /* Rays as very soft light spikes — barely visible, like haze */
-  .sun-ray {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 3px;
-    height: 52px;
-    margin-left: -1.5px;
-    background: linear-gradient(
-      180deg,
-      rgba(255, 220, 140, 0.28),
-      rgba(255, 190, 90, 0.1) 55%,
-      transparent
-    );
-    transform-origin: center top;
-    border-radius: 999px;
-    filter: blur(3px);
-    opacity: 0.55;
-  }
-
-  .sun-ray:nth-child(odd) {
-    height: 42px;
-    opacity: 0.4;
-    filter: blur(4px);
+  .sun--minimal .sun-core {
+    width: 48px;
+    height: 48px;
+    box-shadow: 0 0 28px rgba(255, 200, 100, 0.14);
   }
 
   @keyframes sun-breathe {
     0%, 100% {
       transform: translate(-50%, -50%) scale(1);
-      opacity: 0.92;
+      opacity: 0.85;
     }
     50% {
-      transform: translate(-50%, -50%) scale(1.03);
+      transform: translate(-50%, -50%) scale(1.04);
       opacity: 1;
     }
   }

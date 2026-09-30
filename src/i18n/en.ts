@@ -1008,6 +1008,7 @@ export const en = {
     },
     preview: {
       sunny: "Sunny",
+      partly: "Mainly clear",
       cloudy: "Cloudy",
       overcast: "Overcast",
       fog: "Fog",

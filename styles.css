@@ -1,4 +1,4 @@
-﻿/* ============================================
+/* ============================================
    WORKLIFE CALENDAR вЂ” DARK PREMIUM THEME
    Inspired by Linear, Arc, Notion Calendar
    ============================================ */
@@ -823,6 +823,7 @@ svg.dot.filled {
   width: 100%;
   min-width: 0;
   overflow: hidden;
+  border-radius: var(--mcp-radius-lg);
 }
 
 #calendar-container .calendar {
@@ -843,7 +844,7 @@ svg.dot.filled {
 
 #calendar-container .day,
 #calendar-container .week-num {
-  border-radius: var(--mcp-radius-sm);
+  border-radius: var(--mcp-radius);
   transition: all var(--mcp-transition-fast);
   position: relative;
   padding: 10px 6px;
@@ -7664,6 +7665,10 @@ body > .task-actions-menu {
   background: linear-gradient(180deg, rgba(255, 183, 77, 0.08) 0%, transparent 100%);
 }
 
+.wp-partly {
+  background: linear-gradient(180deg, rgba(255, 183, 77, 0.06) 0%, rgba(100, 130, 180, 0.04) 100%);
+}
+
 .wp-sun-obj {
   position: absolute;
   top: 6px;
@@ -7671,6 +7676,10 @@ body > .task-actions-menu {
   width: 50px;
   height: 50px;
   animation: wp-sun-p 3s ease-in-out infinite;
+}
+
+.wp-sun-obj--minimal {
+  animation: wp-sun-p 5s ease-in-out infinite;
 }
 
 .wp-sun-core {
@@ -7685,20 +7694,16 @@ body > .task-actions-menu {
   box-shadow: 0 0 20px rgba(255, 214, 0, 0.15);
 }
 
-.wp-sun-ray {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 1px;
+.wp-sun-obj--minimal .wp-sun-core {
+  width: 18px;
   height: 18px;
-  background: linear-gradient(180deg, rgba(255, 214, 0, 0.2), transparent);
-  transform-origin: center top;
-  border-radius: 1px;
+  background: radial-gradient(circle, rgba(255, 214, 0, 0.28) 0%, rgba(255, 183, 77, 0.1) 55%, transparent 100%);
+  box-shadow: 0 0 14px rgba(255, 214, 0, 0.12);
 }
 
 @keyframes wp-sun-p {
-  0%, 100% { transform: scale(1); opacity: 0.7; }
-  50% { transform: scale(1.08); opacity: 1; }
+  0%, 100% { transform: scale(1); opacity: 0.75; }
+  50% { transform: scale(1.05); opacity: 1; }
 }
 
 /* Clouds */
@@ -7968,10 +7973,6 @@ body > .task-actions-menu {
 }
 
 /* Weather preview dynamic elements */
-.wp-sun-ray {
-  transform: rotate(var(--wp-rotate, 0deg));
-}
-
 .wp-cloud {
   top: var(--wp-top);
   animation-delay: var(--wp-delay);

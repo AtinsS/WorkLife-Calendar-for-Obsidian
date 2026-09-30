@@ -1036,7 +1036,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
     const wrapper = container.createDiv({ cls: "weather-previews" });
 
     const cards = [
-      { cls: "wp-sun", emoji: "☀️", label: tRaw("weather.preview.sunny"), code: "0,1", anim: "sun" },
+      { cls: "wp-sun", emoji: "☀️", label: tRaw("weather.preview.sunny"), code: "0", anim: "sun" },
+      { cls: "wp-partly", emoji: "🌤️", label: tRaw("weather.preview.partly"), code: "1", anim: "partly" },
       { cls: "wp-clouds", emoji: "⛅", label: tRaw("weather.preview.cloudy"), code: "2", anim: "clouds" },
       { cls: "wp-gloom", emoji: "☁️", label: tRaw("weather.preview.overcast"), code: "3", anim: "gloom" },
       { cls: "wp-fog", emoji: "🌫️", label: tRaw("weather.preview.fog"), code: "45,48", anim: "fog" },
@@ -1049,11 +1050,17 @@ export class CalendarSettingsTab extends PluginSettingTab {
       const card = wrapper.createDiv({ cls: `wp-card ${c.cls}` });
 
       if (c.anim === "sun") {
-        const sun = card.createDiv({ cls: "wp-sun-obj" });
+        const sun = card.createDiv({ cls: "wp-sun-obj wp-sun-obj--minimal" });
         sun.createDiv({ cls: "wp-sun-core" });
-        for (let i = 0; i < 8; i++) {
-          const ray = sun.createDiv({ cls: "wp-sun-ray" });
-          ray.style.setProperty("--wp-rotate", `${i * 45}deg`);
+      }
+      if (c.anim === "partly") {
+        const sun = card.createDiv({ cls: "wp-sun-obj wp-sun-obj--minimal" });
+        sun.createDiv({ cls: "wp-sun-core" });
+        for (let i = 0; i < 2; i++) {
+          const cl = card.createDiv({ cls: "wp-cloud" });
+          cl.style.setProperty("--wp-top", `${25 + i * 28}%`);
+          cl.style.setProperty("--wp-delay", `${i * 3.5}s`);
+          cl.style.setProperty("--wp-opacity", String(0.12 + Math.random() * 0.1));
         }
       }
       if (c.anim === "clouds") {
