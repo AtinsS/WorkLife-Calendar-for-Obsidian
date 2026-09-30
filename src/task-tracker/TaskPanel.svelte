@@ -9,7 +9,7 @@
     tasks, projects, selectedDate, activeTab, taskFilter,
     addTask, updateTask, updateTaskStatus, removeTask,
     createNextRecurringInstance, clearAllRecurringTasks, clearRecurringByProject, clearRecurringByName, resetTaskTimer,
-    carryOverOverdueTasks,
+    carryOverOverdueTasks, updateRecurringSeries,
   } from "./stores";
   import { createNoteTask, deleteNoteTask, shouldSyncTaskToNote, syncTaskToNote } from "./noteTasks";
   import { settings } from "../ui/stores";
@@ -364,9 +364,16 @@
     const modal = new TaskModal(
       appInstance,
       async (data) => {
-        updateTask(task.id, data);
-        const updated = get(tasks).find((t) => t.id === task.id);
-        if (updated && appInstance) await syncTaskToNote(updated, appInstance);
+        updateRecurringSeries(task.id, data);
+        if (!appInstance) return;
+        const members = get(tasks).filter(
+          (t) => t.id === task.id || (t.isRecurringInstance && t.parentTaskId === task.id)
+        );
+        for (const member of members) {
+          if (shouldSyncTaskToNote(member)) {
+            await syncTaskToNote(member, appInstance);
+          }
+        }
       },
       task,
     );

@@ -305,6 +305,52 @@ export function updateTask(id: string, changes: Partial<ITask>): void {
   }
 }
 
+/** Fields unique to a single occurrence — must not be copied across a recurring series. */
+const RECURRING_INSTANCE_ONLY_KEYS = new Set<keyof ITask>([
+  "id",
+  "createdAt",
+  "updatedAt",
+  "dateUID",
+  "status",
+  "completed",
+  "totalWorkTime",
+  "timerStartedAt",
+  "pausedAt",
+  "pausedWorkTime",
+  "isRecurringInstance",
+  "parentTaskId",
+  "notePath",
+  "carriedOverFrom",
+  "sortOrder",
+]);
+
+/**
+ * Applies shared edits (project, title, schedule, pay, …) to a recurring parent
+ * and every already-generated instance of that series.
+ */
+export function updateRecurringSeries(parentId: string, changes: Partial<ITask>): void {
+  const sharedChanges: Partial<ITask> = {};
+  for (const key of Object.keys(changes) as (keyof ITask)[]) {
+    if (!RECURRING_INSTANCE_ONLY_KEYS.has(key)) {
+      (sharedChanges as Record<string, unknown>)[key] = changes[key];
+    }
+  }
+
+  const now = Date.now();
+  tasks.update((current) =>
+    current.map((t) => {
+      if (t.id === parentId) {
+        return { ...t, ...changes, updatedAt: now };
+      }
+      if (t.isRecurringInstance && t.parentTaskId === parentId) {
+        return { ...t, ...sharedChanges, updatedAt: now };
+      }
+      return t;
+    })
+  );
+  debouncedSave();
+}
+
 function startTaskTimer(id: string): void {
   const allTasks = get(tasks);
   const task = allTasks.find((t) => t.id === id);
