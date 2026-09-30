@@ -25,16 +25,25 @@
     getTotalManualIncome,
     getManualIncomeForMonth,
   } from "../finance/financialAnalyticsStorage";
+  import { financeData, getCurrentMonthKey, getMonthData, getCustomExpenseCategories } from "../finance/storage";
+  import { getGoalMonthContribution } from "../finance/types";
+  import { mergeCategories, categoryByName, type ExpenseCategoryDef } from "../finance/expenseCategories";
   import { VIEW_TYPE_FINANCIAL_ANALYTICS } from "../constants";
   import { t, tArray, locale } from "../i18n";
   import { settings } from "../ui/stores";
   import { derived as derivedStore } from "svelte/store";
   import { countUp } from "../utils/visualMotion";
+  import { analyticsTabRequest, type AnalyticsTab as RequestedTab } from "../stores/analyticsStore";
 
   const numberLocale = derivedStore(locale, ($locale) => $locale === "ru" ? "ru-RU" : "en-US");
 
-  type AnalyticsTab = "weight" | "habits" | "time" | "earnings";
+  type AnalyticsTab = RequestedTab;
   let activeTab: AnalyticsTab = "habits";
+
+  $: if ($analyticsTabRequest) {
+    activeTab = $analyticsTabRequest;
+    analyticsTabRequest.set(null);
+  }
 
   $: weightEnabled = $settings.weightControlEnabled !== false;
   $: if (!weightEnabled && activeTab === "weight") {
@@ -183,6 +192,46 @@
   let maxMonthly = 1;
   let monthlyDelta = 0;
   let yearlyDelta = 0;
+
+  // ── Finance: income vs expense ──
+  $: financeMonth = (() => {
+    void $financeData;
+    void $financialAnalyticsData;
+    const key = getCurrentMonthKey();
+    const data = getMonthData(key);
+    const expenseList = data.expenses || [];
+    const expensesFromLog = expenseList.reduce((s, e) => s + (e.amount || 0), 0);
+    const goalContrib = (data.monthGoals || []).reduce((s, g) => s + getGoalMonthContribution(g), 0);
+    // If no expense log yet, fall back to budget plan main categories
+    const planExpenses = (data.mainAccountCategories || []).reduce((s, c) => s + (c.amount || 0), 0);
+    const totalExpenses = expensesFromLog > 0 ? expensesFromLog + goalContrib : planExpenses + goalContrib;
+    return {
+      income: monthlyEarnings || data.monthlyIncome || 0,
+      expenses: totalExpenses,
+      balance: (monthlyEarnings || data.monthlyIncome || 0) - totalExpenses,
+      expenseList,
+    };
+  })();
+
+  $: expenseByCategory = (() => {
+    const cats: ExpenseCategoryDef[] = mergeCategories(getCustomExpenseCategories());
+    const map = new Map<string, { name: string; icon: string; amount: number }>();
+    for (const e of financeMonth.expenseList) {
+      const key = e.categoryName || "other";
+      const def = categoryByName(cats, key);
+      const name = def?.name || key;
+      const icon = e.icon || def?.icon || "📦";
+      const prev = map.get(name) || { name, icon, amount: 0 };
+      prev.amount += e.amount || 0;
+      map.set(name, prev);
+    }
+    return [...map.values()].sort((a, b) => b.amount - a.amount).slice(0, 8);
+  })();
+
+  $: expenseCatMax = Math.max(...expenseByCategory.map((c) => c.amount), 1);
+  $: financeFlowTotal = Math.max(financeMonth.income + financeMonth.expenses, 1);
+  $: financeIncomePct = Math.round((financeMonth.income / financeFlowTotal) * 100);
+  $: financeExpensePct = Math.round((financeMonth.expenses / financeFlowTotal) * 100);
 
   $: monthNames = $tArray("common.months.short");
 
@@ -345,7 +394,7 @@
     </div>
   {/if}
 
-  <!-- Earnings Section -->
+  <!-- Finance Section (income / expense analytics) -->
   {#if activeTab === "earnings"}
     <div class="habit-analytics-section">
     <div class="earnings-header">
@@ -354,6 +403,33 @@
         {$t("financeAnalytics.details")}
       </button>
     </div>
+
+    <!-- Income vs expense overview -->
+    <div class="finance-overview">
+      <div class="finance-overview-card income">
+        <span class="finance-overview-label">{$t("habitAnalytics.income")}</span>
+        <span class="finance-overview-value income">
+          <span use:countUp={{ value: financeMonth.income, duration: 700, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽
+        </span>
+      </div>
+      <div class="finance-overview-card expense">
+        <span class="finance-overview-label">{$t("habitAnalytics.expenses")}</span>
+        <span class="finance-overview-value expense">
+          <span use:countUp={{ value: financeMonth.expenses, duration: 700, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽
+        </span>
+      </div>
+      <div class="finance-overview-card balance">
+        <span class="finance-overview-label">{$t("habitAnalytics.balance")}</span>
+        <span class="finance-overview-value" class:income={financeMonth.balance >= 0} class:expense={financeMonth.balance < 0}>
+          <span use:countUp={{ value: financeMonth.balance, duration: 700, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽
+        </span>
+        <div class="finance-balance-bar">
+          <div class="finance-balance-bar__income" style="width:{financeIncomePct}%"></div>
+          <div class="finance-balance-bar__expense" style="width:{financeExpensePct}%"></div>
+        </div>
+      </div>
+    </div>
+
     <div class="earnings-summary">
       <div class="earnings-card earnings-card-main" style="animation-delay: 0ms">
         <span class="earnings-value"
@@ -397,6 +473,26 @@
         {/if}
       </div>
     </div>
+
+    <!-- Expenses by category -->
+    {#if expenseByCategory.length > 0}
+      <div class="expense-by-cat">
+        <h4 class="expense-by-cat__title">{$t("habitAnalytics.expenseByCategory")}</h4>
+        {#each expenseByCategory as cat (cat.name)}
+          <div class="expense-by-cat__row">
+            <span class="expense-by-cat__icon">{cat.icon}</span>
+            <span class="expense-by-cat__name">{cat.name}</span>
+            <div class="expense-by-cat__bar">
+              <div class="expense-by-cat__fill" style="width:{Math.round((cat.amount / expenseCatMax) * 100)}%"></div>
+            </div>
+            <span class="expense-by-cat__amt">{cat.amount.toLocaleString($numberLocale)} ₽</span>
+          </div>
+        {/each}
+      </div>
+    {:else if activeTab === "earnings"}
+      <div class="earnings-empty">{$t("habitAnalytics.noExpenseData")}</div>
+    {/if}
+
     {#if monthlyChart.some((m) => m.amount > 0)}
       <div class="earnings-chart">
         {#each monthlyChart as monthData}
@@ -450,7 +546,7 @@
   .analytics-tab {
     padding: 8px 14px;
     border: 1px solid var(--mcp-glass-border);
-    border-radius: var(--mcp-radius-sm);
+    border-radius: 12px;
     background: var(--mcp-glass-bg);
     color: var(--text-muted);
     font-size: 12px;
@@ -519,8 +615,9 @@
     backdrop-filter: var(--mcp-blur);
     -webkit-backdrop-filter: var(--mcp-blur);
     border: 1px solid var(--mcp-glass-border);
-    border-radius: var(--mcp-radius);
+    border-radius: 16px;
     box-shadow: var(--mcp-shadow);
+    overflow: hidden;
     animation: analytics-rise 0.45s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
@@ -562,6 +659,12 @@
     gap: 12px;
   }
 
+  /* Keep habit cards rounded inside analytics */
+  :global(.habits-module__grid .habit-card) {
+    border-radius: 14px !important;
+    overflow: hidden;
+  }
+
   /* ═══ SECTIONS ═══════════════════════════ */
   .habit-analytics-section {
     margin-bottom: 24px;
@@ -570,8 +673,9 @@
     backdrop-filter: var(--mcp-blur);
     -webkit-backdrop-filter: var(--mcp-blur);
     border: 1px solid var(--mcp-glass-border);
-    border-radius: var(--mcp-radius);
+    border-radius: 16px;
     box-shadow: var(--mcp-shadow);
+    overflow: hidden;
     animation: analytics-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
 
@@ -803,6 +907,127 @@
   }
 
   /* Earnings */
+  .finance-overview {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .finance-overview-card {
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .finance-overview-label {
+    font-size: 11px;
+    font-weight: 650;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .finance-overview-value {
+    font-size: 22px;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+  }
+
+  .finance-overview-value.income { color: var(--mcp-success, #3dd68c); }
+  .finance-overview-value.expense { color: var(--mcp-danger, #f07178); }
+
+  .finance-balance-bar {
+    display: flex;
+    height: 5px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+    margin-top: 4px;
+  }
+
+  .finance-balance-bar__income {
+    background: linear-gradient(90deg, #3dd68c, #6eebb0);
+    height: 100%;
+  }
+
+  .finance-balance-bar__expense {
+    background: linear-gradient(90deg, #f07178, #ff9a9a);
+    height: 100%;
+  }
+
+  .expense-by-cat {
+    margin: 4px 0 16px;
+    padding: 14px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .expense-by-cat__title {
+    margin: 0 0 12px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+
+  .expense-by-cat__row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .expense-by-cat__icon {
+    width: 22px;
+    text-align: center;
+    font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .expense-by-cat__name {
+    width: 110px;
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .expense-by-cat__bar {
+    flex: 1;
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    min-width: 40px;
+  }
+
+  .expense-by-cat__fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--interactive-accent), color-mix(in srgb, var(--interactive-accent) 50%, #fff));
+    transition: width 0.4s ease;
+  }
+
+  .expense-by-cat__amt {
+    width: 90px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+  }
+
   .earnings-summary {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -817,7 +1042,8 @@
     padding: 18px 14px;
     background: var(--mcp-glass-highlight);
     border: 1px solid var(--mcp-glass-border);
-    border-radius: var(--mcp-radius-sm);
+    border-radius: 14px;
+    overflow: hidden;
     transition: all 0.2s ease;
     animation: analytics-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }

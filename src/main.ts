@@ -30,7 +30,7 @@ import {
   applyGlassBgColor,
   applyAllColors,
 } from "./settings";
-import { TFile, TFolder, type Menu } from "obsidian";
+import { TFile, TFolder, Menu, type MenuItem } from "obsidian";
 import CalendarView from "./view";
 import TaskView from "./views/TaskView";
 import ScheduleView from "./views/ScheduleView";
@@ -65,6 +65,65 @@ import {
   AISummaryModal,
   resolveSummarySources,
 } from "./services/AISummaryModal";
+
+type AiMenuAction = {
+  title: string;
+  icon: string;
+  onClick: () => void;
+};
+
+/** Nest AI actions under one submenu when there are several; otherwise a single item. */
+function addAiMenuItems(menu: Menu, actions: AiMenuAction[]): void {
+  if (actions.length === 0) return;
+  if (actions.length === 1) {
+    const a = actions[0];
+    menu.addItem((item: MenuItem) => {
+      item.setTitle(a.title).setIcon(a.icon).setSection("action").onClick(a.onClick);
+    });
+    return;
+  }
+  menu.addItem((item: MenuItem) => {
+    item.setTitle(tRaw("ai.toolsMenu")).setIcon("sparkles").setSection("action");
+    const withSub = item as MenuItem & { setSubmenu?: () => Menu };
+    if (typeof withSub.setSubmenu === "function") {
+      // Native nested menu (keeps parent open as a flyout)
+      const sub = withSub.setSubmenu();
+      for (const a of actions) {
+        sub.addItem((s: MenuItem) => {
+          s.setTitle(a.title).setIcon(a.icon).onClick(a.onClick);
+        });
+      }
+      return;
+    }
+    // Fallback: open a secondary menu at the parent menu position without
+    // letting the parent close-then-reopen flicker steal the click.
+    item.onClick((evt) => {
+      if (evt instanceof MouseEvent) {
+        evt.preventDefault();
+        evt.stopPropagation();
+      }
+      const sub = new Menu();
+      for (const a of actions) {
+        sub.addItem((s: MenuItem) => {
+          s.setTitle(a.title).setIcon(a.icon).onClick(a.onClick);
+        });
+      }
+      const target = evt.target instanceof HTMLElement ? evt.target : null;
+      const itemEl = target?.closest(".menu-item") ?? target;
+      const rect = itemEl?.getBoundingClientRect();
+      if (rect) {
+        // Fly out to the right of the parent item, aligned to its top
+        sub.showAtPosition({
+          x: Math.round(rect.right + 4),
+          y: Math.round(rect.top),
+          overlap: true,
+        });
+      } else if (evt instanceof MouseEvent) {
+        sub.showAtMouseEvent(evt);
+      }
+    });
+  });
+}
 import { migrateFromSingleFile, migrateRootModuleFiles, VAULT_DATA_DIR } from "./io/vaultStorage";
 import { VIEW_SWITCHED_EVENT } from "./views/viewSwitch";
 
@@ -438,11 +497,13 @@ export default class CalendarPlugin extends Plugin {
       })
     );
 
-    // Right-click on .md file → "Extract tasks with AI"
+    // Right-click on .md file → AI tools (extract / summary)
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu, file) => {
         if (!this.options.ollamaEnabled) return;
         if (window.innerWidth <= 768) return;
+
+        const aiActions: AiMenuAction[] = [];
 
         // Folders / notes → AI summary
         if (
@@ -451,36 +512,35 @@ export default class CalendarPlugin extends Plugin {
         ) {
           const sources = resolveSummarySources(this.app, file);
           if (sources.files.length > 0) {
-            menu.addItem((item) => {
-              item
-                .setTitle(
-                  sources.files.length > 1
-                    ? tRaw("ai.contextMenuSummaryMany", { count: String(sources.files.length) })
-                    : tRaw("ai.contextMenuSummary"),
-                )
-                .setIcon("lucide-file-text")
-                .setSection("action")
-                .onClick(() => {
-                  new AISummaryModal(
-                    this.app,
-                    sources.files,
-                    sources.folderPath,
-                    sources.title,
-                  ).open();
-                });
+            aiActions.push({
+              title:
+                sources.files.length > 1
+                  ? tRaw("ai.contextMenuSummaryMany", { count: String(sources.files.length) })
+                  : tRaw("ai.contextMenuSummary"),
+              icon: "lucide-file-text",
+              onClick: () => {
+                new AISummaryModal(
+                  this.app,
+                  sources.files,
+                  sources.folderPath,
+                  sources.title,
+                ).open();
+              },
             });
           }
         }
 
-        if (!(file instanceof TFile) || file.extension !== "md") return;
-        if (this.options.aiExtractEnabled === false) return;
-        menu.addItem((item) => {
-          item.setTitle(tRaw("ai.contextMenuExtract"))
-            .setIcon("sparkles")
-            .onClick(() => {
+        if (file instanceof TFile && file.extension === "md" && this.options.aiExtractEnabled !== false) {
+          aiActions.push({
+            title: tRaw("ai.contextMenuExtract"),
+            icon: "sparkles",
+            onClick: () => {
               new AIExtractModal(this.app, file.path).open();
-            });
-        });
+            },
+          });
+        }
+
+        addAiMenuItems(menu, aiActions);
       })
     );
 
@@ -495,17 +555,17 @@ export default class CalendarPlugin extends Plugin {
         if (window.innerWidth <= 768) return;
         const mdFiles = files.filter((f): f is TFile => f instanceof TFile && f.extension === "md");
         if (mdFiles.length < 2) return;
-        menu.addItem((item) => {
-          item
-            .setTitle(tRaw("ai.contextMenuSummaryMany", { count: String(mdFiles.length) }))
-            .setIcon("lucide-files")
-            .setSection("action")
-            .onClick(() => {
+        addAiMenuItems(menu, [
+          {
+            title: tRaw("ai.contextMenuSummaryMany", { count: String(mdFiles.length) }),
+            icon: "lucide-files",
+            onClick: () => {
               const folderPath = mdFiles[0]?.parent?.path ?? "";
               const label = tRaw("ai.summarySelection", { count: String(mdFiles.length) });
               new AISummaryModal(this.app, mdFiles.slice(0, 40), folderPath, label).open();
-            });
-        });
+            },
+          },
+        ]);
       })
     );
 
@@ -556,7 +616,7 @@ export default class CalendarPlugin extends Plugin {
     if (this.options.ntfyScheduledEnabled) {
       this.notificationService.scheduleNtfyPush();
     }
-    // Schedule 6:00 morning digest with the day's task list
+    // Schedule 6:00 morning digest with the day's task list (and keep it daily)
     if (this.options.ntfyDailyDigestEnabled) {
       this.notificationService.scheduleNtfyDailyDigest();
     }

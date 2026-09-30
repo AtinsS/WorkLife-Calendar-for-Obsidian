@@ -7,9 +7,23 @@
     getStoredMonthKeys,
     deleteMonthData,
     deleteMonthsBefore,
+    ensureGoalsRollover,
   } from "./storage";
-  import type { FinanceCategory, FinanceMonthData, MonthGoal, SavingsCategory } from "./types";
-  import { generateCategoryId, generateGoalId } from "./types";
+  import type { FinanceCategory, FinanceMonthData, MonthGoal, SavingsCategory, ExpenseEntry } from "./types";
+  import { generateCategoryId, generateGoalId, generateExpenseId, getGoalMonthContribution, isGoalComplete, resolveGoalAdjustment, type GoalAdjustMode } from "./types";
+  import {
+    mergeCategories,
+    iconForCategory,
+    guessCategory,
+    categoryByName,
+    generateCategoryId as generateCatId,
+    type ExpenseCategoryDef,
+  } from "./expenseCategories";
+  import { getCustomExpenseCategories, saveCustomExpenseCategories } from "./storage";
+  import { AIFinanceModal, type AIFinanceMode } from "../services/AIFinanceModal";
+  import { AIExpenseParseModal } from "../services/AIExpenseParseModal";
+  import { buildFinanceSummary, getFinanceAiConfig } from "../services/financeAI";
+  import { settings } from "../ui/stores";
   import { get } from "svelte/store";
   import {
     tasks,
@@ -34,6 +48,7 @@
     monthGoals: [],
     savingsCategories: [],
     distributionRules: [],
+    expenses: [],
     updatedAt: "",
   };
   let incomeSource: DistributionIncomeSource = "fact";
@@ -70,6 +85,12 @@
     }
   }
 
+  // Carry incomplete goals (with money) into the open month
+  $: {
+    void monthKey;
+    ensureGoalsRollover(monthKey);
+  }
+
   // ── Sync income from tasks/analytics (only when not editing manually) ──
   // Guard: only sync after data has been loaded from disk and user is not in manual mode
   $: {
@@ -90,6 +111,7 @@
               monthGoals: [],
               savingsCategories: [],
               distributionRules: [],
+              expenses: [],
               updatedAt: "",
             }),
             monthlyIncome: income,
@@ -107,11 +129,13 @@
   $: savingsTotal = monthData
     ? monthData.savingsCategories.reduce((sum, c) => sum + c.amount, 0)
     : 0;
-  $: goalsTotal = monthData
-    ? (monthData.monthGoals || []).reduce((sum, g) => sum + g.currentAmount, 0)
+  // Only THIS month's goal deposits reduce the remainder —
+  // money carried over from previous months is already saved and must not be subtracted again.
+  $: goalsMonthContributions = monthData
+    ? (monthData.monthGoals || []).reduce((sum, g) => sum + getGoalMonthContribution(g), 0)
     : 0;
   $: balance = monthData
-    ? monthData.monthlyIncome - mainTotal - goalsTotal
+    ? monthData.monthlyIncome - mainTotal - goalsMonthContributions
     : 0;
 
   // Recalculate savings amounts from percentages when balance changes
@@ -143,7 +167,11 @@
 
   $: incomeDelta = prevMonthData ? monthData.monthlyIncome - prevMonthData.monthlyIncome : 0;
   $: expenseDelta = prevMonthData ? mainTotal - (prevMonthData.mainAccountCategories?.reduce((s, c) => s + c.amount, 0) || 0) : 0;
-  $: balanceDelta = prevMonthData ? balance - ((prevMonthData.monthlyIncome || 0) - (prevMonthData.mainAccountCategories?.reduce((s, c) => s + c.amount, 0) || 0)) : 0;
+  $: balanceDelta = prevMonthData
+    ? balance - ((prevMonthData.monthlyIncome || 0)
+        - (prevMonthData.mainAccountCategories?.reduce((s, c) => s + c.amount, 0) || 0)
+        - (prevMonthData.monthGoals || []).reduce((s, g) => s + getGoalMonthContribution(g), 0))
+    : 0;
 
   function normalizeIncomeSource(source: FinanceMonthData["incomeSource"]): DistributionIncomeSource {
     if (source === "manual") return "manual";
@@ -238,6 +266,7 @@
       name: get(t)("finance.newGoal"),
       currentAmount: 0,
       targetAmount: 0,
+      broughtForward: 0,
     };
     updateMonthData(monthKey, {
       monthGoals: [...(monthData.monthGoals || []), newGoal],
@@ -256,6 +285,26 @@
     );
     monthData = { ...monthData, monthGoals: updated };
     updateMonthData(monthKey, { monthGoals: updated });
+  }
+
+  // ── Goal deposit / withdraw this month (by amount or %) ──
+  let goalAdjustMode: GoalAdjustMode = "amount";
+  let goalAdjustValues: Record<string, string> = {};
+
+  function setGoalAdjustValue(id: string, value: string) {
+    goalAdjustValues = { ...goalAdjustValues, [id]: value };
+  }
+
+  function applyGoalAdjust(goal: MonthGoal, direction: "deposit" | "withdraw") {
+    const raw = parseFloat((goalAdjustValues[goal.id] ?? "").replace(",", ".")) || 0;
+    const delta = resolveGoalAdjustment(raw, goalAdjustMode, direction, {
+      balance,
+      currentAmount: goal.currentAmount ?? 0,
+    });
+    if (delta === 0) return;
+    const next = clampAmount((goal.currentAmount ?? 0) + delta);
+    updateGoal(goal.id, { currentAmount: next });
+    setGoalAdjustValue(goal.id, "");
   }
 
   // ── Savings ──
@@ -328,29 +377,44 @@
 
   function duplicatePrevMonth(): void {
     if (!prevMonthKey) return;
+    // Bring incomplete goals forward with their money before copying expense plan
+    ensureGoalsRollover(prevMonthKey);
     const prev = getMonthData(prevMonthKey);
-    const blankCat = (c: FinanceCategory): FinanceCategory => ({
+    // Copy expense line items WITH their amounts (actual plan, not empty shells)
+    const copyCat = (c: FinanceCategory): FinanceCategory => ({
+      id: generateCategoryId(),
+      name: c.name,
+      icon: c.icon,
+      amount: c.amount ?? 0,
+      order: c.order,
+    });
+    // Savings: keep percent, zero amount so it recalculates from the new remainder
+    const copySavings = (c: SavingsCategory): SavingsCategory => ({
       id: generateCategoryId(),
       name: c.name,
       icon: c.icon,
       amount: 0,
       order: c.order,
+      percent: c.percent ?? 0,
+      completed: false,
     });
-    const blankGoal = (g: MonthGoal): MonthGoal => ({
+    // Goals continue with accumulated money — only the monthly deposit resets to 0
+    const continueGoal = (g: MonthGoal): MonthGoal => ({
       id: generateGoalId(),
       icon: g.icon,
       name: g.name,
-      currentAmount: 0,
-      targetAmount: g.targetAmount,
+      currentAmount: g.currentAmount ?? 0,
+      targetAmount: g.targetAmount ?? 0,
+      broughtForward: g.currentAmount ?? 0,
     });
+    const existingGoalIds = new Set((monthData.monthGoals || []).map((g) => g.id));
+    const continuedGoals = (prev.monthGoals || [])
+      .filter((g) => !isGoalComplete(g) && !existingGoalIds.has(g.id))
+      .map(continueGoal);
     updateMonthData(monthKey, {
-      mainAccountCategories: prev.mainAccountCategories.map(blankCat),
-      monthGoals: (prev.monthGoals || []).map(blankGoal),
-      savingsCategories: (prev.savingsCategories || []).map(c => ({
-        ...blankCat(c),
-        percent: c.percent,
-        completed: false,
-      } as SavingsCategory)),
+      mainAccountCategories: prev.mainAccountCategories.map(copyCat),
+      monthGoals: [...(monthData.monthGoals || []), ...continuedGoals],
+      savingsCategories: (prev.savingsCategories || []).map(copySavings),
       distributionRules: [...prev.distributionRules],
     });
   }
@@ -362,6 +426,7 @@
       savingsCategories: [],
       monthGoals: [],
       distributionRules: [],
+      expenses: [],
       monthlyIncome: 0,
     });
   }
@@ -376,29 +441,262 @@
     if (!confirm(get(t)("finance.deleteAllConfirm"))) return;
     for (const k of storedKeys) deleteMonthData(k);
   }
+
+  // ── Tabs ──
+  let activeTab: "plan" | "expenses" = "plan";
+
+  // ── Expense log (actual money spent — separate from the budget plan) ──
+  $: expenses = monthData?.expenses || [];
+  $: expensesTotal = expenses.reduce((s, e) => s + (e.amount || 0), 0);
+
+  function todayStr(): string {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+
+  function addExpenseEntry(entry: Omit<ExpenseEntry, "id" | "createdAt">) {
+    const next: ExpenseEntry = {
+      ...entry,
+      icon: entry.icon || iconForCategory(expenseCats, entry.categoryName),
+      id: generateExpenseId(),
+      createdAt: new Date().toISOString(),
+    };
+    updateMonthData(monthKey, { expenses: [...(monthData.expenses || []), next] });
+  }
+
+  function removeExpenseEntry(id: string) {
+    updateMonthData(monthKey, {
+      expenses: (monthData.expenses || []).filter((e) => e.id !== id),
+    });
+    if (editingExpenseId === id) editingExpenseId = null;
+  }
+
+  function updateExpenseEntry(id: string, changes: Partial<ExpenseEntry>) {
+    const updated = (monthData.expenses || []).map((e) =>
+      e.id === id ? { ...e, ...changes } : e,
+    );
+    updateMonthData(monthKey, { expenses: updated });
+  }
+
+  // Inline edit state for expenses
+  let editingExpenseId: string | null = null;
+  let editExpenseName = "";
+  let editExpenseAmount = "";
+  let editExpenseCategory = "";
+  let editExpenseDate = "";
+
+  function startEditExpense(exp: ExpenseEntry) {
+    editingExpenseId = exp.id;
+    editExpenseName = exp.name;
+    editExpenseAmount = String(exp.amount);
+    editExpenseCategory = exp.categoryName || "other";
+    editExpenseDate = exp.date;
+  }
+
+  function saveExpenseEdit() {
+    if (!editingExpenseId) return;
+    const amount = clampAmount(parseFloat(editExpenseAmount) || 0);
+    if (!editExpenseName.trim() || amount <= 0) return;
+    updateExpenseEntry(editingExpenseId, {
+      name: editExpenseName.trim(),
+      amount,
+      categoryName: editExpenseCategory,
+      icon: iconForCategory(expenseCats, editExpenseCategory),
+      date: editExpenseDate || todayStr(),
+    });
+    editingExpenseId = null;
+  }
+
+  function cancelExpenseEdit() {
+    editingExpenseId = null;
+  }
+
+  let newExpenseName = "";
+  let newExpenseAmount = "";
+  let newExpenseCategory = "other";
+  let newExpenseDate = todayStr();
+
+  function addExpenseFromForm() {
+    const amount = clampAmount(parseFloat(newExpenseAmount) || 0);
+    if (!newExpenseName.trim() || amount <= 0) return;
+    const cat = categoryByName(expenseCats, newExpenseCategory) || guessCategory(expenseCats, newExpenseName);
+    addExpenseEntry({
+      name: newExpenseName.trim(),
+      icon: cat.icon,
+      amount,
+      categoryName: cat.name,
+      date: newExpenseDate || todayStr(),
+    });
+    newExpenseName = "";
+    newExpenseAmount = "";
+    newExpenseCategory = "other";
+    newExpenseDate = todayStr();
+  }
+
+  // ── Expense categories (builtins + custom, user-editable) ──
+  let showCatManager = false;
+  let newCatName = "";
+  let newCatIcon = "📦";
+  let editingCatId: string | null = null;
+  let editCatName = "";
+  let editCatIcon = "";
+
+  $: expenseCats = (() => {
+    void $financeData;
+    return mergeCategories(getCustomExpenseCategories());
+  })();
+
+  function addCustomCategory() {
+    const name = newCatName.trim();
+    if (!name) return;
+    if (categoryByName(expenseCats, name)) return;
+    const cat: ExpenseCategoryDef = {
+      id: generateCatId(),
+      name,
+      icon: newCatIcon.trim() || "📦",
+      keywords: [name.toLowerCase()],
+      builtin: false,
+    };
+    saveCustomExpenseCategories([...getCustomExpenseCategories(), cat]);
+    newCatName = "";
+    newCatIcon = "📦";
+  }
+
+  function startEditCategory(cat: ExpenseCategoryDef) {
+    if (cat.builtin) return;
+    editingCatId = cat.id;
+    editCatName = cat.name;
+    editCatIcon = cat.icon;
+  }
+
+  function saveCategoryEdit() {
+    if (!editingCatId) return;
+    const name = editCatName.trim();
+    if (!name) return;
+    const customs = getCustomExpenseCategories().map((c) =>
+      c.id === editingCatId
+        ? { ...c, name, icon: editCatIcon.trim() || "📦", keywords: [name.toLowerCase()] }
+        : c,
+    );
+    saveCustomExpenseCategories(customs);
+    editingCatId = null;
+  }
+
+  function removeCustomCategory(id: string) {
+    saveCustomExpenseCategories(getCustomExpenseCategories().filter((c) => c.id !== id));
+    if (editingCatId === id) editingCatId = null;
+  }
+
+  // ── AI finance tools ──
+  $: ollamaOn = $settings.ollamaEnabled === true;
+
+  function openExpenseParse() {
+    if (!getFinanceAiConfig().enabled) return;
+    const app = window.app as never;
+    new AIExpenseParseModal(
+      app,
+      expenseCats,
+      (items) => {
+        const date = todayStr();
+        const created = items.map((item) => ({
+          id: generateExpenseId(),
+          name: item.name,
+          icon: item.icon || iconForCategory(expenseCats, item.categoryName),
+          amount: item.amount,
+          categoryName: item.categoryName,
+          date,
+          createdAt: new Date().toISOString(),
+        }));
+        updateMonthData(monthKey, {
+          expenses: [...(monthData.expenses || []), ...created],
+        });
+        activeTab = "expenses";
+      },
+    ).open();
+  }
+
+  function openAiFinance(mode: AIFinanceMode) {
+    if (!getFinanceAiConfig().enabled) return;
+    const app = window.app as never;
+    new AIFinanceModal(app, mode, {
+      getSummary: () =>
+        buildFinanceSummary({
+          monthlyIncome: monthData.monthlyIncome,
+          mainCategories: monthData.mainAccountCategories,
+          goals: monthData.monthGoals || [],
+          savings: monthData.savingsCategories || [],
+          rules: monthData.distributionRules || [],
+          goalContribution: goalsMonthContributions,
+        }),
+      applyRules: (rules, categoryPercents) => {
+        const savings = (monthData.savingsCategories || []).map((s) => {
+          const sug = categoryPercents.find(
+            (c) => c.name.toLowerCase() === s.name.toLowerCase(),
+          );
+          if (!sug) return s;
+          const amount =
+            balance > 0 ? clampAmount(Math.round((balance * sug.percent) / 100)) : s.amount;
+          return { ...s, percent: sug.percent, amount };
+        });
+        updateMonthData(monthKey, {
+          distributionRules: rules,
+          savingsCategories: savings,
+        });
+      },
+    }).open();
+  }
 </script>
 
 <div class="finance-tracker">
-  <!-- Month Navigator -->
-  <div class="month-selector">
-    <button class="month-nav-btn" on:click={prevMonth}>&#8249;</button>
-    <select bind:value={monthKey} class="month-select">
-      {#each Array.from({length: 12}, (_, i) => i + 1) as m}
-        <option value="{displayYear}-{String(m).padStart(2, '0')}">
-          {$tArray("common.months.long")[m - 1]} {displayYear}
-        </option>
-      {/each}
-    </select>
-    <button class="month-nav-btn" on:click={nextMonth}>&#8250;</button>
+  <!-- Top bar: month + tabs -->
+  <div class="fin-topbar">
+    <div class="month-selector">
+      <button class="month-nav-btn" on:click={prevMonth} aria-label="‹">&#8249;</button>
+      <select bind:value={monthKey} class="month-select">
+        {#each Array.from({length: 12}, (_, i) => i + 1) as m}
+          <option value="{displayYear}-{String(m).padStart(2, '0')}">
+            {$tArray("common.months.long")[m - 1]} {displayYear}
+          </option>
+        {/each}
+      </select>
+      <button class="month-nav-btn" on:click={nextMonth} aria-label="›">&#8250;</button>
+    </div>
+    <h2 class="fin-title">{$t("finance.title")}</h2>
+    <div class="fin-tabs" role="tablist">
+      <button
+        class="fin-tab"
+        class:is-active={activeTab === "plan"}
+        role="tab"
+        aria-selected={activeTab === "plan"}
+        on:click={() => activeTab = "plan"}
+      >{$t("finance.tabBudget")}</button>
+      <button
+        class="fin-tab"
+        class:is-active={activeTab === "expenses"}
+        role="tab"
+        aria-selected={activeTab === "expenses"}
+        on:click={() => activeTab = "expenses"}
+      >{$t("finance.tabExpenses")}</button>
+    </div>
   </div>
 
-  <h2>{$t("finance.title")}</h2>
+  {#if activeTab === "plan"}
+    {#if ollamaOn}
+      <div class="ai-finance-bar">
+        <button class="ai-finance-bar-btn" on:click={() => openAiFinance("forecast")} title={$t("ai.finance.forecastHint")}>
+          📈 {$t("ai.finance.tab.forecast")}
+        </button>
+        <button class="ai-finance-bar-btn" on:click={() => openAiFinance("rules")} title={$t("ai.finance.rulesHint")}>
+          🧩 {$t("ai.finance.tab.rules")}
+        </button>
+      </div>
+    {/if}
 
-  {#if prevMonthKey}
-    <button class="dup-btn" on:click={duplicatePrevMonth}>
-      {$t("finance.duplicateExpenses")}
-    </button>
-  {/if}
+    {#if prevMonthKey}
+      <button class="dup-btn" on:click={duplicatePrevMonth}>
+        {$t("finance.duplicateExpenses")}
+      </button>
+    {/if}
 
   <!-- Блок 1: Общий баланс -->
   <div class="glass-card">
@@ -517,7 +815,7 @@
           </div>
         {:else}
           <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <div class="goal-row" role="button" tabindex="0" on:click={() => editingGoalId = goal.id} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editingGoalId = goal.id; }}>
+          <div class="goal-row" class:goal-complete={isGoalComplete(goal)} role="button" tabindex="0" on:click={() => editingGoalId = goal.id} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editingGoalId = goal.id; }}>
             <span class="goal-icon">{goal.icon}</span>
             <div class="goal-info">
               <div class="goal-header">
@@ -525,9 +823,51 @@
                 <span class="goal-amounts">{formatMoney(goal.currentAmount)} {$t("locale.currencySymbol")} / {formatMoney(goal.targetAmount)} {$t("locale.currencySymbol")}</span>
               </div>
               <div class="goal-progress-bar">
-                <div class="goal-progress-fill" style="width: {goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0}%"></div>
+                <div class="goal-progress-fill" class:complete={isGoalComplete(goal)} style="width: {goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0}%"></div>
               </div>
-              <span class="goal-percent">{goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0}%</span>
+              <div class="goal-meta">
+                <span class="goal-percent">{goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0}%</span>
+                {#if getGoalMonthContribution(goal) > 0}
+                  <span class="goal-month-add">+{formatMoney(getGoalMonthContribution(goal))} {$t("locale.currencySymbol")}</span>
+                {/if}
+                {#if (goal.broughtForward ?? 0) > 0}
+                  <span class="goal-brought">↩ {formatMoney(goal.broughtForward ?? 0)}</span>
+                {/if}
+              </div>
+              <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+              <div class="goal-adjust" role="group" on:click|stopPropagation on:keydown|stopPropagation>
+                <div class="goal-adjust-mode" role="group">
+                  <button
+                    type="button"
+                    class="goal-adjust-mode-btn"
+                    class:active={goalAdjustMode === "amount"}
+                    on:click={() => goalAdjustMode = "amount"}
+                  >{$t("finance.amount")}</button>
+                  <button
+                    type="button"
+                    class="goal-adjust-mode-btn"
+                    class:active={goalAdjustMode === "percent"}
+                    on:click={() => goalAdjustMode = "percent"}
+                  >%</button>
+                </div>
+                <input
+                  type="number"
+                  min="0"
+                  class="goal-adjust-input"
+                  placeholder={goalAdjustMode === "amount" ? $t("finance.adjustPlaceholder") : "0%"}
+                  value={goalAdjustValues[goal.id] ?? ""}
+                  on:input={(e) => setGoalAdjustValue(goal.id, inputVal(e))}
+                  on:keydown={(e) => {
+                    if (e.key === "Enter") applyGoalAdjust(goal, "deposit");
+                  }}
+                />
+                <button type="button" class="goal-adjust-btn deposit" title={$t("finance.depositThisMonth")} on:click={() => applyGoalAdjust(goal, "deposit")}>
+                  + {$t("finance.deposit")}
+                </button>
+                <button type="button" class="goal-adjust-btn withdraw" title={$t("finance.withdrawThisMonth")} on:click={() => applyGoalAdjust(goal, "withdraw")}>
+                  − {$t("finance.withdraw")}
+                </button>
+              </div>
             </div>
             <button class="cat-delete" on:click|stopPropagation={() => removeGoal(goal.id)}>✕</button>
           </div>
@@ -645,6 +985,145 @@
       </div>
     {/if}
   </div>
+  {:else}
+  <!-- ── Вкладка: Расходы ── -->
+  <div class="glass-card expenses-card">
+    <div class="glass-card-header">
+      <span class="glass-icon">🧾</span>
+      <h3>{$t("finance.expensesTitle")}</h3>
+      <span class="glass-badge">{formatMoney(expensesTotal)} {$t("locale.currencySymbol")}</span>
+    </div>
+
+    <div class="expenses-toolbar">
+      {#if ollamaOn}
+        <button class="ai-finance-bar-btn expenses-ai-btn" on:click={openExpenseParse}>
+          {$t("finance.expensesParseAi")}
+        </button>
+      {/if}
+      <button class="ai-finance-bar-btn manage-cats-btn" on:click={() => showCatManager = !showCatManager}>
+        {$t("finance.manageCategories")}
+      </button>
+    </div>
+
+    {#if showCatManager}
+      <div class="cat-manager">
+        <div class="cat-manager__list">
+          {#each expenseCats as cat (cat.id)}
+            {#if editingCatId === cat.id}
+              <div class="cat-manager__row editing">
+                <input class="cat-manager__icon" type="text" bind:value={editCatIcon} maxlength="4" />
+                <input class="cat-manager__name" type="text" bind:value={editCatName} />
+                <button class="goal-done-btn" on:click={saveCategoryEdit}>✓</button>
+                <button class="cat-delete" on:click={() => (editingCatId = null)}>✕</button>
+              </div>
+            {:else}
+              <div class="cat-manager__row">
+                <span class="cat-manager__icon">{cat.icon}</span>
+                <span class="cat-manager__name">{cat.name}</span>
+                {#if !cat.builtin}
+                  <button class="dash-btn dash-btn--sm" on:click={() => startEditCategory(cat)} title={$t("common.edit")}>✎</button>
+                  <button class="cat-delete" on:click={() => removeCustomCategory(cat.id)} title={$t("common.delete")}>✕</button>
+                {:else}
+                  <span class="cat-manager__builtin">★</span>
+                {/if}
+              </div>
+            {/if}
+          {/each}
+        </div>
+        <div class="expense-form">
+          <input class="expense-input" type="text" bind:value={newCatIcon} maxlength="4" placeholder="📦" style="max-width:56px;flex:0 0 56px" />
+          <input class="expense-input" type="text" bind:value={newCatName} placeholder={$t("finance.expensesCategory")} />
+          <button class="expense-add-btn" on:click={addCustomCategory}>{$t("finance.addCategory")}</button>
+        </div>
+      </div>
+    {/if}
+
+    <div class="expense-form">
+      <input class="expense-input" type="text" bind:value={newExpenseName} placeholder={$t("finance.expensesName")} />
+      <input class="expense-input amount" type="number" min="0" bind:value={newExpenseAmount} placeholder={$t("finance.expensesAmount")} />
+      <select class="expense-input" bind:value={newExpenseCategory}>
+        {#each expenseCats as cat (cat.id)}
+          <option value={cat.name}>{cat.icon} {cat.name}</option>
+        {/each}
+      </select>
+      <input class="expense-input date" type="date" bind:value={newExpenseDate} />
+      <button class="expense-add-btn" on:click={addExpenseFromForm}>{$t("finance.expensesAdd")}</button>
+    </div>
+
+    <!-- Category chips summary -->
+    {#if expenses.length > 0}
+      {@const byCat = (() => {
+        const map = new Map();
+        for (const e of expenses) {
+          const key = e.categoryName || "other";
+          const prev = map.get(key) || { name: key, icon: e.icon || "📦", amount: 0, count: 0 };
+          prev.amount += e.amount || 0;
+          prev.count += 1;
+          if (e.icon) prev.icon = e.icon;
+          map.set(key, prev);
+        }
+        return [...map.values()].sort((a, b) => b.amount - a.amount);
+      })()}
+      <div class="expense-chips">
+        {#each byCat as chip (chip.name)}
+          <div class="expense-chip">
+            <span class="expense-chip__icon">{chip.icon}</span>
+            <span class="expense-chip__name">{chip.name}</span>
+            <span class="expense-chip__amt">{formatMoney(chip.amount)}</span>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    <div class="expense-list modern">
+      {#if expenses.length === 0}
+        <div class="expense-empty">
+          <span class="expense-empty__icon">🧾</span>
+          <div class="expense-empty__text">{$t("finance.expensesEmpty")}</div>
+        </div>
+      {:else}
+        {#each expenses as exp (exp.id)}
+          {#if editingExpenseId === exp.id}
+            <div class="expense-card editing">
+              <input class="expense-input" type="text" bind:value={editExpenseName} placeholder={$t("finance.expensesName")} style="flex:2" />
+              <input class="expense-input amount" type="number" min="0" bind:value={editExpenseAmount} />
+              <select class="expense-input" bind:value={editExpenseCategory}>
+                {#each expenseCats as cat (cat.id)}
+                  <option value={cat.name}>{cat.icon} {cat.name}</option>
+                {/each}
+              </select>
+              <input class="expense-input date" type="date" bind:value={editExpenseDate} />
+              <button class="expense-save-btn" on:click={saveExpenseEdit} title={$t("common.save")}>✓</button>
+              <button class="expense-del-btn" on:click={cancelExpenseEdit} title={$t("common.cancel")}>✕</button>
+            </div>
+          {:else}
+            <div
+              class="expense-card"
+              role="button"
+              tabindex="0"
+              on:click={() => startEditExpense(exp)}
+              on:keydown={(e) => { if (e.key === "Enter" || e.key === " ") startEditExpense(exp); }}
+            >
+              <span class="expense-card__icon">{exp.icon || "💸"}</span>
+              <div class="expense-card__body">
+                <span class="expense-card__name">{exp.name}</span>
+                <div class="expense-card__meta">
+                  {#if exp.categoryName}<span class="expense-card__cat">{exp.categoryName}</span>{/if}
+                  <span class="expense-card__date">{exp.date}</span>
+                </div>
+              </div>
+              <span class="expense-card__amt">{formatMoney(exp.amount)} {$t("locale.currencySymbol")}</span>
+              <div class="expense-card__actions">
+                <button class="expense-edit-btn" on:click|stopPropagation={() => startEditExpense(exp)} title={$t("common.edit")}>✎</button>
+                <button class="expense-del-btn" on:click|stopPropagation={() => removeExpenseEntry(exp.id)} title={$t("finance.expensesDelete")}>✕</button>
+              </div>
+            </div>
+          {/if}
+        {/each}
+      {/if}
+    </div>
+  </div>
+  {/if}
 </div>
 
 <style>
@@ -669,41 +1148,82 @@
     --fi-shadow: var(--mcp-shadow, 0 8px 32px rgba(0, 0, 0, 0.15));
     --fi-shadow-glow: var(--mcp-shadow-glow, 0 0 40px rgba(80, 170, 210, 0.06));
 
-    padding: 24px 16px 32px;
+    padding: 20px 16px 36px;
     height: 100%;
     overflow-y: auto;
     background: var(--fi-bg);
     color: var(--fi-text);
-    max-width: 1200px;
+    max-width: 1080px;
     margin: 0 auto;
   }
 
-  .finance-tracker h2 {
-    margin: 0 0 22px;
-    font-size: 20px;
+  /* ── Top bar: month + tabs ───────────────────────────── */
+  .fin-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 16px;
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--fi-border);
+  }
+
+  .fin-title {
+    margin: 0;
+    flex: 1;
+    min-width: 160px;
+    font-size: 18px;
     font-weight: 700;
-    color: var(--fi-text);
-    text-align: center;
     letter-spacing: -0.02em;
+    color: var(--fi-text);
+    text-align: left;
+  }
+
+  .fin-tabs {
+    display: inline-flex;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--fi-surface);
+    border: 1px solid var(--fi-border);
+  }
+
+  .fin-tab {
+    padding: 7px 16px;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--fi-muted);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  }
+
+  .fin-tab:hover { color: var(--fi-text); }
+
+  .fin-tab.is-active {
+    background: var(--fi-accent);
+    color: var(--text-on-accent, #fff);
+    box-shadow: 0 2px 10px color-mix(in srgb, var(--fi-accent) 35%, transparent);
   }
 
   /* ── Month navigator ─────────────────────────────────── */
   .month-selector {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin-bottom: 16px;
+    gap: 6px;
   }
 
   .month-nav-btn {
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     border: 1px solid var(--fi-border);
-    border-radius: var(--fi-radius-sm);
+    border-radius: 10px;
     background: var(--fi-surface);
     backdrop-filter: var(--fi-blur);
     -webkit-backdrop-filter: var(--fi-blur);
@@ -730,18 +1250,19 @@
   }
 
   .month-select {
-    border-radius: var(--fi-radius-sm);
+    border-radius: 10px;
     border: 1px solid var(--fi-border);
     background: var(--fi-surface);
     backdrop-filter: var(--fi-blur);
     -webkit-backdrop-filter: var(--fi-blur);
     color: var(--fi-text);
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
     font-family: inherit;
-    min-width: 180px;
+    min-width: 150px;
     text-align: center;
     cursor: pointer;
+    padding: 7px 10px;
     transition: all 0.2s ease;
   }
 
@@ -755,12 +1276,308 @@
     border-color: var(--fi-accent);
   }
 
+  /* ── Expense form ────────────────────────────────────── */
+  .expense-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .expense-input {
+    flex: 1;
+    min-width: 110px;
+    padding: 0 12px;
+    font-size: 12.5px;
+    font-family: inherit;
+    border: 1px solid var(--fi-border);
+    border-radius: 12px;
+    background: var(--background-primary);
+    color: var(--fi-text);
+    height: 36px;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    outline: none;
+  }
+
+  select.expense-input {
+    padding-right: 28px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--fi-muted) 50%),
+      linear-gradient(135deg, var(--fi-muted) 50%, transparent 50%);
+    background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    cursor: pointer;
+  }
+
+  select.expense-input option {
+    background: var(--background-primary);
+    color: var(--fi-text);
+  }
+
+  .expense-input.amount { max-width: 110px; flex: 0 0 110px; }
+  .expense-input.date { max-width: 140px; flex: 0 0 140px; }
+
+  .expense-input:focus {
+    outline: none;
+    border-color: var(--fi-accent);
+  }
+
+  .expense-add-btn {
+    padding: 8px 14px;
+    border: none;
+    border-radius: 10px;
+    background: var(--fi-accent);
+    color: var(--text-on-accent, #fff);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .expense-add-btn:hover { filter: brightness(1.08); }
+
+  .expenses-ai-btn,
+  .manage-cats-btn {
+    margin: 4px 0 8px;
+  }
+
+  /* Modern expense list */
+  .expense-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0 12px;
+  }
+
+  .expense-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--fi-border);
+    font-size: 11.5px;
+    font-weight: 600;
+  }
+
+  .expense-chip__icon { font-size: 13px; line-height: 1; }
+  .expense-chip__name { color: var(--fi-muted); }
+  .expense-chip__amt {
+    font-variant-numeric: tabular-nums;
+    color: var(--fi-text);
+  }
+
+  .expense-list.modern {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .expense-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid var(--fi-border);
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01));
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.12s, box-shadow 0.15s;
+  }
+
+  .expense-card:hover {
+    border-color: color-mix(in srgb, var(--fi-accent) 28%, var(--fi-border));
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  }
+
+  .expense-card.editing {
+    flex-wrap: wrap;
+    cursor: default;
+  }
+
+  .expense-card__icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--fi-border);
+    flex-shrink: 0;
+  }
+
+  .expense-card__body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .expense-card__name {
+    font-size: 13px;
+    font-weight: 650;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .expense-card__meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .expense-card__cat {
+    font-size: 10px;
+    font-weight: 650;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--fi-accent) 12%, transparent);
+    color: var(--fi-accent);
+  }
+
+  .expense-card__date {
+    font-size: 11px;
+    color: var(--fi-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .expense-card__amt {
+    font-size: 14px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .expense-card__actions {
+    display: flex;
+    gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+
+  .expense-card:hover .expense-card__actions { opacity: 1; }
+
+  .expense-edit-btn,
+  .expense-del-btn,
+  .expense-save-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--fi-muted);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .expense-edit-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--fi-text); }
+  .expense-del-btn:hover { background: color-mix(in srgb, var(--fi-red) 15%, transparent); color: var(--fi-red); }
+  .expense-save-btn { background: var(--fi-accent); color: #fff; }
+
+  .expense-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 32px 16px;
+    border: 1px dashed var(--fi-border);
+    border-radius: 14px;
+    color: var(--fi-muted);
+  }
+
+  .expense-empty__icon { font-size: 28px; opacity: 0.5; }
+  .expense-empty__text { font-size: 13px; }
+
+  .expenses-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 6px 0 10px;
+  }
+
+  .cat-manager {
+    border: 1px solid var(--fi-border);
+    border-radius: var(--fi-radius-sm);
+    padding: 10px;
+    margin-bottom: 12px;
+    background: color-mix(in srgb, var(--fi-surface) 80%, transparent);
+  }
+
+  .cat-manager__list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
+  .cat-manager__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 6px;
+    border-radius: 8px;
+    font-size: 12.5px;
+  }
+
+  .cat-manager__row:hover {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .cat-manager__icon {
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .cat-manager__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: transparent;
+    border: none;
+    color: var(--fi-text);
+    font-family: inherit;
+    font-size: 12.5px;
+  }
+
+  .cat-manager__row.editing .cat-manager__name {
+    border: 1px solid var(--fi-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    background: var(--background-primary);
+  }
+
+  .cat-manager__builtin {
+    font-size: 10px;
+    color: var(--fi-muted);
+    opacity: 0.5;
+    width: 24px;
+    text-align: center;
+  }
+
   /* ── Duplicate button ────────────────────────────────── */
   .dup-btn {
     display: block;
-    margin: 0 auto 20px;
+    margin: 0 auto 18px;
     border: 1px solid var(--fi-border);
-    border-radius: var(--fi-radius-sm);
+    border-radius: 10px;
     background: var(--fi-surface);
     backdrop-filter: var(--fi-blur);
     -webkit-backdrop-filter: var(--fi-blur);
@@ -769,6 +1586,7 @@
     font-size: 12px;
     font-weight: 500;
     font-family: inherit;
+    padding: 8px 14px;
     transition: all 0.2s ease;
   }
 
@@ -780,20 +1598,22 @@
 
   /* ── Glass card ──────────────────────────────────────── */
   .glass-card {
-    background: var(--fi-surface);
+    background:
+      linear-gradient(160deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.01)),
+      var(--fi-surface);
     backdrop-filter: var(--fi-blur);
     -webkit-backdrop-filter: var(--fi-blur);
     border: 1px solid var(--fi-border);
     border-radius: var(--fi-radius);
-    padding: 20px;
-    margin-bottom: 16px;
-    box-shadow: var(--fi-shadow);
-    transition: all 0.25s ease;
+    padding: 18px 18px 16px;
+    margin-bottom: 14px;
+    box-shadow: var(--fi-shadow), var(--fi-shadow-glow);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   .glass-card:hover {
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: var(--fi-shadow-glow);
+    border-color: color-mix(in srgb, var(--fi-accent) 18%, var(--fi-border));
+    box-shadow: var(--fi-shadow), 0 0 0 1px color-mix(in srgb, var(--fi-accent) 10%, transparent);
   }
 
   .glass-card-header {
@@ -1263,6 +2083,126 @@
   .goal-percent {
     font-size: 11px;
     color: var(--fi-muted);
+  }
+
+  .goal-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .goal-month-add {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--fi-green);
+    background: color-mix(in srgb, var(--fi-green) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--fi-green) 25%, transparent);
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+
+  .goal-brought {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--fi-muted);
+    background: var(--fi-border);
+    padding: 1px 6px;
+    border-radius: 999px;
+  }
+
+  .goal-adjust {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+  }
+
+  .goal-adjust-mode {
+    display: inline-flex;
+    border: 1px solid var(--fi-border);
+    border-radius: var(--fi-radius-sm);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .goal-adjust-mode-btn {
+    padding: 4px 8px;
+    font-size: 10px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--fi-muted);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .goal-adjust-mode-btn + .goal-adjust-mode-btn {
+    border-left: 1px solid var(--fi-border);
+  }
+
+  .goal-adjust-mode-btn.active {
+    background: var(--fi-accent);
+    color: var(--text-on-accent, #fff);
+  }
+
+  .goal-adjust-input {
+    width: 72px;
+    padding: 5px 8px;
+    font-size: 12px;
+    border: 1px solid var(--fi-border);
+    border-radius: var(--fi-radius-sm);
+    background: var(--background-primary);
+    color: var(--fi-text);
+  }
+
+  .goal-adjust-input:focus {
+    outline: none;
+    border-color: var(--fi-accent);
+  }
+
+  .goal-adjust-btn {
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: var(--fi-radius-sm);
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.12s;
+    white-space: nowrap;
+  }
+
+  .goal-adjust-btn:active {
+    transform: scale(0.97);
+  }
+
+  .goal-adjust-btn.deposit {
+    background: color-mix(in srgb, var(--fi-green) 16%, transparent);
+    color: var(--fi-green);
+    border-color: color-mix(in srgb, var(--fi-green) 30%, transparent);
+  }
+
+  .goal-adjust-btn.deposit:hover {
+    filter: brightness(1.1);
+  }
+
+  .goal-adjust-btn.withdraw {
+    background: color-mix(in srgb, var(--fi-red, #e74c3c) 12%, transparent);
+    color: var(--fi-red, #e74c3c);
+    border-color: color-mix(in srgb, var(--fi-red, #e74c3c) 28%, transparent);
+  }
+
+  .goal-adjust-btn.withdraw:hover {
+    filter: brightness(1.1);
+  }
+
+  .goal-complete {
+    opacity: 0.75;
+  }
+
+  .goal-progress-fill.complete {
+    background: var(--fi-green);
   }
 
   /* ── Add button ──────────────────────────────────────── */

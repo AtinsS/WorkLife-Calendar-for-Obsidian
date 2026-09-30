@@ -5,7 +5,9 @@
   import { settings } from "../ui/stores";
   import { fetchWeekWeather, type DayWeather } from "../services/weatherService";
   import { t, tArray } from "../i18n";
-  import WeightQuickInput from "../weight/WeightQuickInput.svelte";
+  import { weightData } from "../weight/stores";
+  import { latestWeight } from "../weight/stats";
+  import { WeightEntryModal } from "../weight/WeightEntryModal";
 
   export let appInstance: App;
   export let onOpenTasks: (() => void) | undefined = undefined;
@@ -131,6 +133,14 @@
   $: showSearch = $settings.helloShowSearch !== false;
   $: showWeightInput =
     $settings.weightControlEnabled !== false && $settings.helloShowWeight !== false;
+  $: currentWeight = latestWeight($weightData?.entries || []);
+  $: weightLabel = currentWeight
+    ? `${currentWeight.weight.toFixed(1).replace(/\.0$/, "")} ${$t("weight.unit")}`
+    : $t("weight.quickTitle");
+
+  function openWeightModal() {
+    new WeightEntryModal(appInstance, currentWeight ? String(currentWeight.weight) : "").open();
+  }
   $: hour = now.hour();
   $: greetingText = hour < 6 ? $t("hello.goodNight") : hour < 12 ? $t("hello.goodMorning") : hour < 18 ? $t("hello.goodAfternoon") : $t("hello.goodEvening");
   $: greeting = userName ? `${greetingText}, ${userName}` : greetingText;
@@ -209,31 +219,37 @@
     <h1 class="hello-title">{greeting} <span class="hello-emoji">{greetingEmoji}</span></h1>
     <p class="hello-date">{dateDisplay}</p>
     {#if weather}
-      <p class="hello-weather-label">{weather.icon} {weather.label} {weather.tempMin}…{weather.tempMax}°C</p>
+      <div class="hello-weather-card" title={weather.label}>
+        <span class="hello-weather-card__icon" aria-hidden="true">{weather.icon}</span>
+        <span class="hello-weather-card__temp">{weather.tempMin}…{weather.tempMax}°</span>
+        <span class="hello-weather-card__label">{weather.label}</span>
+      </div>
     {/if}
   </div>
 
-  <!-- Note search -->
-  {#if showSearch}
-    <div class="hello-search">
-      <svg class="hello-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <input
-        class="hello-search__input"
-        type="text"
-        placeholder={$t("hello.searchPlaceholder")}
-        bind:value={noteSearchQuery}
-        bind:this={searchInputEl}
-        on:input={searchNotes}
-      />
-    </div>
-  {/if}
+  <!-- Search + weight -->
+  <div class="hello-toolbar">
+    {#if showSearch}
+      <div class="hello-search">
+        <svg class="hello-search__icon" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <input
+          class="hello-search__input"
+          type="text"
+          placeholder={$t("hello.searchPlaceholder")}
+          bind:value={noteSearchQuery}
+          bind:this={searchInputEl}
+          on:input={searchNotes}
+        />
+      </div>
+    {/if}
 
-  <!-- Quick weight entry -->
-  {#if showWeightInput}
-    <div class="hello-weight">
-      <WeightQuickInput />
-    </div>
-  {/if}
+    {#if showWeightInput}
+      <button class="hello-weight-btn" on:click={openWeightModal} title={$t("weight.quickTitle")}>
+        <span class="hello-weight-btn__icon">⚖️</span>
+        <span class="hello-weight-btn__value">{weightLabel}</span>
+      </button>
+    {/if}
+  </div>
 
   <!-- Nav -->
   <div class="hello-nav">
@@ -273,6 +289,7 @@
     position: relative;
     overflow: hidden;
     border-radius: 0;
+    padding: 18px 16px 8px;
     transition: background 1s ease;
   }
 
@@ -406,42 +423,85 @@
     96% { opacity: 0.85; }
   }
 
-  /* Sun */
+  /* Sun — realistic disc + soft atmospheric glow */
   .sun {
     position: absolute;
-    top: -30px;
-    right: -30px;
-    width: 120px;
-    height: 120px;
-    animation: sun-pulse 4s ease-in-out infinite;
+    top: -28px;
+    right: 8%;
+    width: 200px;
+    height: 200px;
+    pointer-events: none;
   }
 
   .sun-core {
     position: absolute;
     top: 50%; left: 50%;
     transform: translate(-50%, -50%);
-    width: 50px; height: 50px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(255, 214, 0, 0.3) 0%, rgba(255, 183, 77, 0.1) 60%, transparent 100%);
-    box-shadow: 0 0 40px rgba(255, 214, 0, 0.15), 0 0 80px rgba(255, 183, 77, 0.08);
+    /* Soft realistic sun body */
+    background: radial-gradient(
+      circle at 42% 38%,
+      #fff7d6 0%,
+      #ffe9a0 18%,
+      #ffd56e 38%,
+      #ffb84d 58%,
+      rgba(255, 170, 70, 0.55) 72%,
+      rgba(255, 150, 50, 0.15) 86%,
+      transparent 100%
+    );
+    box-shadow:
+      0 0 18px rgba(255, 214, 120, 0.45),
+      0 0 48px rgba(255, 190, 80, 0.28),
+      0 0 90px rgba(255, 160, 50, 0.16),
+      0 0 140px rgba(255, 140, 40, 0.08);
+    animation: sun-breathe 7s ease-in-out infinite;
   }
 
+  /* Rays as very soft light spikes — barely visible, like haze */
   .sun-ray {
     position: absolute;
-    top: 50%; left: 50%;
-    width: 2px; height: 40px;
-    background: linear-gradient(180deg, rgba(255, 214, 0, 0.2), transparent);
+    top: 50%;
+    left: 50%;
+    width: 3px;
+    height: 52px;
+    margin-left: -1.5px;
+    background: linear-gradient(
+      180deg,
+      rgba(255, 220, 140, 0.28),
+      rgba(255, 190, 90, 0.1) 55%,
+      transparent
+    );
     transform-origin: center top;
-    border-radius: 1px;
+    border-radius: 999px;
+    filter: blur(3px);
+    opacity: 0.55;
   }
 
-  @keyframes sun-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.8; }
-    50% { transform: scale(1.05); opacity: 1; }
+  .sun-ray:nth-child(odd) {
+    height: 42px;
+    opacity: 0.4;
+    filter: blur(4px);
+  }
+
+  @keyframes sun-breathe {
+    0%, 100% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.92;
+    }
+    50% {
+      transform: translate(-50%, -50%) scale(1.03);
+      opacity: 1;
+    }
   }
 
   /* ═══ HERO ═══════════════════════════════ */
-  .hello-hero { text-align: center; margin-bottom: 28px; }
+  .hello-hero {
+    text-align: center;
+    margin-bottom: 28px;
+    padding-top: 8px;
+  }
 
   .hello-title {
     font-size: 36px;
@@ -454,10 +514,60 @@
 
   .hello-date { margin: 0; font-size: 14px; color: var(--text-muted, #6b7280); font-weight: 500; }
 
-  .hello-weather-label {
-    margin: 6px 0 0;
+  /* Compact, high-contrast weather chip */
+  .hello-weather-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-top: 12px;
+    padding: 5px 12px 5px 8px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+
+  .hello-weather-card__icon {
+    font-size: 16px;
+    line-height: 1;
+  }
+
+  .hello-weather-card__temp {
     font-size: 13px;
-    color: var(--text-muted, #6b7280);
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    color: var(--text-normal, #fff);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .hello-weather-card__label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted, #c5cad3);
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 1;
+  }
+
+  /* Search + weight toolbar */
+  .hello-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    max-width: 480px;
+    margin: 0 auto 18px;
+    width: 100%;
+  }
+
+  .hello-toolbar .hello-search {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    max-width: none;
   }
 
   /* ═══ NAV ════════════════════════════════ */
@@ -563,9 +673,42 @@
     color: var(--text-faint, #4b5563);
   }
 
-  /* ═══ QUICK WEIGHT ═══════════════════════ */
-  .hello-weight {
-    max-width: 420px;
-    margin: -16px auto 20px;
+  /* ═══ QUICK WEIGHT BUTTON (next to search) ═══ */
+  .hello-weight-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 13px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-normal, #e8ecf0);
+    font-size: 12px;
+    font-weight: 650;
+    font-family: inherit;
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+    transition: border-color 0.15s, background 0.15s, transform 0.12s;
+  }
+
+  .hello-weight-btn:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .hello-weight-btn:active {
+    transform: scale(0.97);
+  }
+
+  .hello-weight-btn__icon {
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .hello-weight-btn__value {
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
   }
 </style>

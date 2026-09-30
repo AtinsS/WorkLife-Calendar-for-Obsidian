@@ -1,7 +1,7 @@
 import { writable, get } from "svelte/store";
 import type CalendarPlugin from "../main";
 import type { IFinanceData, FinanceMonthData, MonthGoal } from "./types";
-import { createEmptyMonthData, generateGoalId } from "./types";
+import { createEmptyMonthData, generateGoalId, getGoalMonthContribution, isGoalComplete } from "./types";
 import { loadModuleData, saveModuleData } from "../io/vaultStorage";
 
 export const financeData = writable<IFinanceData>({});
@@ -98,6 +98,7 @@ export function getMonthData(monthKey: string): FinanceMonthData {
     monthGoals: (raw.monthGoals || []).map((g) => ({ ...g })),
     savingsCategories: (raw.savingsCategories || []).map((c) => ({ ...c })),
     distributionRules: [...raw.distributionRules],
+    expenses: (raw.expenses || []).map((e) => ({ ...e })),
   };
 
   // Migration: convert old string[] monthGoals to MonthGoal[]
@@ -108,8 +109,18 @@ export function getMonthData(monthKey: string): FinanceMonthData {
       name: typeof g === "string" ? g : "Цель",
       currentAmount: 0,
       targetAmount: 0,
+      broughtForward: 0,
     }));
   }
+
+  // Migration: ensure goals have broughtForward (treat missing as "saved before this month")
+  // so multi-month goals don't count their whole history against this month's balance.
+  data.monthGoals = (data.monthGoals || []).map((g) => ({
+    ...g,
+    broughtForward: g.broughtForward ?? g.currentAmount ?? 0,
+    currentAmount: g.currentAmount ?? 0,
+    targetAmount: g.targetAmount ?? 0,
+  }));
 
   // Migration: ensure savingsCategories have percent and completed
   if (data.savingsCategories) {
@@ -153,7 +164,14 @@ export function getSavingsTotal(monthKey: string): number {
 
 export function getCurrentBalance(monthKey: string): number {
   const data = getMonthData(monthKey);
-  return data.monthlyIncome - data.lastMonthExpense;
+  const mainTotal = data.mainAccountCategories.reduce((sum, c) => sum + c.amount, 0);
+  return data.monthlyIncome - mainTotal - getMonthGoalContributions(monthKey);
+}
+
+/** Sum of goal deposits made THIS month (excludes money carried over from previous months). */
+export function getMonthGoalContributions(monthKey: string): number {
+  const data = getMonthData(monthKey);
+  return (data.monthGoals || []).reduce((sum, g) => sum + getGoalMonthContribution(g), 0);
 }
 
 export function getMonthGoals(monthKey: string): MonthGoal[] {
@@ -188,6 +206,33 @@ export function deleteMonthsBefore(cutoffKey: string): number {
 }
 
 const ARCHIVE_KEY = "_archive";
+const EXPENSE_CATS_KEY = "_expenseCategories";
+
+type ExpenseCatsMeta = {
+  expenseCategories: import("./expenseCategories").ExpenseCategoryDef[];
+  updatedAt: string;
+};
+
+/** Custom expense categories (built on top of built-in taxonomy). */
+export function getCustomExpenseCategories(): import("./expenseCategories").ExpenseCategoryDef[] {
+  const all = get(financeData) as Record<string, unknown>;
+  const raw = all[EXPENSE_CATS_KEY] as ExpenseCatsMeta | undefined;
+  return raw?.expenseCategories || [];
+}
+
+export function saveCustomExpenseCategories(
+  cats: import("./expenseCategories").ExpenseCategoryDef[],
+): void {
+  financeData.update((current) => {
+    const next = { ...current } as Record<string, unknown>;
+    next[EXPENSE_CATS_KEY] = {
+      expenseCategories: cats,
+      updatedAt: new Date().toISOString(),
+    } satisfies ExpenseCatsMeta;
+    return next as typeof current;
+  });
+  void debouncedSave();
+}
 
 export function getArchivedGoals(): MonthGoal[] {
   const all = get(financeData);
@@ -211,59 +256,134 @@ export function deleteArchivedGoal(goalId: string): void {
   void debouncedSave();
 }
 
-export function rolloverGoals(prevMonthKey: string, currentMonthKey: string): void {
+function normalizeGoalForCarry(goal: MonthGoal): MonthGoal {
+  return {
+    ...goal,
+    currentAmount: goal.currentAmount ?? 0,
+    targetAmount: goal.targetAmount ?? 0,
+    // Money already saved before the target month — not this month's deposit
+    broughtForward: goal.currentAmount ?? 0,
+  };
+}
+
+/** Expand YYYY-MM keys into a continuous chain from the earliest key through currentMonthKey. */
+function expandMonthChain(keys: string[], currentMonthKey: string): string[] {
+  const sorted = [...new Set([...keys, currentMonthKey])].sort();
+  const start = sorted[0] || currentMonthKey;
+  const [sy, sm] = start.split("-").map(Number);
+  const [ey, em] = currentMonthKey.split("-").map(Number);
+  const chain: string[] = [];
+  let y = sy;
+  let m = sm;
+  while (y < ey || (y === ey && m <= em)) {
+    chain.push(`${y}-${String(m).padStart(2, "0")}`);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return chain;
+}
+
+/**
+ * Carry savings goals forward month by month until they are fully funded.
+ * - Incomplete goals are DUPLICATED into the next month (history is kept in previous months),
+ *   including the accumulated money (`currentAmount` → `broughtForward`).
+ * - Completed goals are archived and do not continue.
+ * - Runs as a cascade so opening a later month fills the gap from earlier ones.
+ */
+export function ensureGoalsRollover(currentMonthKey: string): void {
   const all = get(financeData);
-  const prevData = all[prevMonthKey];
-  if (!prevData || !prevData.monthGoals || prevData.monthGoals.length === 0) return;
+  const existingKeys = Object.keys(all).filter((k) => k !== ARCHIVE_KEY && k <= currentMonthKey);
+  const chain = expandMonthChain(existingKeys, currentMonthKey);
 
-  const currentData = all[currentMonthKey];
-  const currentGoalIds = new Set((currentData?.monthGoals || []).map((g) => g.id));
+  // Build a working copy of goals for every month in the chain
+  const goalsByMonth: Record<string, MonthGoal[]> = {};
+  for (const key of chain) {
+    goalsByMonth[key] = (all[key]?.monthGoals || []).map((g) => ({
+      ...g,
+      currentAmount: g.currentAmount ?? 0,
+      targetAmount: g.targetAmount ?? 0,
+      broughtForward: g.broughtForward ?? g.currentAmount ?? 0,
+    }));
+  }
 
-  const completed: MonthGoal[] = [];
-  const incomplete: MonthGoal[] = [];
+  const archivedIds = new Set(getArchivedGoals().map((g) => g.id));
+  const newArchived: MonthGoal[] = [];
+  let changed = false;
 
-  for (const goal of prevData.monthGoals) {
-    if (currentGoalIds.has(goal.id)) continue; // already in current month
-    if (goal.currentAmount >= goal.targetAmount && goal.targetAmount > 0) {
-      completed.push({ ...goal });
-    } else {
-      incomplete.push({ ...goal });
+  for (let i = 0; i < chain.length - 1; i++) {
+    const fromKey = chain[i];
+    const toKey = chain[i + 1];
+    const fromGoals = goalsByMonth[fromKey];
+    const toGoals = goalsByMonth[toKey];
+    const toIds = new Set(toGoals.map((g) => g.id));
+
+    for (const goal of fromGoals) {
+      if (toIds.has(goal.id)) continue;
+
+      if (isGoalComplete(goal)) {
+        if (!archivedIds.has(goal.id)) {
+          newArchived.push({ ...goal });
+          archivedIds.add(goal.id);
+          changed = true;
+        }
+        continue;
+      }
+
+      toGoals.push(normalizeGoalForCarry(goal));
+      toIds.add(goal.id);
+      changed = true;
     }
   }
 
-  if (completed.length === 0 && incomplete.length === 0) return;
+  // Archive completed goals sitting in past months that never got archived
+  for (const key of chain) {
+    if (key === currentMonthKey) continue;
+    for (const goal of goalsByMonth[key]) {
+      if (isGoalComplete(goal) && !archivedIds.has(goal.id)) {
+        newArchived.push({ ...goal });
+        archivedIds.add(goal.id);
+        changed = true;
+      }
+    }
+  }
+
+  if (!changed) return;
 
   financeData.update((current) => {
     const next = { ...current };
 
-    // Move completed goals to archive
-    if (completed.length > 0) {
+    if (newArchived.length > 0) {
       const existingArchive = next[ARCHIVE_KEY]?.monthGoals || [];
-      next[ARCHIVE_KEY] = {
-        ...(next[ARCHIVE_KEY] || createEmptyMonthData()),
-        monthGoals: [...existingArchive, ...completed],
-        updatedAt: new Date().toISOString(),
-      };
+      const existingIds = new Set(existingArchive.map((g) => g.id));
+      const toAdd = newArchived.filter((g) => !existingIds.has(g.id));
+      if (toAdd.length > 0) {
+        next[ARCHIVE_KEY] = {
+          ...(next[ARCHIVE_KEY] || createEmptyMonthData()),
+          monthGoals: [...existingArchive, ...toAdd],
+          updatedAt: new Date().toISOString(),
+        };
+      }
     }
 
-    // Move incomplete goals to current month
-    if (incomplete.length > 0) {
-      const curData = next[currentMonthKey] || createEmptyMonthData();
-      next[currentMonthKey] = {
-        ...curData,
-        monthGoals: [...(curData.monthGoals || []), ...incomplete],
-        updatedAt: new Date().toISOString(),
-      };
-    }
+    for (const key of Object.keys(goalsByMonth)) {
+      const prevGoals = next[key]?.monthGoals || [];
+      const nextGoals = goalsByMonth[key];
+      const prevIds = new Set(prevGoals.map((g) => g.id));
+      const nextIds = new Set(nextGoals.map((g) => g.id));
+      const same =
+        prevIds.size === nextIds.size &&
+        [...nextIds].every((id) => prevIds.has(id));
+      if (same && next[key]) continue;
 
-    // Remove rolled-over goals from previous month
-    const prevGoalsRemaining = (next[prevMonthKey]?.monthGoals || []).filter(
-      (g) => !completed.some((c) => c.id === g.id) && !incomplete.some((i) => i.id === g.id)
-    );
-    if (next[prevMonthKey]) {
-      next[prevMonthKey] = {
-        ...next[prevMonthKey],
-        monthGoals: prevGoalsRemaining,
+      // Only write months that already exist or that received carried goals
+      if (!next[key] && nextGoals.length === 0) continue;
+
+      next[key] = {
+        ...(next[key] || createEmptyMonthData()),
+        monthGoals: nextGoals,
         updatedAt: new Date().toISOString(),
       };
     }
@@ -271,4 +391,10 @@ export function rolloverGoals(prevMonthKey: string, currentMonthKey: string): vo
     return next;
   });
   void debouncedSave();
+}
+
+/** @deprecated Use ensureGoalsRollover — kept for existing call sites. */
+export function rolloverGoals(prevMonthKey: string, currentMonthKey: string): void {
+  void prevMonthKey;
+  ensureGoalsRollover(currentMonthKey);
 }

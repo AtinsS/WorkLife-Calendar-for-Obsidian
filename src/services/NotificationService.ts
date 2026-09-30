@@ -37,10 +37,14 @@ export const defaultNotificationSettings: NotificationSettings = {
 };
 
 const NTFY_DEDUP_KEY = "worklife-ntfy-scheduled";
+const DIGEST_ENSURE_INTERVAL_MS = 15 * 60_000;
 
 export class NotificationService {
   private plugin: CalendarPlugin;
   private timer: number | null = null;
+  private digestTimer: number | null = null;
+  private digestScheduling = false;
+  private lastDigestDate = "";
   private firedReminders = new Set<string>();
   private firedOverdue = new Set<string>();
   private firedDeadline = new Set<string>();
@@ -62,12 +66,21 @@ export class NotificationService {
     }
   }
 
-  /** Persist the dedup map, pruning entries whose delivery time is already past. */
+  /** Persist the dedup map. Digest keys survive until end of their calendar day. */
   private saveNtfySchedule(map: Record<string, number>): void {
     const now = Math.floor(Date.now() / 1000);
     const pruned: Record<string, number> = {};
     for (const [k, v] of Object.entries(map)) {
-      if (v > now) pruned[k] = v;
+      if (v > now) {
+        pruned[k] = v;
+        continue;
+      }
+      // daily-digest-YYYY-MM-DD: keep until that day ends so we never re-send
+      const m = /^daily-digest-(\d{4}-\d{2}-\d{2})$/.exec(k);
+      if (m) {
+        const endOfDay = Math.floor(new Date(`${m[1]}T23:59:59.999`).getTime() / 1000);
+        if (now <= endOfDay) pruned[k] = v;
+      }
     }
     try {
       this.plugin.app.saveLocalStorage(NTFY_DEDUP_KEY, JSON.stringify(pruned));
@@ -81,6 +94,11 @@ export class NotificationService {
     this.requestPermission();
     this.timer = window.setInterval(() => this.check(), this.getSettings().checkIntervalMs);
     this.check(); // run immediately
+
+    const opts = this.plugin.options;
+    if (opts.ntfyEnabled && opts.ntfyDailyDigestEnabled && opts.ntfyTopic) {
+      this.ensureDailyDigestLoop();
+    }
   }
 
   stop(): void {
@@ -88,6 +106,7 @@ export class NotificationService {
       window.clearInterval(this.timer);
       this.timer = null;
     }
+    this.stopDailyDigestLoop();
     this.firedReminders.clear();
     this.firedOverdue.clear();
     this.firedDeadline.clear();
@@ -392,10 +411,14 @@ export class NotificationService {
 
   /** Schedule an ntfy.sh push at 06:00 with the current day's task list.
    *  Delivery is delayed via X-Delay so it arrives even if Obsidian is closed.
-   *  Dedup key is per calendar day — reopening Obsidian won't schedule twice. */
+   *  Idempotent: one message per calendar day (key `daily-digest-YYYY-MM-DD`). */
   scheduleNtfyDailyDigest(): void {
     const opts: ISettings = this.plugin.options;
     if (!opts.ntfyEnabled || !opts.ntfyDailyDigestEnabled || !opts.ntfyTopic) return;
+    if (this.digestScheduling) return;
+
+    // Keep checking daily so long-running sessions still get tomorrow's digest
+    this.ensureDailyDigestLoop();
 
     const now = momentFn();
     let delivery = now.clone().hour(6).minute(0).second(0).millisecond(0);
@@ -407,37 +430,64 @@ export class NotificationService {
     const dedupeKey = `daily-digest-${digestDate}`;
     const fireUnix = Math.floor(delivery.valueOf() / 1000);
     const scheduled = this.loadNtfySchedule();
-    if (scheduled[dedupeKey] === fireUnix) return;
 
-    const dayTasks = get(tasks)
-      .filter((t) => {
-        if (t.completed || t.status === "done" || t.status === "paused") return false;
-        const match = /^day-(\d{4}-\d{2}-\d{2})/.exec(t.dateUID);
-        return match?.[1] === digestDate;
-      })
-      .sort((a, b) => {
-        const at = a.scheduledTime || "99:99";
-        const bt = b.scheduledTime || "99:99";
-        return at.localeCompare(bt) || a.title.localeCompare(b.title);
-      });
+    // Already queued for this date — never send a second copy
+    if (scheduled[dedupeKey] !== undefined) return;
 
-    const dateLabel = delivery.format("DD.MM.YYYY");
-    const body = dayTasks.length
-      ? tRaw("notifications.dailyDigest", {
-          date: dateLabel,
-          list: dayTasks
-            .map((t) => {
-              const time = t.scheduledTime || "—".padStart(5);
-              return `${time}  ${t.title}`;
-            })
-            .join("\n"),
-          count: String(dayTasks.length),
+    this.digestScheduling = true;
+    try {
+      const dayTasks = get(tasks)
+        .filter((t) => {
+          if (t.completed || t.status === "done" || t.status === "paused") return false;
+          const match = /^day-(\d{4}-\d{2}-\d{2})/.exec(t.dateUID);
+          return match?.[1] === digestDate;
         })
-      : tRaw("notifications.dailyDigestEmpty", { date: dateLabel });
+        .sort((a, b) => {
+          const at = a.scheduledTime || "99:99";
+          const bt = b.scheduledTime || "99:99";
+          return at.localeCompare(bt) || a.title.localeCompare(b.title);
+        });
 
-    this.sendNtfyDelayed(tRaw("taskStore.notificationTitle"), body, delivery.toISOString(), dedupeKey);
-    scheduled[dedupeKey] = fireUnix;
-    this.saveNtfySchedule(scheduled);
+      const dateLabel = delivery.format("DD.MM.YYYY");
+      const body = dayTasks.length
+        ? tRaw("notifications.dailyDigest", {
+            date: dateLabel,
+            list: dayTasks
+              .map((t) => {
+                const time = t.scheduledTime || "—".padStart(5);
+                return `${time}  ${t.title}`;
+              })
+              .join("\n"),
+            count: String(dayTasks.length),
+          })
+        : tRaw("notifications.dailyDigestEmpty", { date: dateLabel });
+
+      // Mark BEFORE network call so a concurrent tick cannot double-send
+      scheduled[dedupeKey] = fireUnix;
+      this.lastDigestDate = digestDate;
+      this.saveNtfySchedule(scheduled);
+
+      this.sendNtfyDelayed(tRaw("taskStore.notificationTitle"), body, delivery.toISOString(), dedupeKey);
+    } finally {
+      this.digestScheduling = false;
+    }
+  }
+
+  /** Re-check periodically so a multi-day session still schedules tomorrow's digest. */
+  private ensureDailyDigestLoop(): void {
+    if (this.digestTimer) return;
+    this.digestTimer = window.setInterval(() => {
+      this.scheduleNtfyDailyDigest();
+    }, DIGEST_ENSURE_INTERVAL_MS);
+  }
+
+  private stopDailyDigestLoop(): void {
+    if (this.digestTimer) {
+      window.clearInterval(this.digestTimer);
+      this.digestTimer = null;
+    }
+    this.lastDigestDate = "";
+    this.digestScheduling = false;
   }
 
   private sendNtfyDelayed(title: string, body: string, deliveryIso: string, _dedupeId: string): void {

@@ -98,9 +98,10 @@
 <style>
   .habit-card {
     border: 1px solid var(--mcp-glass-border);
-    border-radius: var(--mcp-radius-sm);
+    border-radius: 14px;
     padding: 14px;
     background: var(--mcp-glass-highlight);
+    overflow: hidden;
     transition: all 0.2s ease;
   }
 

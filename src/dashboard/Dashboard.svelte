@@ -20,7 +20,8 @@
   import type { ITask } from "../task-tracker/types";
   import type { IHabit } from "../habit-tracker/types";
   import { getDateUID } from "obsidian-daily-notes-interface";
-  import { getCurrentMonthKey, financeData, rolloverGoals, getArchivedGoals, deleteArchivedGoal } from "../finance/storage";
+  import { getCurrentMonthKey, financeData, ensureGoalsRollover, getArchivedGoals, deleteArchivedGoal, updateMonthData } from "../finance/storage";
+  import { generateGoalId, isGoalComplete, resolveGoalAdjustment, type GoalAdjustMode, type MonthGoal } from "../finance/types";
   import { settings } from "../ui/stores";
   import { t } from "../i18n";
 
@@ -145,6 +146,111 @@
     return allData[monthKey];
   })();
   $: monthGoals = monthData?.monthGoals || [];
+  $: goalsTotalTarget = monthGoals.reduce((s, g) => s + (g.targetAmount || 0), 0);
+  $: goalsTotalCurrent = monthGoals.reduce((s, g) => s + (g.currentAmount || 0), 0);
+  $: goalsProgress = goalsTotalTarget > 0 ? Math.min(100, Math.round((goalsTotalCurrent / goalsTotalTarget) * 100)) : 0;
+  $: goalsDoneCount = monthGoals.filter((g) => isGoalComplete(g)).length;
+
+  // Goal CRUD
+  function goalPercent(goal: MonthGoal): number {
+    return goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0;
+  }
+
+  function formatMoney(amount: number): string {
+    return (amount || 0).toLocaleString($t("locale.numberLocale"));
+  }
+
+  function addGoal() {
+    const newGoal: MonthGoal = {
+      id: generateGoalId(),
+      icon: "🎯",
+      name: $t("finance.newGoal"),
+      currentAmount: 0,
+      targetAmount: 0,
+      broughtForward: 0,
+    };
+    updateMonthData(monthKey, {
+      monthGoals: [...(monthData?.monthGoals || []), newGoal],
+    });
+    openEditGoal(newGoal);
+  }
+
+  function updateGoal(id: string, changes: Partial<MonthGoal>) {
+    const updated = (monthData?.monthGoals || []).map((g) =>
+      g.id === id ? { ...g, ...changes } : g
+    );
+    updateMonthData(monthKey, { monthGoals: updated });
+  }
+
+  function removeGoal(id: string) {
+    updateMonthData(monthKey, {
+      monthGoals: (monthData?.monthGoals || []).filter((g) => g.id !== id),
+    });
+    if (editingGoal?.id === id) {
+      showGoalModal = false;
+      editingGoal = null;
+    }
+  }
+
+  // Goal modal
+  let showGoalModal = false;
+  let editingGoal: MonthGoal | null = null;
+  let goalIconInput = "🎯";
+  let goalNameInput = "";
+  let goalCurrentInput = "";
+  let goalTargetInput = "";
+  let goalAdjustMode: GoalAdjustMode = "amount";
+  let goalAdjustInput = "";
+
+  // Remainder available for % deposits: income − main expenses − this month's goal deposits
+  $: goalAdjustBalance = (() => {
+    const d = monthData;
+    if (!d) return 0;
+    const main = (d.mainAccountCategories || []).reduce((s, c) => s + (c.amount || 0), 0);
+    const contributed = (d.monthGoals || []).reduce((s, g) => {
+      const brought = g.broughtForward ?? 0;
+      return s + Math.max(0, (g.currentAmount || 0) - brought);
+    }, 0);
+    return (d.monthlyIncome || 0) - main - contributed;
+  })();
+
+  function openEditGoal(goal: MonthGoal) {
+    editingGoal = goal;
+    goalIconInput = goal.icon || "🎯";
+    goalNameInput = goal.name || "";
+    goalCurrentInput = String(goal.currentAmount ?? 0);
+    goalTargetInput = String(goal.targetAmount ?? 0);
+    goalAdjustMode = "amount";
+    goalAdjustInput = "";
+    showGoalModal = true;
+  }
+
+  function applyGoalAdjustToForm(direction: "deposit" | "withdraw") {
+    const raw = parseFloat(String(goalAdjustInput).replace(",", ".")) || 0;
+    const current = Math.max(0, parseFloat(goalCurrentInput) || 0);
+    const delta = resolveGoalAdjustment(raw, goalAdjustMode, direction, {
+      balance: goalAdjustBalance,
+      currentAmount: current,
+    });
+    if (delta === 0) return;
+    goalCurrentInput = String(Math.max(0, current + delta));
+    goalAdjustInput = "";
+  }
+
+  function saveGoalEdit() {
+    if (!editingGoal) return;
+    const current = Math.max(0, parseFloat(goalCurrentInput) || 0);
+    const target = Math.max(0, parseFloat(goalTargetInput) || 0);
+    updateGoal(editingGoal.id, {
+      icon: goalIconInput.trim() || "🎯",
+      name: goalNameInput.trim() || $t("finance.newGoal"),
+      currentAmount: current,
+      targetAmount: target,
+      broughtForward: editingGoal.broughtForward ?? 0,
+    });
+    showGoalModal = false;
+    editingGoal = null;
+  }
 
   // Archive state
   let showArchive = false;
@@ -210,11 +316,8 @@
 
   onMount(async () => {
     data = await loadDashboard(appInstance, filePath);
-    // Rollover goals from previous month
-    const now = new Date();
-    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const prevKey = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, "0")}`;
-    rolloverGoals(prevKey, monthKey);
+    // Carry incomplete savings goals (with money) into the current month
+    ensureGoalsRollover(monthKey);
   });
 
   function openEditCard(card: DashboardCard) {
@@ -409,29 +512,55 @@
     {/if}
 
     <!-- Goals widget -->
-    {#if showGoalsWidget && monthGoals.length > 0}
+    {#if showGoalsWidget}
       <div class="dash-widget-wrap">
-        <button class="dash-widget dash-widget--goals" class:expanded={goalsExpanded} on:click={() => goalsExpanded = !goalsExpanded}>
-          <span class="dash-widget__icon">{monthGoals[0]?.icon || '🎯'}</span>
-          {#if monthGoals.length === 1}
-            <span class="dash-widget__label">{monthGoals[0].name}</span>
-            {@const g = monthGoals[0]}
-            <div class="dash-widget__bar"><div class="dash-widget__bar-fill goal-fill" style="width:{g.targetAmount > 0 ? Math.min(100, Math.round(g.currentAmount / g.targetAmount * 100)) : 0}%"></div></div>
-            <span class="dash-widget__count">{g.currentAmount.toLocaleString($t("locale.numberLocale"))}/{g.targetAmount.toLocaleString($t("locale.numberLocale"))} {$t("locale.currencySymbol")}</span>
-          {:else}
-            <span class="dash-widget__label">{monthGoals[0].name} +{monthGoals.length - 1}</span>
-            <span class="dash-widget__count">{$t("dashboard.goalsCount", {count: monthGoals.length})}</span>
-            <span class="dash-widget__chevron" class:open={goalsExpanded}>›</span>
+        <div class="dash-widget dash-widget--goals" class:expanded={goalsExpanded && monthGoals.length > 1} role="button" tabindex="0" on:click={() => { if (monthGoals.length > 1) goalsExpanded = !goalsExpanded; }} on:keydown={(e) => e.key === "Enter" && monthGoals.length > 1 && (goalsExpanded = !goalsExpanded)}>
+          <span class="dash-widget__icon-wrap" data-kind="goals">
+            <span class="dash-widget__icon">{monthGoals.length === 1 ? (monthGoals[0].icon || "🎯") : "🎯"}</span>
+          </span>
+          <span class="dash-widget__body">
+            {#if monthGoals.length === 1}
+              {@const g = monthGoals[0]}
+              {@const remaining = Math.max(0, (g.targetAmount || 0) - (g.currentAmount || 0))}
+              <span class="dash-widget__label">
+                {g.name}{#if !isGoalComplete(g)}
+                  <span class="dash-widget__remaining"> · {$t("finance.remaining", { amount: `${formatMoney(remaining)} ${$t("locale.currencySymbol")}` })}</span>
+                {/if}
+              </span>
+              <div class="dash-widget__bar"><div class="dash-widget__bar-fill goal-fill" class:complete={goalsProgress >= 100} style="width:{goalPercent(g)}%"></div></div>
+            {:else}
+              <span class="dash-widget__label">{$t("dashboard.savingsGoals")}</span>
+              {#if monthGoals.length > 0}
+                <div class="dash-widget__bar"><div class="dash-widget__bar-fill goal-fill" class:complete={goalsProgress >= 100} style="width:{goalsProgress}%"></div></div>
+              {/if}
+            {/if}
+          </span>
+          {#if monthGoals.length > 1}
+            <span class="dash-widget__count" class:done={goalsDoneCount === monthGoals.length && monthGoals.length > 0}>{goalsDoneCount}/{monthGoals.length}</span>
+          {:else if monthGoals.length === 1}
+            <span class="dash-widget__count" class:done={isGoalComplete(monthGoals[0])}>{goalPercent(monthGoals[0])}%</span>
           {/if}
-        </button>
+          <button class="dash-widget__add-btn" on:click|stopPropagation={addGoal} title={$t("finance.addGoal")}>+</button>
+          {#if monthGoals.length > 1}<span class="dash-widget__chevron" class:open={goalsExpanded}>›</span>{/if}
+        </div>
         {#if goalsExpanded && monthGoals.length > 1}
           <div class="dash-widget__dropdown">
             {#each monthGoals as goal (goal.id)}
-              <div class="dash-goal">
-                <span class="dash-goal-icon">{goal.icon}</span>
-                <span class="dash-goal-name">{goal.name}</span>
-                <div class="dash-goal-bar"><div class="dash-goal-bar-fill" style="width:{goal.targetAmount > 0 ? Math.min(100, Math.round(goal.currentAmount / goal.targetAmount * 100)) : 0}%"></div></div>
-                <span class="dash-goal-amt">{goal.currentAmount.toLocaleString($t("locale.numberLocale"))}/{goal.targetAmount.toLocaleString($t("locale.numberLocale"))} {$t("locale.currencySymbol")}</span>
+              {@const pct = goalPercent(goal)}
+              {@const done = isGoalComplete(goal)}
+              <div class="dash-goal" class:done>
+                <span class="dash-goal-icon">{goal.icon || "🎯"}</span>
+                <div class="dash-goal-main">
+                  <div class="dash-goal-top">
+                    <span class="dash-goal-name" class:strike={done}>{goal.name}</span>
+                    <span class="dash-goal-amt">{formatMoney(goal.currentAmount)} / {formatMoney(goal.targetAmount)} {$t("locale.currencySymbol")}</span>
+                  </div>
+                  <div class="dash-goal-bar"><div class="dash-goal-bar-fill" class:complete={done} style="width:{pct}%"></div></div>
+                </div>
+                <div class="dash-goal-actions">
+                  <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => openEditGoal(goal)} title={$t("common.edit")}>✎</button>
+                  <button class="dash-btn dash-btn--sm dash-btn--danger" on:click|stopPropagation={() => removeGoal(goal.id)} title={$t("common.delete")}>✕</button>
+                </div>
               </div>
             {/each}
           </div>
@@ -599,6 +728,74 @@
   </div>
 {/if}
 
+<!-- Edit goal modal -->
+{#if showGoalModal && editingGoal}
+  <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+  <div class="dash-popup-overlay" role="dialog" aria-modal="true" on:click={(e) => closeModal(e, () => { showGoalModal = false; editingGoal = null; })} on:keydown={(e) => { if (e.key === 'Escape') { showGoalModal = false; editingGoal = null; } }}>
+    <div class="dash-popup">
+      <h3 class="dash-popup__title">{$t("dashboard.monthGoal")}</h3>
+      <label class="dash-popup__label">
+        {$t("dashboard.icon")}
+        <input class="dash-popup__input" type="text" bind:value={goalIconInput} maxlength="4" />
+      </label>
+      <label class="dash-popup__label">
+        {$t("dashboard.name")}
+        <input class="dash-popup__input" type="text" bind:value={goalNameInput} placeholder={$t("finance.newGoal")} />
+      </label>
+      <div class="dash-popup__row">
+        <label class="dash-popup__label dash-popup__label--half">
+          {$t("finance.amountPlaceholder")}
+          <input class="dash-popup__input" type="number" min="0" bind:value={goalCurrentInput} placeholder={$t("finance.amountPlaceholder")} />
+        </label>
+        <label class="dash-popup__label dash-popup__label--half">
+          {$t("finance.goalPlaceholder")}
+          <input class="dash-popup__input" type="number" min="0" bind:value={goalTargetInput} placeholder={$t("finance.goalPlaceholder")} />
+        </label>
+      </div>
+
+      <div class="goal-adjust">
+        <div class="goal-adjust__header">
+          <span class="goal-adjust__title">{$t("finance.depositThisMonth")}</span>
+          <div class="goal-adjust__mode" role="group">
+            <button type="button" class="goal-adjust__mode-btn" class:active={goalAdjustMode === "amount"} on:click={() => goalAdjustMode = "amount"}>
+              {$t("finance.amount")}
+            </button>
+            <button type="button" class="goal-adjust__mode-btn" class:active={goalAdjustMode === "percent"} on:click={() => goalAdjustMode = "percent"}>
+              %
+            </button>
+          </div>
+        </div>
+        <div class="goal-adjust__row">
+          <input
+            class="dash-popup__input goal-adjust__input"
+            type="number"
+            min="0"
+            bind:value={goalAdjustInput}
+            placeholder={goalAdjustMode === "amount" ? $t("locale.currencySymbol") : "0%"}
+            on:keydown={(e) => { if (e.key === "Enter") applyGoalAdjustToForm("deposit"); }}
+          />
+          <button type="button" class="goal-adjust__btn goal-adjust__btn--deposit" on:click={() => applyGoalAdjustToForm("deposit")}>
+            + {$t("finance.deposit")}
+          </button>
+          <button type="button" class="goal-adjust__btn goal-adjust__btn--withdraw" on:click={() => applyGoalAdjustToForm("withdraw")}>
+            − {$t("finance.withdraw")}
+          </button>
+        </div>
+        {#if goalAdjustMode === "percent"}
+          <div class="goal-adjust__hint">
+            {$t("finance.deposit")}: % {$t("finance.remainder").toLowerCase()} · {$t("finance.withdraw")}: % {$t("finance.amountPlaceholder").toLowerCase()}
+          </div>
+        {/if}
+      </div>
+
+      <div class="dash-popup__actions">
+        <button class="dash-btn dash-btn--cancel" on:click={() => { showGoalModal = false; editingGoal = null; }}>{$t("common.cancel")}</button>
+        <button class="dash-btn dash-btn--save" on:click={saveGoalEdit}>{$t("common.save")}</button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <style>
   /* Widgets */
   .dashboard__widgets { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
@@ -652,6 +849,10 @@
     background: rgba(255, 140, 60, 0.14);
     border-color: rgba(255, 140, 60, 0.28);
   }
+  .dash-widget__icon-wrap[data-kind="goals"] {
+    background: rgba(61, 214, 140, 0.14);
+    border-color: rgba(61, 214, 140, 0.28);
+  }
   .dash-widget__icon { font-size: 16px; line-height: 1; }
 
   .dash-widget__body {
@@ -662,6 +863,11 @@
     font-size: 13px; font-weight: 650; color: var(--text-normal);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     letter-spacing: 0.01em;
+  }
+  .dash-widget__remaining {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 12px;
   }
 
   .dash-widget__bar {
@@ -952,12 +1158,77 @@
   }
 
   /* Goal rows */
-  .dash-goal { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 12.5px; }
-  .dash-goal-icon { font-size: 13px; flex-shrink: 0; }
-  .dash-goal-name { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-  .dash-goal-bar { width: 52px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
-  .dash-goal-bar-fill { height: 100%; background: linear-gradient(90deg, var(--interactive-accent), #3dd68c); border-radius: 2px; transition: width 0.4s ease; }
-  .dash-goal-amt { font-size: 10px; color: var(--text-faint); flex-shrink: 0; white-space: nowrap; }
+  .dash-goal {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.04);
+    border-radius: 10px;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+    width: 100%; text-align: left; color: var(--text-normal); font-family: inherit; font-size: 13px;
+  }
+  .dash-goal:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(61, 214, 140, 0.22);
+  }
+  .dash-goal.done {
+    opacity: 0.65;
+    border-color: rgba(61, 214, 140, 0.2);
+  }
+  .dash-goal-icon {
+    width: 26px; height: 26px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; line-height: 1; flex-shrink: 0;
+    background: rgba(61, 214, 140, 0.12);
+    border: 1px solid rgba(61, 214, 140, 0.2);
+  }
+  .dash-goal-main {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; gap: 5px;
+  }
+  .dash-goal-top {
+    display: flex; align-items: center; gap: 8px; min-width: 0;
+  }
+  .dash-goal-name {
+    font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0; font-size: 12.5px; line-height: 1.3; flex: 1;
+  }
+  .dash-goal-name.strike { text-decoration: line-through; color: var(--text-faint); }
+  .dash-goal-amt {
+    font-size: 10px; font-weight: 600;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.05);
+    padding: 2px 7px; border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.05);
+    flex-shrink: 0; white-space: nowrap;
+  }
+  .dash-goal-bar {
+    width: 100%; height: 4px;
+    background: rgba(255,255,255,0.07);
+    border-radius: 999px; overflow: hidden;
+  }
+  .dash-goal-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--interactive-accent), #3dd68c);
+    border-radius: 999px;
+    transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 8px rgba(61, 214, 140, 0.3);
+  }
+  .dash-goal-bar-fill.complete {
+    background: linear-gradient(90deg, #3dd68c, #6eebb0);
+    box-shadow: 0 0 8px rgba(61, 214, 140, 0.35);
+  }
+  .dash-goal-actions {
+    display: flex; gap: 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .dash-goal:hover .dash-goal-actions { opacity: 1; }
+  @media (max-width: 768px) {
+    .dash-goal-actions { opacity: 0.55; }
+  }
 
   /* Card drag & drop */
   .dashboard-card[draggable="true"] {
@@ -1156,6 +1427,111 @@
     font-size: 13px;
     font-weight: 500;
     color: var(--text-muted);
+  }
+
+  .dash-popup__row {
+    display: flex;
+    gap: 10px;
+  }
+
+  .dash-popup__label--half {
+    flex: 1;
+    min-width: 0;
+    margin-bottom: 12px;
+  }
+
+  .goal-adjust {
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 10px;
+    margin-bottom: 14px;
+    background: rgba(255,255,255,0.02);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .goal-adjust__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .goal-adjust__title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .goal-adjust__mode {
+    display: inline-flex;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .goal-adjust__mode-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+
+  .goal-adjust__mode-btn + .goal-adjust__mode-btn {
+    border-left: 1px solid rgba(255,255,255,0.08);
+  }
+
+  .goal-adjust__mode-btn.active {
+    background: var(--interactive-accent);
+    color: var(--text-on-accent);
+  }
+
+  .goal-adjust__row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .goal-adjust__input {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .goal-adjust__btn {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: filter 0.15s, transform 0.12s;
+  }
+
+  .goal-adjust__btn:active {
+    transform: scale(0.97);
+  }
+
+  .goal-adjust__btn--deposit {
+    background: rgba(61, 214, 140, 0.16);
+    color: #3dd68c;
+    border-color: rgba(61, 214, 140, 0.3);
+  }
+
+  .goal-adjust__btn--withdraw {
+    background: rgba(231, 76, 60, 0.12);
+    color: #e74c3c;
+    border-color: rgba(231, 76, 60, 0.28);
+  }
+
+  .goal-adjust__hint {
+    font-size: 11px;
+    color: var(--text-faint);
+    line-height: 1.4;
   }
 
   .dash-popup__input {

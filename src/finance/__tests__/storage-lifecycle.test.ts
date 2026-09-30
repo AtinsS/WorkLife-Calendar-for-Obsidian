@@ -515,7 +515,9 @@ describe("Computed helpers with vault data", () => {
 
     expect(getMainAccountTotal("2026-07")).toBe(53000);
     expect(getSavingsTotal("2026-07")).toBe(200000);
-    expect(getCurrentBalance("2026-07")).toBe(70000);
+    // Balance = income − main expenses − this month's goal deposits
+    // Goal has 25000 already saved (treated as broughtForward) → contribution 0
+    expect(getCurrentBalance("2026-07")).toBe(97000);
     expect(getMonthGoals("2026-07")).toHaveLength(1);
     expect(getStoredMonthKeys()).toContain("2026-07");
   });

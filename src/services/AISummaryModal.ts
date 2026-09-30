@@ -127,6 +127,8 @@ export class AISummaryModal extends CustomModal {
 
   onOpen(): void {
     this.contentEl.addClass("ai-summary-modal");
+    this.containerEl?.addClass("ai-summary-shell");
+
     const head = this.contentEl.createDiv({ cls: "ai-summary-head" });
     head.createEl("h2", { text: tRaw("ai.summaryTitle"), cls: "ai-title" });
     head.createDiv({
@@ -163,7 +165,9 @@ export class AISummaryModal extends CustomModal {
     this.progressEl = this.contentEl.createDiv({ cls: "ai-summary-progress" });
     this.progressFillEl = this.progressEl.createDiv({ cls: "ai-summary-progress-fill" });
 
-    this.textareaEl = this.contentEl.createEl("textarea", {
+    // Scan shell wraps the output area (same visual language as AI extract analysis)
+    const scanShell = this.contentEl.createDiv({ cls: "ai-summary-scan" });
+    this.textareaEl = scanShell.createEl("textarea", {
       cls: "ai-summary-textarea",
       attr: {
         rows: "14",

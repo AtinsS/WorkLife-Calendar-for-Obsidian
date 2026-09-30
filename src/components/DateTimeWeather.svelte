@@ -414,9 +414,18 @@
     >
       <span class="dtw-icon">{monthGoals[0].icon}</span>
       {#if monthGoals.length === 1}
-        <span>{monthGoals[0].name}: {monthGoals[0].done ? "✓" : monthGoals[0].remaining.toLocaleString($t("locale.numberLocale")) + " " + $t("locale.currencySymbol")}</span>
+        {#if monthGoals[0].done}
+          <span>{monthGoals[0].name}: ✓</span>
+        {:else}
+          <span>{monthGoals[0].name}: {$t("finance.remaining", { amount: monthGoals[0].remaining.toLocaleString($t("locale.numberLocale")) + " " + $t("locale.currencySymbol") })}</span>
+        {/if}
       {:else}
-        <span>{$t("dtw.goalsLabel")}: {monthGoals.filter(g => g.done).length}/{monthGoals.length}</span>
+        {@const totalLeft = monthGoals.reduce((s, g) => s + Math.max(0, g.remaining), 0)}
+        {#if monthGoals.every((g) => g.done)}
+          <span>{$t("dtw.goalsLabel")}: ✓</span>
+        {:else}
+          <span>{$t("dtw.goalsLabel")}: {$t("finance.remaining", { amount: totalLeft.toLocaleString($t("locale.numberLocale")) + " " + $t("locale.currencySymbol") })}</span>
+        {/if}
       {/if}
     </span>
   {/if}

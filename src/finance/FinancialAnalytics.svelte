@@ -12,6 +12,26 @@
     removeIncomeCategory,
   } from "./financialAnalyticsStorage";
   import { t, tArray } from "../i18n";
+  import { get } from "svelte/store";
+  import { app } from "../stores/appStore";
+  import { analyticsTabRequest } from "../stores/analyticsStore";
+  import { VIEW_TYPE_HABIT_ANALYTICS } from "../constants";
+
+  async function openAnalyticsFinance(): Promise<void> {
+    const appInstance = get(app);
+    if (!appInstance) return;
+    analyticsTabRequest.set("earnings");
+    const existing = appInstance.workspace.getLeavesOfType(VIEW_TYPE_HABIT_ANALYTICS);
+    if (existing.length) {
+      appInstance.workspace.revealLeaf(existing[0]);
+      return;
+    }
+    const leaf = appInstance.workspace.getLeaf("tab");
+    if (leaf) {
+      await leaf.setViewState({ type: VIEW_TYPE_HABIT_ANALYTICS, active: true });
+      appInstance.workspace.revealLeaf(leaf);
+    }
+  }
 
   $: numberLocale = $t("locale.numberLocale");
   $: currencySymbol = $t("locale.currencySymbol");
@@ -246,6 +266,9 @@
 <div class="financial-analytics">
   <div class="fa-header">
     <h2>{$t("financeAnalytics.title")}</h2>
+    <button class="fa-analytics-link" on:click={openAnalyticsFinance} title={$t("financeAnalytics.openAnalyticsFinance")}>
+      {$t("financeAnalytics.openAnalyticsFinance")}
+    </button>
     <div class="fa-month-selector">
       <button class="fa-month-nav" on:click={() => {
         if (selectedMonth === 1) {
@@ -553,6 +576,26 @@
     align-items: center;
   }
 
+  .fa-analytics-link {
+    margin: -8px 0 12px;
+    padding: 7px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--mcp-glass-border, rgba(255, 255, 255, 0.08));
+    background: var(--mcp-glass-bg, rgba(255, 255, 255, 0.04));
+    color: var(--mcp-accent, var(--interactive-accent));
+    font-size: 12px;
+    font-weight: 650;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.12s;
+  }
+
+  .fa-analytics-link:hover {
+    border-color: var(--mcp-accent, var(--interactive-accent));
+    background: color-mix(in srgb, var(--mcp-accent, var(--interactive-accent)) 12%, transparent);
+    transform: translateY(-1px);
+  }
+
   .fa-month-selector {
     display: flex;
     align-items: center;
@@ -616,8 +659,9 @@
     backdrop-filter: var(--mcp-blur);
     -webkit-backdrop-filter: var(--mcp-blur);
     border: 1px solid var(--mcp-glass-border);
-    border-radius: var(--mcp-radius);
+    border-radius: 16px;
     box-shadow: var(--mcp-shadow);
+    overflow: hidden;
     transition: all 0.25s ease;
     animation: fa-card-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
   }
