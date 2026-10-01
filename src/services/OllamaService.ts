@@ -1133,18 +1133,21 @@ Rules:
 - Same language as the task title/description.
 - No numbering, no markdown in titles.
 - Concrete verbs: "Написать…", "Проверить…", "Собрать…".
-- Do not repeat the parent title.`;
+- Do not repeat the parent title.
+- Use the project name and task description as context: tailor subtasks to the domain and any constraints mentioned there.`;
 
 export async function generateSubtasks(
   url: string,
   model: string,
   taskTitle: string,
   taskDescription?: string | null,
+  projectName?: string | null,
   opts: StreamChatOptions = {},
 ): Promise<string[]> {
   const user = [
     `Task: ${taskTitle}`,
     taskDescription ? `Description: ${taskDescription}` : "",
+    projectName ? `Project: ${projectName}` : "",
   ]
     .filter(Boolean)
     .join("\n");

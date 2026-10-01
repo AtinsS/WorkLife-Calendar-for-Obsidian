@@ -181,6 +181,7 @@ async function tryLoadJson(app: App, path: string): Promise<Record<string, unkno
 
 /**
  * Save a module's data with backup and checksum.
+ * Skips disk writes when content is unchanged (keeps Syncthing quiet).
  */
 export async function saveModuleData(
   app: App,
@@ -190,20 +191,29 @@ export async function saveModuleData(
   const primaryPath = moduleFilePath(moduleName);
   const backupPath = backupFilePath(moduleName);
   const content = JSON.stringify(data, null, 2);
+  const checksum = simpleHash(content);
 
-  // Create backup of current file before overwriting
   const existingContent = await readFileContent(app, primaryPath);
+  if (existingContent === content) {
+    // Identical payload — only ensure meta checksum is present (skip write if same)
+    await updateMeta(app, moduleName, checksum);
+    return;
+  }
+
+  // Backup previous primary (skip if backup already holds that exact content)
   if (existingContent !== null && existingContent !== "") {
-    await writeFileContent(app, backupPath, existingContent).catch((e: unknown) =>
-      console.error(`[vaultStorage] Failed to create backup for ${moduleName}:`, e)
-    );
+    const existingBackup = await readFileContent(app, backupPath);
+    if (existingBackup !== existingContent) {
+      await writeFileContent(app, backupPath, existingContent).catch((e: unknown) =>
+        console.error(`[vaultStorage] Failed to create backup for ${moduleName}:`, e)
+      );
+    }
   }
 
   // Write primary
   await writeFileContent(app, primaryPath, content);
 
   // Update checksum in meta
-  const checksum = simpleHash(content);
   await updateMeta(app, moduleName, checksum);
 }
 
@@ -226,6 +236,10 @@ async function updateMeta(app: App, moduleName: string, checksum: string): Promi
       checksums: {},
       lastUpdated: new Date().toISOString(),
     };
+    // Skip meta write when checksum is already recorded (avoids Syncthing churn)
+    if (meta.checksums[moduleName] === checksum) {
+      return;
+    }
     meta.checksums[moduleName] = checksum;
     meta.lastUpdated = new Date().toISOString();
     const content = JSON.stringify(meta, null, 2);
@@ -362,6 +376,8 @@ export async function saveVaultData(
   data: VaultData
 ): Promise<void> {
   const content = JSON.stringify(data, null, 2);
+  const existing = await readFileContent(app, VAULT_DATA_FILE);
+  if (existing === content) return;
   await writeFileContent(app, VAULT_DATA_FILE, content);
 }
 

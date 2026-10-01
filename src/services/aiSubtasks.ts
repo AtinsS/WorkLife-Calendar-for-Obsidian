@@ -3,7 +3,7 @@ import { Notice } from "obsidian";
 import { get } from "svelte/store";
 import { settings } from "../ui/stores";
 import { tRaw } from "../i18n";
-import { addChecklistItem, checklists } from "../task-tracker/stores";
+import { addChecklistItem, checklists, projects } from "../task-tracker/stores";
 import type { ITask } from "../task-tracker/types";
 
 /** Разбить задачу на подзадачи через Ollama и добавить в чек-лист. */
@@ -26,12 +26,17 @@ export async function splitTaskIntoSubtasks(
     return 0;
   }
 
+  const projectName = task.projectId
+    ? get(projects).find((p) => p.id === task.projectId)?.name ?? null
+    : null;
+
   const { generateSubtasks } = await import("./OllamaService");
   const titles = await generateSubtasks(
     opts.ollamaUrl || "http://localhost:11434",
     opts.ollamaModel || "llama3.1",
     task.title,
     task.description || null,
+    projectName,
   );
   if (!titles.length) {
     new Notice(tRaw("ai.subtasksEmpty"));

@@ -18,7 +18,6 @@
   import TimeLogsModal from "./TimeLogsModal.svelte";
   import { TaskModal } from "./TaskModal";
   import { ProjectModal } from "./ProjectModal";
-  import { AIExtractModal } from "../services/AIExtractModal";
   import { t } from "../i18n";
 
   export let appInstance: App;
@@ -317,7 +316,6 @@
     showRecurringRoot = false;
     recurringPanel = null;
   }
-  function openAIExtract() { closeMenu(); new AIExtractModal(appInstance).open(); }
   function toggleSearch() { showSearch = !showSearch; if (!showSearch) searchQuery = ""; }
 
   /** Вложенное меню повторяющихся: root → clear | edit */
@@ -469,9 +467,6 @@
                 {/if}
               </div>
             {/if}
-            {#if $settings.ollamaEnabled && !isMobile}
-              <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={openAIExtract}>🤖 {$t("ai.button")}</button>
-            {/if}
           </div>
         {/if}
       </div>
@@ -557,9 +552,6 @@
                     </div>
                   {/if}
                 </div>
-              {/if}
-              {#if $settings.ollamaEnabled && !isMobile}
-                <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={openAIExtract}>🤖 {$t("ai.button")}</button>
               {/if}
             </div>
           {/if}

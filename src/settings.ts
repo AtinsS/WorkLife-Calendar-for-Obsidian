@@ -71,6 +71,8 @@ export interface ISettings {
 
   // Sync settings
   syncToVault: boolean;
+  /** Автоочистка *.sync-conflict-* (Syncthing) при запуске */
+  syncConflictCleanupEnabled: boolean;
 
   // Notification settings
   notificationsEnabled: boolean;
@@ -162,6 +164,8 @@ export interface ISettings {
   aiSummaryEnabled: boolean;
   /** Разбить задачу на подзадачи (ПКМ → задача) */
   aiSubtasksEnabled: boolean;
+  /** Умное быстрое добавление задач (ИИ: работа / заметка / повтор / мульти) */
+  aiQuickAddEnabled: boolean;
   /** Стиль саммари заметок */
   aiSummaryStyle?: "brief" | "detailed" | "bullets" | "executive";
   /** Доп. инструкции к промпту саммари */
@@ -211,6 +215,7 @@ export const defaultSettings = Object.freeze({
   viewSwitcherMode: "everywhere" as const,
 
   syncToVault: true,
+  syncConflictCleanupEnabled: true,
 
   notificationsEnabled: false,
   reminderMinutesBefore: 5,
@@ -281,6 +286,7 @@ export const defaultSettings = Object.freeze({
   aiExtractEnabled: true,
   aiSummaryEnabled: true,
   aiSubtasksEnabled: true,
+  aiQuickAddEnabled: true,
   aiSummaryStyle: "detailed" as const,
   aiSummaryPrompt: "", // 0 = unlimited
 });
@@ -407,13 +413,21 @@ export class CalendarSettingsTab extends PluginSettingTab {
       cls: "settings-coffee-desc",
     });
     coffeeDesc.textContent = tRaw("settings.general.supportDesc");
-    const coffeeBtn = coffeeBanner.createEl("a", {
+    const coffeeActions = coffeeBanner.createDiv({ cls: "settings-coffee-actions" });
+    const coffeeBtn = coffeeActions.createEl("a", {
       cls: "settings-coffee-btn",
       text: tRaw("settings.general.supportBtn"),
       href: "https://boosty.to/atins/donate",
     });
     coffeeBtn.setAttribute("target", "_blank");
     coffeeBtn.setAttribute("rel", "noopener");
+    const starBtn = coffeeActions.createEl("a", {
+      cls: "settings-coffee-btn settings-github-star-btn",
+      text: tRaw("settings.general.githubStarBtn"),
+      href: "https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian",
+    });
+    starBtn.setAttribute("target", "_blank");
+    starBtn.setAttribute("rel", "noopener");
 
     if (!appHasDailyNotesPluginLoaded()) {
       const banner = this.containerEl.createDiv({ cls: "settings-banner" });
@@ -589,6 +603,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
     // Sync tab
     const sync = tabContainers["sync"];
+    new Setting(sync).setName(tRaw("settings.sync.sectionVault")).setHeading();
+    this.addSyncConflictCleanupSetting(sync);
     new Setting(sync).setName(tRaw("settings.sync.sectionTaskNote")).setHeading();
     this.addTaskNoteSyncSettings(sync);
     this.addGitHubGistSettings(sync);
@@ -1577,6 +1593,18 @@ priority: medium
       });
   }
 
+  addSyncConflictCleanupSetting(container: HTMLElement): void {
+    new Setting(container)
+      .setName(tRaw("settings.sync.syncConflictCleanup"))
+      .setDesc(tRaw("settings.sync.syncConflictCleanupDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.syncConflictCleanupEnabled !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ syncConflictCleanupEnabled: value });
+        });
+      });
+  }
+
   addGitHubGistSettings(container: HTMLElement): void {
     new Setting(container).setName(tRaw("settings.sync.sectionGithubGist")).setHeading();
 
@@ -2087,6 +2115,14 @@ priority: medium
   addOllamaSettings(container: HTMLElement): void {
     new Setting(container).setName(tRaw("settings.ai.sectionOllama")).setHeading();
 
+    // AI is desktop-only: hide the whole surface on mobile (user rule)
+    const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+    if (isMobile) {
+      const notice = container.createDiv({ cls: "setting-item-description" });
+      notice.setText(tRaw("settings.ai.mobileOnlyDesktop"));
+      return;
+    }
+
     new Setting(container)
       .setName(tRaw("settings.ai.enabled"))
       .setDesc(tRaw("settings.ai.enabledDesc"))
@@ -2323,6 +2359,20 @@ priority: medium
           await this.plugin.writeOptions({ aiSubtasksEnabled: value });
         });
       });
+
+    // Smart quick add (AI): work / note / recurrence + multi-task prompt
+    new Setting(container)
+      .setName(tRaw("settings.ai.quickAddEnabled"))
+      .setDesc(tRaw("settings.ai.quickAddEnabledDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.aiQuickAddEnabled !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ aiQuickAddEnabled: value });
+        });
+      });
+
+    const quickAddHowTo = container.createDiv({ cls: "setting-item-description" });
+    quickAddHowTo.setText(tRaw("settings.ai.quickAddHowTo"));
 
     // How-to
     new Setting(container).setName(tRaw("settings.ai.howToTitle")).setHeading();

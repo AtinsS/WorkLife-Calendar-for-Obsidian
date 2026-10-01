@@ -125,6 +125,7 @@ function addAiMenuItems(menu: Menu, actions: AiMenuAction[]): void {
   });
 }
 import { migrateFromSingleFile, migrateRootModuleFiles, VAULT_DATA_DIR } from "./io/vaultStorage";
+import { cleanupSyncConflictFiles } from "./io/syncConflicts";
 import { VIEW_SWITCHED_EVENT } from "./views/viewSwitch";
 
 declare global {
@@ -143,6 +144,7 @@ export default class CalendarPlugin extends Plugin {
   private ribbonDefs: { el: HTMLElement; key: string }[] = [];
   private habitRibbonIcon: HTMLElement | null = null;
   private syncReloadTimer: number | null = null;
+  private lastSavedDataJson = "";
   public notificationService: NotificationService;
   private dtwPanel: DateTimeWeather | null = null;
   private dtwContainer: HTMLElement | null = null;
@@ -586,6 +588,9 @@ export default class CalendarPlugin extends Plugin {
     // Migrate root-level module files to calendar-data/ (one-time, idempotent)
     await migrateRootModuleFiles(this.app);
 
+    // Drop Syncthing conflict copies (keep newest) before loading data
+    void this.cleanupConflicts();
+
     // Initialize task tracker (must await to prevent empty data from overwriting vault)
     await initTaskStores(this);
     setupNoteTaskSync(this.app, this);
@@ -947,16 +952,44 @@ export default class CalendarPlugin extends Plugin {
 
     // Always save if data.json doesn't exist (first run / fresh install)
     // This ensures the file is created so settings persist across restarts.
+    // Skip rewrite when the payload is unchanged — avoids Syncthing conflicts.
+    const nextJson = JSON.stringify(this.options);
     if (Object.keys(options).length === 0) {
-      await this.saveData(this.options);
+      await this.persistOptions(nextJson);
     } else if (JSON.stringify(old) !== JSON.stringify(this.options)) {
-      await this.saveData(this.options);
+      await this.persistOptions(nextJson);
+    } else {
+      this.lastSavedDataJson = nextJson;
+    }
+  }
+
+  /** Write data.json only when the serialized payload actually changed. */
+  private async persistOptions(json?: string): Promise<void> {
+    const payload = json ?? JSON.stringify(this.options);
+    if (payload === this.lastSavedDataJson) return;
+    this.lastSavedDataJson = payload;
+    await this.saveData(this.options);
+  }
+
+  /**
+   * Remove Syncthing conflict copies for calendar-data/ and plugin data.json.
+   * Newest file wins; losers are deleted. Safe to call multiple times.
+   */
+  private async cleanupConflicts(): Promise<void> {
+    if (this.options.syncConflictCleanupEnabled === false) return;
+    const dirs = [VAULT_DATA_DIR, ""];
+    const pluginDir = await this.findPluginDir();
+    if (pluginDir) dirs.push(pluginDir);
+    try {
+      await cleanupSyncConflictFiles(this.app, dirs);
+    } catch (e) {
+      console.error("[CalendarPlugin] Conflict cleanup failed:", e);
     }
   }
 
   async writeOptions(changes: Partial<ISettings>): Promise<void> {
     settings.update((old) => ({ ...old, ...changes }));
-    await this.saveData(this.options);
+    await this.persistOptions();
     if (changes.habitTrackerMode !== undefined || changes.showHabitTracker !== undefined) {
       this.updateHabitRibbonVisibility();
     }
