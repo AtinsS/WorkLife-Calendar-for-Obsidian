@@ -1268,9 +1268,6 @@
     const startStr = info.event.startStr as string;
     const endStr = info.event.endStr as string;
 
-    console.log("[handleEventResize] strings:", { startStr, endStr });
-    console.log("[handleEventResize] dates:", { start: info.event.start, end: info.event.end });
-
     if (!startStr || !endStr) {
       info.revert();
       return;
@@ -1292,18 +1289,15 @@
       (info.event.end.getTime() - info.event.start.getTime()) / 1000 / 60,
     );
 
-    console.log("[handleEventResize] parsed:", { scheduledTime, endTime, durationMin });
-
     if (dropDebounceTimer) clearTimeout(dropDebounceTimer);
     dropDebounceTimer = setTimeout(() => {
       dropDebounceTimer = null;
       try {
-        const updates: Record<string, any> = { 
+        const updates: Record<string, any> = {
           estimatedTime: Math.max(15, durationMin),
           endTime: endTime,
           scheduledTime: scheduledTime,
         };
-        console.log("[handleEventResize] updating with:", updates);
         updateTask(task.id, updates);
         const updatedTask = get(tasks).find((t) => t.id === task.id);
         if (updatedTask) syncTaskToNote(updatedTask, plugin.app);
@@ -1528,7 +1522,7 @@
         btn.className =
           "sch-context-item" +
           ("danger" in item && item.danger ? " sch-context-danger" : "");
-        btn.innerHTML = item.label;
+        btn.textContent = item.label;
         btn.addEventListener("click", (e) => {
           e.stopPropagation();
           item.action();

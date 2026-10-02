@@ -62,7 +62,14 @@
     for (const r of noteSearchResults) {
       const btn = document.createElement("button");
       btn.className = "hello-search-portal__item";
-      btn.innerHTML = `<span class="hello-search-portal__name">${r.name}</span><span class="hello-search-portal__path">${r.path}</span>`;
+      const nameEl = document.createElement("span");
+      nameEl.className = "hello-search-portal__name";
+      nameEl.textContent = r.name;
+      const pathEl = document.createElement("span");
+      pathEl.className = "hello-search-portal__path";
+      pathEl.textContent = r.path;
+      btn.appendChild(nameEl);
+      btn.appendChild(pathEl);
       btn.addEventListener("click", () => {
         openNote(r.path);
         removeSearchDropdown();

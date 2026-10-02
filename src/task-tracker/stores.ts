@@ -1,11 +1,6 @@
 import { writable, get } from "svelte/store";
-import { moment, TFile } from "obsidian";
-import type { Moment } from "moment";
-
-// Obsidian's type defs export moment as `typeof Moment` (the module namespace),
-// but at runtime it's the callable moment function. Cast once here.
-// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Obsidian types moment as namespace, runtime is callable
-const momentFn = moment as unknown as (inp?: unknown, format?: string, strict?: boolean) => Moment;
+import { TFile } from "obsidian";
+import { momentFn, type Moment } from "../utils/moment";
 
 import type CalendarPlugin from "src/main";
 import { getDateUID } from "obsidian-daily-notes-interface";

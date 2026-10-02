@@ -9,6 +9,7 @@
   import { syncTaskToNote } from "./noteTasks";
   import { t } from "../i18n";
   import { settings } from "../ui/stores";
+  import { errorMessage } from "../utils/sanitize";
 
   export let task: ITask;
   export let appInstance: App;
@@ -153,7 +154,7 @@
       const { splitTaskIntoSubtasks } = await import("../services/aiSubtasks");
       await splitTaskIntoSubtasks(appInstance, task);
     } catch (e) {
-      alert(get(t)("ai.summaryError", { error: e instanceof Error ? e.message : String(e) }));
+      alert(get(t)("ai.summaryError", { error: errorMessage(e) }));
     } finally {
       splittingSubtasks = false;
     }

@@ -1,5 +1,6 @@
 import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from "obsidian";
 import { tRaw } from "../i18n";
+import { errorMessage } from "../utils/sanitize";
 
 const TRANSIENT_NET_ERRORS = [
   "ERR_NETWORK_CHANGED",
@@ -38,7 +39,7 @@ const TRANSIENT_NET_ERRORS = [
 ];
 
 function isTransientNetError(e: unknown): boolean {
-  const msg = e instanceof Error ? `${e.name} ${e.message}` : String(e);
+  const msg = errorMessage(e);
   return TRANSIENT_NET_ERRORS.some((code) => msg.includes(code));
 }
 

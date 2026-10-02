@@ -5,7 +5,7 @@ import type CalendarPlugin from "src/main";
 import type { ITask, IProject } from "./types";
 import { tasks, projects, updateTask } from "./stores";
 import { settings } from "../ui/stores";
-import { isPathSafe, sanitizePathComponent } from "../utils/sanitize";
+import { isPathSafe, sanitizePathComponent, errorMessage } from "../utils/sanitize";
 
 let isSyncing = false;
 
@@ -521,7 +521,7 @@ function validateFrontmatterField(
   }
 
   if (validValues && !validValues.includes(value)) {
-    console.warn(`[Calendar Plugin] Invalid value for ${field}: "${String(value)}". Ignoring.`);
+    console.warn(`[Calendar Plugin] Invalid value for ${field}: "${errorMessage(value)}". Ignoring.`);
     return { valid: false };
   }
 

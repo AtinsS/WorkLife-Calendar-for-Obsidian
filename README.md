@@ -16,7 +16,7 @@
 
 ![alt text](animate.gif)
 
-[**English README**](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/blob/master/README.md)
+[**Русский README**](README.RU.md)
 
 ## 💡 Why This Plugin Exists
 
@@ -44,13 +44,13 @@ Many workflows share the same problem: tasks live in one place, the calendar in 
 ### Via BRAT (Recommended)
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin.
 2. Open BRAT settings → **Add Beta Plugin**.
-3. Paste the link: `https://github.com/AtinsS/obsidian-calendar-plugin-remastered`
+3. Paste the link: `https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian`
 4. Click **Add Plugin**.
 
 ### Manually
 1. Download the archive or clone the repository.
 2. Copy `main.js`, `manifest.json`, and `styles.css`.
-3. Place them in the `.obsidian/plugins/calendar-plugin-remastered/` folder (create it if it doesn't exist).
+3. Place them in the `.obsidian/plugins/worklife-calendar/` folder (create it if it doesn't exist).
 4. Enable the plugin in *Settings → Community Plugins*.
 
 ---

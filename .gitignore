@@ -7,3 +7,4 @@ main.js
 .mimocode/
 distill_query.mjs
 distill_guery2.mjs
+tools/obsidian-review/node_modules/

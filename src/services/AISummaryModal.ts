@@ -5,6 +5,7 @@ import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
 import { get } from "svelte/store";
 import { streamOllamaChat } from "./OllamaService";
+import { errorMessage } from "../utils/sanitize";
 
 const MAX_NOTES = 40;
 const MAX_CHARS_PER_NOTE = 6000;
@@ -367,7 +368,7 @@ export class AISummaryModal extends CustomModal {
       window.setTimeout(() => this.clearProgress(), 400);
       this.syncCreateBtn();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       this.clearProgress();
       if (msg.includes("aborted") || this.abort?.signal.aborted) {
         this.setStatus(tRaw("ai.summaryCancelled"));
@@ -411,7 +412,7 @@ export class AISummaryModal extends CustomModal {
       await this.app.workspace.getLeaf("tab").openFile(file);
       this.close();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       this.setStatus(tRaw("ai.summaryCreateError", { error: msg }), true);
     }
   }

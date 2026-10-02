@@ -1,12 +1,14 @@
 {
   "name": "worklife-calendar",
-  "version": "2.22.0",
+  "version": "2.22.2",
   "description": "Calendar, task tracker, habit tracker, and financial planner for Obsidian",
   "author": "AtinsS",
   "main": "main.js",
   "license": "MIT",
   "scripts": {
-    "lint": "svelte-check && eslint . --ext .ts",
+    "lint": "svelte-check && node node_modules/eslint/bin/eslint.js . --ext .ts",
+    "lint:review": "node tools/obsidian-review/node_modules/eslint/bin/eslint.js -c tools/obsidian-review/eslint.config.mjs src package.json",
+    "lint:review:setup": "npm --prefix tools/obsidian-review install",
     "build": "npm run lint && rollup -c rollup.config.mjs",
     "test": "jest --passWithNoTests",
     "test:watch": "npm test -- --watch"
@@ -42,7 +44,7 @@
     "@types/node": "18.19.64",
     "@typescript-eslint/eslint-plugin": "4.20.0",
     "@typescript-eslint/parser": "4.20.0",
-    "eslint": "^7.23.0",
+    "eslint": "^7.32.0",
     "jest": "26.6.3",
     "moment": "2.29.1",
     "rollup": "2.44.0",

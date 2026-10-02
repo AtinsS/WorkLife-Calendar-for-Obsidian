@@ -49,3 +49,16 @@ export function clampRate(value: number): number {
   if (!Number.isFinite(value) || isNaN(value)) return 0;
   return Math.max(0, Math.min(1_000_000, value));
 }
+
+/** Safe error-to-string for catch blocks (`String(e)` is unsafe for objects). */
+export function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "string") return e;
+  if (e === null || e === undefined) return "";
+  if (typeof e === "number" || typeof e === "boolean") return String(e);
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return "Unknown error";
+  }
+}

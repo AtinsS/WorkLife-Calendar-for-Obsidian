@@ -40,8 +40,8 @@ export class WeightEntryModal extends CustomModal {
         inputmode: "decimal",
       },
     });
-    if (!(input instanceof HTMLInputElement)) return;
-    row.createEl("span", {
+    if (!input.instanceOf(HTMLInputElement)) return;
+    row.createSpan({
       text: tRaw("weight.unit"),
       cls: "weight-entry-unit",
     });

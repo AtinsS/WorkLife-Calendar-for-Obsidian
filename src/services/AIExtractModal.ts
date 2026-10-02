@@ -8,6 +8,7 @@ import {
 } from "../ui/CustomModal";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { tRaw } from "../i18n";
+import { errorMessage } from "../utils/sanitize";
 import type { ExtractedTask } from "./OllamaService";
 import {
   extractTasksFromNoteStream,
@@ -299,7 +300,7 @@ export class AIExtractModal extends CustomModal {
     } catch (e: unknown) {
       this.askReady = false;
       this.setAnalyzing(false);
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       if (msg.includes("Failed to fetch") || msg.includes("ECONNREFUSED") || msg.includes("NetworkError") || msg.includes("fetch")) {
         this.showStatus(tRaw("ai.connectionError"), "error");
       } else {
@@ -475,7 +476,7 @@ export class AIExtractModal extends CustomModal {
       assistantRow.removeClass("ai-chat-streaming");
       assistantRow.querySelector(".ai-chat-cursor")?.remove();
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       assistantEntry.streaming = false;
       assistantEntry.text = tRaw("ai.error", { error: msg });
       if (bubbleEl) bubbleEl.textContent = assistantEntry.text;

@@ -12,6 +12,7 @@ import type { ISettings } from "src/settings";
 import { getActiveTimer } from "src/task-tracker/TimerManager";
 import { recordNotificationEvent } from "./notificationTelemetry";
 import { tRaw } from "../i18n";
+import { errorMessage } from "../utils/sanitize";
 
 const DEFAULT_CHECK_INTERVAL_MS = 60_000; // 1 minute
 const DEFAULT_REMINDER_MINUTES = 5;
@@ -335,7 +336,7 @@ export class NotificationService {
         body,
         source,
         topic: opts.ntfyTopic,
-        error: e instanceof Error ? e.message : String(e),
+        error: errorMessage(e),
       }).catch((historyError: unknown) => console.warn("[ntfy] history write failed:", historyError));
     });
   }
@@ -529,7 +530,7 @@ export class NotificationService {
         body,
         source: "scheduled",
         topic: opts.ntfyTopic,
-        error: e instanceof Error ? e.message : String(e),
+        error: errorMessage(e),
       });
     });
   }
@@ -557,7 +558,7 @@ export class NotificationService {
       });
       return ok ? { ok: true } : { ok: false, error: `HTTP ${resp.status}` };
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       await recordNotificationEvent(this.plugin.app, {
         channel: "ntfy",
         status: "failed",
@@ -598,7 +599,7 @@ export class NotificationService {
       });
       return ok ? { ok: true } : { ok: false, error: `HTTP ${resp.status}: ${resp.text}` };
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errorMessage(e);
       await recordNotificationEvent(this.plugin.app, {
         channel: "ntfy",
         status: "failed",

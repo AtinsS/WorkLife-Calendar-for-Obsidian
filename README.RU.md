@@ -16,7 +16,7 @@
 
 ![alt text](animate.gif)
 
-[**English README**](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/blob/master/README.md)
+[**English README**](README.md)
 
 ## 💡 Почему этот плагин существует
 
@@ -44,13 +44,13 @@
 ### Через BRAT (Рекомендуется)
 1. Установите плагин [BRAT](https://github.com/TfTHacker/obsidian42-brat).
 2. Откройте настройки BRAT → **Add Beta Plugin**.
-3. Вставьте ссылку: `https://github.com/AtinsS/obsidian-calendar-plugin-remastered`
+3. Вставьте ссылку: `https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian`
 4. Нажмите **Add Plugin**.
 
 ### Вручную
 1. Скачайте архив или клонируйте репозиторий.
 2. Скопируйте `main.js`, `manifest.json` и `styles.css`.
-3. Поместите их в папку `.obsidian/plugins/calendar-plugin-remastered/` (создайте её, если нет).
+3. Поместите их в папку `.obsidian/plugins/worklife-calendar/` (создайте её, если нет).
 4. Включите плагин в *Настройки → Сторонние плагины*.
 
 ---

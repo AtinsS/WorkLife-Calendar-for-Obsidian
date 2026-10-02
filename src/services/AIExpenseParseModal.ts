@@ -145,20 +145,20 @@ export class AIExpenseParseModal extends CustomModal {
         cls: "ai-finance-row-check",
         attr: { "aria-label": item.name },
       });
-      if (check instanceof HTMLInputElement) {
+      if (check.instanceOf(HTMLInputElement)) {
         check.checked = item.selected;
         check.addEventListener("change", () => {
           item.selected = check.checked;
         });
       }
-      row.createEl("span", { text: item.icon, cls: "ai-finance-row-icon" });
-      row.createEl("span", { text: item.name, cls: "ai-finance-row-name" });
-      row.createEl("span", {
+      row.createSpan({ text: item.icon, cls: "ai-finance-row-icon" });
+      row.createSpan({ text: item.name, cls: "ai-finance-row-name" });
+      row.createSpan({
         text: `${item.amount.toLocaleString()} ${tRaw("locale.currencySymbol")}`,
         cls: "ai-finance-row-amt",
       });
       if (item.categoryName) {
-        row.createEl("span", { text: item.categoryName, cls: "ai-finance-row-cat" });
+        row.createSpan({ text: item.categoryName, cls: "ai-finance-row-cat" });
       }
     }
 

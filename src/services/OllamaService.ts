@@ -1,4 +1,5 @@
 import { requestUrl } from "obsidian";
+import { errorMessage } from "../utils/sanitize";
 
 export interface OllamaSettings {
   ollamaEnabled: boolean;
@@ -685,7 +686,7 @@ export async function testOllamaConnection(url: string): Promise<OllamaConnectio
     const models = data.models?.map((m) => m.name).filter((n): n is string => !!n) ?? [];
     return { ok: true, models };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+    return { ok: false, error: errorMessage(e) };
   }
 }
 
@@ -699,7 +700,7 @@ export async function testOllamaModel(
     ], { temperature: 0 });
     return { ok: true, model, response: content.trim().slice(0, 80) };
   } catch (e) {
-    return { ok: false, model, error: e instanceof Error ? e.message : String(e) };
+    return { ok: false, model, error: errorMessage(e) };
   }
 }
 
@@ -1046,7 +1047,7 @@ export async function extractTasksFromNoteStream(
         },
       );
     } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e));
+      lastError = e instanceof Error ? e : new Error(errorMessage(e));
       if (attempt < maxRetries) continue;
       throw lastError;
     }
@@ -1056,7 +1057,7 @@ export async function extractTasksFromNoteStream(
     try {
       parsed = parseOllamaJson(content);
     } catch (e) {
-      lastError = e instanceof Error ? e : new Error(String(e));
+      lastError = e instanceof Error ? e : new Error(errorMessage(e));
       if (attempt < maxRetries) continue;
       throw lastError;
     }

@@ -1,7 +1,7 @@
 import type { App } from "obsidian";
 
 export function isEditableTarget(target: EventTarget | null): boolean {
-  if (!target || !(target instanceof HTMLElement)) return false;
+  if (!target || !(target instanceof Node) || !target.instanceOf(HTMLElement)) return false;
   if (target.instanceOf(HTMLInputElement) && target.disabled) return false;
   const tag = target.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable === true;
@@ -198,8 +198,9 @@ export abstract class CustomModal {
   }
 
   abstract onOpen(): void;
-  // eslint-disable-next-line @typescript-eslint/no-empty-function -- default no-op lifecycle hook
-  onClose(): void {}
+  onClose(): void {
+    // default no-op lifecycle hook
+  }
 
   open(): void {
     if (this.isOpen) return;

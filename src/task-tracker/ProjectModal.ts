@@ -398,6 +398,7 @@ class DeleteConfirmModal extends CustomModal {
     });
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-empty-function -- required by CustomModal
-  onClose(): void {}
+  onClose(): void {
+    // required by CustomModal
+  }
 }

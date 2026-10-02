@@ -108,7 +108,9 @@ function addAiMenuItems(menu: Menu, actions: AiMenuAction[]): void {
           s.setTitle(a.title).setIcon(a.icon).onClick(a.onClick);
         });
       }
-      const target = evt.target instanceof HTMLElement ? evt.target : null;
+      const rawTarget = evt.target;
+      const target =
+        rawTarget instanceof Node && rawTarget.instanceOf(HTMLElement) ? rawTarget : null;
       const itemEl = target?.closest(".menu-item") ?? target;
       const rect = itemEl?.getBoundingClientRect();
       if (rect) {
