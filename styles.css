@@ -4660,7 +4660,6 @@ h2.tm-title.tm-title {
 /* Class hook is .wf-task-modal on .wf-dialog-container (CustomModal). */
 .wf-dialog-overlay .wf-task-modal {
   max-height: 100dvh;
-  width: 100vw;
   padding: 0;
   overflow: hidden;
   border-radius: 16px;
