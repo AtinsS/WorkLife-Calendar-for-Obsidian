@@ -54,8 +54,8 @@
   --mcp-blur: blur(0px);
 }
 
-.ai-hidden {
-  display: none !important;
+.ai-hidden.ai-hidden {
+  display: none;
 }
 
 /* ============================================
@@ -67,7 +67,7 @@
 }
 
 #calendar-container .reset-button {
-  display: flex !important;
+  display: flex;
   align-items: center;
   justify-content: center;
   background: var(--mcp-surface);
@@ -464,7 +464,7 @@
 
   /* Main view: stack columns, hide info panel */
   .calendar-main-view .month-goals-indicator {
-    display: none !important;
+    display: none;
   }
 
   .calendar-main-view .task-tracker-panel,
@@ -831,8 +831,8 @@
 }
 
 /* Hide calendar dot indicators from obsidian-calendar-ui */
-svg.dot.filled {
-  display: none !important;
+#calendar-container svg.dot.filled {
+  display: none;
 }
 
 /* ============================================
@@ -1153,8 +1153,8 @@ svg.dot.filled {
   display: none;
 }
 
-.mobile-only {
-  display: none !important;
+.mobile-only.mobile-only {
+  display: none;
 }
 
 /* ============================================
@@ -2476,12 +2476,12 @@ body > .task-actions-menu {
   padding: 24px 24px 16px;
 }
 
-.tm-title {
-  margin: 0 !important;
-  font-size: 20px !important;
-  font-weight: 700 !important;
-  color: #fff !important;
-  font-family: var(--font-interface) !important;
+h2.tm-title.tm-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--font-interface);
 }
 
 .tm-close {
@@ -2610,7 +2610,7 @@ body > .task-actions-menu {
 
 .tm-half {
   flex: 1;
-  padding: 0 !important;
+  padding: 0;
 }
 
 /* Priority buttons */
@@ -2746,8 +2746,8 @@ body > .task-actions-menu {
 }
 
 /* Utility: hidden state for dynamic display toggles */
-.mcp-hidden {
-  display: none !important;
+.mcp-hidden.mcp-hidden {
+  display: none;
 }
 
 .tm-adv-row {
@@ -2777,15 +2777,15 @@ body > .task-actions-menu {
   opacity: 0.7;
 }
 
-.tm-adv-input {
+.tm-adv-input.tm-adv-input {
   flex: 1;
   min-width: 0;
-  height: 38px !important;
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 8px !important;
-  font-size: 13px !important;
-  color-scheme: dark !important;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  font-size: 13px;
+  color-scheme: dark;
 }
 
 .tm-adv-input option {
@@ -3246,8 +3246,8 @@ body > .task-actions-menu {
 }
 
 .pm-input-error {
-  border-color: var(--mcp-danger) !important;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15) !important;
+  border-color: var(--mcp-danger);
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
   animation: pm-shake 0.4s ease;
 }
 
@@ -3913,7 +3913,7 @@ body > .task-actions-menu {
 }
 
 .habit-edit-btn:disabled {
-  opacity: 0.3 !important;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
@@ -3937,7 +3937,7 @@ body > .task-actions-menu {
 }
 
 .habit-panel-view-container > .habit-tracker-panel {
-  max-height: none !important;
+  max-height: none;
   overflow: visible;
   border-top: none;
   min-height: 0;
@@ -3997,12 +3997,11 @@ body > .task-actions-menu {
    REDUCED MOTION
    ============================================ */
 @media (prefers-reduced-motion: reduce) {
-
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+  html body *,
+  html body *::before,
+  html body *::after {
+    animation-duration: 0.01ms;
+    transition-duration: 0.01ms;
   }
 }
 
@@ -4422,7 +4421,7 @@ body > .task-actions-menu {
   }
 
   .task-item-row-meta {
-    display: flex !important;
+    display: flex;
     gap: 5px;
     padding-left: 32px;
     flex-wrap: wrap;
@@ -4449,7 +4448,7 @@ body > .task-actions-menu {
 
   /* Show status badge and time */
   .task-item .task-status-badge {
-    display: inline-flex !important;
+    display: inline-flex;
     font-size: 10px;
     padding: 2px 7px;
     border-radius: 5px;
@@ -4458,25 +4457,25 @@ body > .task-actions-menu {
   }
 
   .task-item .task-scheduled {
-    display: inline-flex !important;
+    display: inline-flex;
     font-size: 10px;
     padding: 2px 6px;
   }
 
   .task-item .task-timer {
-    display: inline-flex !important;
+    display: inline-flex;
     font-size: 10px;
     padding: 2px 6px;
   }
 
   .task-item .task-estimate {
-    display: inline-flex !important;
+    display: inline-flex;
     font-size: 10px;
     padding: 2px 6px;
   }
 
   .task-item .task-deadline {
-    display: inline-flex !important;
+    display: inline-flex;
     font-size: 10px;
     padding: 2px 6px;
   }
@@ -4551,7 +4550,7 @@ body > .task-actions-menu {
 .task-item .task-timer,
 .task-item .task-estimate,
 .task-item .task-estimate-compare {
-  display: inline-flex !important;
+  display: inline-flex;
   font-size: 10px;
   padding: 2px 7px;
   border-radius: 5px;
@@ -4561,7 +4560,7 @@ body > .task-actions-menu {
 
 /* Hide non-essential meta on mobile */
 .task-item .task-work-paused {
-  display: none !important;
+  display: none;
 }
 
 .task-item .task-project-dot {
@@ -4576,7 +4575,7 @@ body > .task-actions-menu {
 
 /* Actions toggle вЂ” always visible on mobile */
 .task-actions-toggle {
-  opacity: 1 !important;
+  opacity: 1;
   min-width: 36px;
   min-height: 36px;
   padding: 6px;
@@ -4610,7 +4609,7 @@ body > .task-actions-menu {
 }
 
 .checklist-remove {
-  opacity: 0.5 !important;
+  opacity: 0.5;
   min-width: 32px;
   min-height: 32px;
 }
@@ -4657,26 +4656,23 @@ body > .task-actions-menu {
   opacity: 1;
 }
 
-/* ===== MOBILE TASK MODAL (tm) вЂ” full width, touch-friendly, scrollable ===== */
-/* Obsidian modal hierarchy: .modal-container > .modal > .modal-content.tm */
-/* Scoped to only affect modals containing .tm (mobile task modal) */
-.modal-container:has(.tm) .modal {
-  max-height: 100vh;
+/* ===== MOBILE TASK MODAL (tm) — full width, touch-friendly, scrollable ===== */
+/* Class hook is .wf-task-modal on .wf-dialog-container (CustomModal). */
+.wf-dialog-overlay .wf-task-modal {
   max-height: 100dvh;
-  width: 100vw !important;
+  width: 100vw;
   padding: 0;
   overflow: hidden;
-  border-radius: 16px !important;
-  margin: 0 !important;
+  border-radius: 16px;
+  margin: 0;
 }
 
-.tm {
-  max-width: 100vw !important;
-  max-height: 100vh !important;
-  max-height: 100dvh !important;
-  border-radius: 0 !important;
-  margin: 0 !important;
-  overflow-y: auto !important;
+.wf-task-modal .wf-dialog-content {
+  max-width: 100vw;
+  max-height: 100dvh;
+  border-radius: 0;
+  margin: 0;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   display: flex;
@@ -4693,7 +4689,7 @@ body > .task-actions-menu {
 }
 
 .tm-title {
-  font-size: 18px !important;
+  font-size: 18px;
 }
 
 .tm-field {
@@ -4872,14 +4868,13 @@ body > .task-actions-menu {
 /* ===== MOBILE PROJECT MODAL вЂ” full width, touch-friendly ===== */
 .task-tracker-project-modal {
   padding: 14px;
-  overflow-y: auto !important;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  max-width: 100vw !important;
-  max-height: 100vh;
+  max-width: 100vw;
   max-height: 100dvh;
-  border-radius: 0 !important;
-  margin: 0 !important;
+  border-radius: 0;
+  margin: 0;
 }
 
 .task-tracker-project-modal h2 {
@@ -5002,15 +4997,14 @@ body > .task-actions-menu {
 /* Edit modal */
 .pm-edit-modal {
   padding: 14px;
-  overflow-y: auto !important;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  max-width: 100vw !important;
-  max-height: 100vh;
+  max-width: 100vw;
   max-height: 100dvh;
-  border-radius: 0 !important;
-  margin: 0 !important;
-  width: 100vw !important;
+  border-radius: 0;
+  margin: 0;
+  width: 100vw;
 }
 
 .pm-modal-buttons {
@@ -5068,7 +5062,7 @@ body > .task-actions-menu {
 .task-tracker-modal,
 .task-tracker-project-modal {
   padding: 24px 20px;
-  overflow-y: auto !important;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
 }
@@ -5136,12 +5130,12 @@ body > .task-actions-menu {
 }
 
 /* Mobile-only / desktop-only visibility */
-.desktop-only {
-  display: none !important;
+.desktop-only.desktop-only {
+  display: none;
 }
 
-.mobile-only {
-  display: flex !important;
+.mobile-only.mobile-only {
+  display: flex;
 }
 
 /* Kanban dropdown вЂ” compact on mobile */
@@ -5592,9 +5586,9 @@ body > .task-actions-menu {
   .task-tracker-panel,
   .habit-tracker-panel {
     padding: 10px 12px;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    overflow: visible !important;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: visible;
   }
 
   .task-tracker-panel .task-tracker-list,
@@ -5648,7 +5642,7 @@ body > .task-actions-menu {
   }
 
   .calendar-main-view .task-tracker-panel .task-item-row-meta {
-    display: flex !important;
+    display: flex;
     gap: 3px;
     padding-left: 0;
   }
@@ -5935,7 +5929,7 @@ body > .task-actions-menu {
 
   /* в”Ђв”Ђ Task modal (tm) вЂ” match reference в”Ђв”Ђ */
   .tm-title {
-    font-size: 18px !important;
+    font-size: 18px;
   }
 
   .tm-header {
@@ -6159,7 +6153,7 @@ body > .task-actions-menu {
 
   /* Quick action buttons вЂ” always visible on touch */
   .task-tracker-panel .task-quick-actions {
-    opacity: 1 !important;
+    opacity: 1;
   }
 
   .task-tracker-panel .quick-btn {
@@ -6258,7 +6252,7 @@ body > .task-actions-menu {
   }
 
   .checklist-remove {
-    opacity: 0.5 !important;
+    opacity: 0.5;
     min-width: 28px;
     min-height: 28px;
   }
@@ -6371,9 +6365,9 @@ body > .task-actions-menu {
 }
 
 .schedule-view-container .fc .fc-button-active {
-  background: var(--mcp-accent) !important;
-  color: var(--mcp-text, var(--text-normal)) !important;
-  border-color: var(--mcp-accent-faint) !important;
+  background: var(--mcp-accent);
+  color: var(--mcp-text, var(--text-normal));
+  border-color: var(--mcp-accent-faint);
   box-shadow: 0 0 12px var(--mcp-accent-faint);
 }
 
@@ -6406,8 +6400,8 @@ body > .task-actions-menu {
 
 .schedule-view-container .fc .fc-event {
   cursor: pointer;
-  border: none !important;
-  border-radius: 8px !important;
+  border: none;
+  border-radius: 8px;
   transition: background-color 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
   box-shadow: inset 3px 0 0 var(--event-project-color, rgba(120, 145, 175, 1)), 0 2px 8px rgba(0, 0, 0, 0.12);
 }
@@ -6428,15 +6422,15 @@ body > .task-actions-menu {
 .schedule-view-container .fc .fc-event.fc-dragging,
 .schedule-view-container .fc .fc-event-event-dragging,
 .schedule-view-container .fc .fc-event-mirror {
-  transition: none !important;
-  transform: none !important;
+  transition: none;
+  transform: none;
   will-change: auto;
   opacity: 0.9;
   z-index: 9999;
-  box-shadow: none !important;
-  filter: none !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  box-shadow: none;
+  filter: none;
+  margin: 0;
+  padding: 0;
 }
 
 .schedule-view-container .fc-event-main-inner {
@@ -6459,7 +6453,7 @@ body > .task-actions-menu {
 
 /* РЎРµРіРѕРґРЅСЏ вЂ” Р±РµР· Р·Р°Р»РёРІРєРё, С‚РѕР»СЊРєРѕ Р±РѕСЂРґРµСЂ */
 .schedule-view-container .fc .fc-day-today {
-  background: transparent !important;
+  background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--mcp-accent, rgba(95, 153, 225, 0.48));
   border-radius: 6px;
 }
@@ -6883,7 +6877,7 @@ body > .task-actions-menu {
 }
 
 .checklist-remove:hover {
-  opacity: 1 !important;
+  opacity: 1;
   color: var(--mcp-danger);
   background: var(--mcp-danger-dim);
 }
@@ -7011,8 +7005,8 @@ body > .task-actions-menu {
    SCHEDULE VIEW вЂ” MONTH VIEW PROJECT COLORS
    ============================================ */
 .schedule-view-container .fc .fc-daygrid-event {
-  border-left-width: 3px !important;
-  border-left-style: solid !important;
+  border-left-width: 3px;
+  border-left-style: solid;
 }
 
 .schedule-view-container .fc .fc-daygrid-event .sch-event {
@@ -7027,8 +7021,8 @@ body > .task-actions-menu {
 }
 
 .schedule-view-container .fc .fc-daygrid-event.sch-event-deadline-parent {
-  background-color: rgba(180, 60, 60, 0.85) !important;
-  border-left-color: #b43c3c !important;
+  background-color: rgba(180, 60, 60, 0.85);
+  border-left-color: #b43c3c;
 }
 
 /* ============================================
@@ -7077,7 +7071,7 @@ body > .task-actions-menu {
 
 /* РЎРѕР±С‹С‚РёСЏ РїСЂР°Р·РґРЅРёРєРѕРІ РІ СЂР°СЃРїРёСЃР°РЅРёРё */
 .sch-event-holiday {
-  border-left-width: 3px !important;
+  border-left-width: 3px;
   font-weight: 600;
 }
 
@@ -7499,8 +7493,8 @@ body > .task-actions-menu {
   gap: 8px;
   padding: clamp(10px, 1.5vw, 12px) clamp(12px, 1.5vw, 16px);
   border-radius: clamp(10px, 1.5vw, 14px);
-  text-decoration: none !important;
-  color: var(--text-muted) !important;
+  text-decoration: none;
+  color: var(--text-muted);
   background: color-mix(in srgb, var(--background-primary-alt) 60%, transparent);
   border: 1px solid rgba(255, 255, 255, 0.03);
   font-size: clamp(0.88rem, 1.5vw, 0.95rem);
@@ -7517,7 +7511,7 @@ body > .task-actions-menu {
 
 .dashboard-card__item:hover {
   background: var(--interactive-accent);
-  color: #fff !important;
+  color: #fff;
   border-color: var(--interactive-accent);
   transform: translateX(6px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -8227,14 +8221,14 @@ body > .task-actions-menu {
    QUICK ADD MODAL
    ============================================ */
 
-.modal-container:has(.quick-add-shell) .modal {
-  width: min(540px, calc(100vw - 24px)) !important;
-  border-radius: 18px !important;
-  padding: 0 !important;
+.modal-container .modal.quick-add-shell {
+  width: min(540px, calc(100vw - 24px));
+  border-radius: 18px;
+  padding: 0;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 20px 56px rgba(0, 0, 0, 0.45);
-  background: var(--mcp-surface, var(--background-primary)) !important;
+  background: var(--mcp-surface, var(--background-primary));
 }
 
 .quick-add-shell .modal-content {
@@ -8400,15 +8394,15 @@ body > .task-actions-menu {
   margin-top: 8px;
 }
 
-.qa2-input,
-.qa2-textarea {
+input.qa2-input.qa2-input,
+textarea.qa2-textarea.qa2-textarea {
   flex: 1;
   min-width: 0;
-  border: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  padding: 13px 0 !important;
-  font-size: 14.5px !important;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 13px 0;
+  font-size: 14.5px;
   color: var(--text-normal);
   outline: none;
   font-family: inherit;
@@ -8424,7 +8418,7 @@ body > .task-actions-menu {
   width: 100%;
   min-height: 104px;
   line-height: 1.5;
-  padding: 12px 0 !important;
+  padding: 12px 0;
 }
 
 .qa2-input-wrap--multi {
@@ -9523,19 +9517,19 @@ body > .task-actions-menu {
 .wf-dialog-content textarea,
 .ai-ask-input,
 .ai-ask-input-shell {
-  user-select: text !important;
-  -webkit-user-select: text !important;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .ai-extract-modal {
-  max-width: 720px !important;
-  width: min(720px, 96vw) !important;
+  max-width: 720px;
+  width: min(720px, 96vw);
 }
 
 .ai-extract-modal .wf-dialog-content {
-  padding: 0 !important;
-  overflow-y: auto !important;
-  display: flex !important;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
   flex-direction: column;
   max-height: min(85vh, 820px);
 }
@@ -9638,8 +9632,8 @@ body > .task-actions-menu {
 }
 
 .ai-extract-btn {
-  width: auto !important;
-  margin: 0 !important;
+  width: auto;
+  margin: 0;
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -9766,23 +9760,23 @@ body > .task-actions-menu {
 }
 
 /* Task title */
-.ai-task-title-input {
-  width: 100% !important;
-  height: auto !important;
-  background: rgba(255, 255, 255, 0.03) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+input.ai-task-title-input.ai-task-title-input {
+  width: 100%;
+  height: auto;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 4px;
-  padding: 3px 6px !important;
-  font-size: 13px !important;
+  padding: 3px 6px;
+  font-size: 13px;
   font-weight: 500;
-  color: #fff !important;
+  color: #fff;
   outline: none;
   box-sizing: border-box;
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
-.ai-task-title-input:focus {
-  border-color: rgba(95, 153, 225, 0.4) !important;
+input.ai-task-title-input.ai-task-title-input:focus {
+  border-color: rgba(95, 153, 225, 0.4);
 }
 
 /* Description */
@@ -9804,19 +9798,19 @@ body > .task-actions-menu {
   flex-wrap: wrap;
 }
 
-.ai-task-time-input {
-  width: 52px !important;
-  height: auto !important;
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+input.ai-task-time-input.ai-task-time-input {
+  width: 52px;
+  height: auto;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
-  padding: 2px 4px !important;
-  font-size: 11px !important;
-  color: #fff !important;
+  padding: 2px 4px;
+  font-size: 11px;
+  color: #fff;
   text-align: center;
   outline: none;
   box-sizing: border-box;
-  box-shadow: none !important;
+  box-shadow: none;
 }
 
 .ai-task-est {
@@ -9934,8 +9928,8 @@ body > .task-actions-menu {
 
 /* Drag & drop */
 .ai-day-card-drop {
-  border-color: rgba(95, 153, 225, 0.5) !important;
-  background: rgba(95, 153, 225, 0.04) !important;
+  border-color: rgba(95, 153, 225, 0.5);
+  background: rgba(95, 153, 225, 0.04);
   box-shadow: 0 0 0 2px rgba(95, 153, 225, 0.15);
 }
 
@@ -10358,7 +10352,7 @@ body > .task-actions-menu {
 /* Mobile: hide completely */
 @media (max-width: 768px) {
   .ai-extract-modal {
-    display: none !important;
+    display: none;
   }
 }
 
@@ -10632,7 +10626,7 @@ body > .task-actions-menu {
   .ai-summary-modal.scanning::after,
   .ai-summary-progress.indeterminate .ai-summary-progress-fill,
   .ai-summary-status.busy .ai-summary-spinner {
-    animation: none !important;
+    animation: none;
   }
 
   .ai-summary-modal.scanning::before {
@@ -11042,8 +11036,8 @@ body > .task-actions-menu {
 .wf-dialog-content,
 .ai-finance-modal,
 .ai-extract-modal {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 .finance-tracker::-webkit-scrollbar,
@@ -11059,22 +11053,22 @@ body > .task-actions-menu {
 .ai-finance-modal::-webkit-scrollbar,
 .ai-extract-modal::-webkit-scrollbar,
 .worklife-scroll-hidden::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-  background: transparent !important;
-  display: none !important;
+  width: 0;
+  height: 0;
+  background: transparent;
+  display: none;
 }
 
 /* Broader: any scrollable area inside WorkLife plugin views */
 .workspace-leaf-content[data-type^="calendar-"] *,
 .workspace-leaf-content[data-type^="calendar-"] {
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 .workspace-leaf-content[data-type^="calendar-"] ::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-  display: none !important;
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 /* ── AI Summary: scan effect (same language as AI extract) ── */
@@ -11168,7 +11162,7 @@ body > .task-actions-menu {
   .ai-summary-modal.scanning .ai-summary-scan::before,
   .ai-summary-modal.scanning .ai-summary-scan::after,
   .ai-summary-modal.scanning .ai-summary-status.busy::after {
-    animation: none !important;
+    animation: none;
   }
   .ai-summary-modal.scanning .ai-summary-scan::before {
     display: none;
