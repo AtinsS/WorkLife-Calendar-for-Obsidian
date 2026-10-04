@@ -166,6 +166,8 @@ export interface ISettings {
   aiSubtasksEnabled: boolean;
   /** Умное быстрое добавление задач (ИИ: работа / заметка / повтор / мульти) */
   aiQuickAddEnabled: boolean;
+  /** Предварительное согласование AI-задач перед добавлением */
+  aiConfirmBeforeAdd: boolean;
   /** Стиль саммари заметок */
   aiSummaryStyle?: "brief" | "detailed" | "bullets" | "executive";
   /** Доп. инструкции к промпту саммари */
@@ -287,6 +289,7 @@ export const defaultSettings = Object.freeze({
   aiSummaryEnabled: true,
   aiSubtasksEnabled: true,
   aiQuickAddEnabled: true,
+  aiConfirmBeforeAdd: true,
   aiSummaryStyle: "detailed" as const,
   aiSummaryPrompt: "", // 0 = unlimited
 });
@@ -2369,6 +2372,17 @@ priority: medium
         toggle.setValue(this.plugin.options.aiQuickAddEnabled !== false);
         toggle.onChange(async (value) => {
           await this.plugin.writeOptions({ aiQuickAddEnabled: value });
+        });
+      });
+
+    // Confirm AI-parsed tasks before adding
+    new Setting(container)
+      .setName(tRaw("settings.ai.confirmBeforeAdd"))
+      .setDesc(tRaw("settings.ai.confirmBeforeAddDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.aiConfirmBeforeAdd !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ aiConfirmBeforeAdd: value });
         });
       });
 

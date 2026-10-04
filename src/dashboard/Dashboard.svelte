@@ -272,16 +272,15 @@
 
   // Task CRUD
   function openCreateTask() {
-    const todayDateUID = getDateUID(now, "day");
-    new TaskModal(appInstance, (taskData) => {
-      addTask({
-        ...taskData,
-        dateUID: todayDateUID,
-        status: "todo",
-        completed: false,
-        sortOrder: todayAllTasks.length,
-      } as Omit<ITask, "id" | "createdAt" | "updatedAt">);
-    }, undefined, todayStr).open();
+    void import("../task-tracker/QuickAddModal").then(({ QuickAddModal }) => {
+      new QuickAddModal(appInstance, now, () => {
+        /* store-driven */
+      }, {
+        onTaskCreated: (task) => {
+          void task;
+        },
+      }).open();
+    });
   }
 
   function openEditTask(task: ITask) {

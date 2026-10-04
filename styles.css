@@ -1,5 +1,5 @@
 /* ============================================
-   WORKLIFE CALENDAR вЂ” DARK PREMIUM THEME
+   WORKLIFE CALENDAR — DARK PREMIUM THEME
    Inspired by Linear, Arc, Notion Calendar
    ============================================ */
 
@@ -10,7 +10,7 @@
   --mcp-surface-2: #1E222B;
   --mcp-surface-hover: #252A36;
 
-  /* Accent вЂ” indigo/purple gradient */
+  /* Accent — indigo/purple gradient */
   --mcp-accent: #7C5CFC;
   --mcp-accent-dim: rgba(124, 92, 252, 0.12);
   --mcp-accent-faint: rgba(124, 92, 252, 0.08);
@@ -43,7 +43,7 @@
   --mcp-radius-lg: 20px;
   --mcp-radius-sm: 12px;
 
-  /* Shadows вЂ” layered depth */
+  /* Shadows — layered depth */
   --mcp-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.04);
   --mcp-shadow-glow: 0 0 40px rgba(124, 92, 252, 0.08);
   --mcp-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
@@ -132,7 +132,7 @@
 }
 
 /* ============================================
-   MAIN VIEW вЂ” side-by-side adaptive layout
+   MAIN VIEW — side-by-side adaptive layout
    ============================================ */
 .calendar-main-view {
   display: flex;
@@ -184,7 +184,7 @@
   border-radius: var(--mcp-radius);
 }
 
-/* в”Ђв”Ђ Larger sizes for main view в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Larger sizes for main view ─────────────────────── */
 
 /* Calendar nav and title */
 .calendar-main-view #calendar-container .nav .title {
@@ -210,7 +210,7 @@
   height: 18px;
 }
 
-/* Calendar day cells вЂ” bigger */
+/* Calendar day cells — bigger */
 .calendar-main-view #calendar-container .day,
 .calendar-main-view #calendar-container .week-num {
   min-height: 56px;
@@ -218,7 +218,7 @@
   padding: 14px 10px;
 }
 
-/* Wide screens вЂ” even bigger calendar */
+/* Wide screens — even bigger calendar */
 @media (min-width: 1200px) {
   .calendar-main-view .calendar-layout {
     max-width: 1600px;
@@ -279,7 +279,7 @@
   border-spacing: 6px;
 }
 
-/* Task badges on calendar days вЂ” bigger */
+/* Task badges on calendar days — bigger */
 .calendar-main-view #calendar-container .day[data-task-count]::after {
   font-size: 15px;
   min-width: 20px;
@@ -297,7 +297,7 @@
   left: 2px;
 }
 
-/* Task panel вЂ” bigger */
+/* Task panel — bigger */
 .calendar-main-view .task-tracker-panel {
   padding: 24px 26px;
 }
@@ -393,7 +393,7 @@
   font-size: 17px;
 }
 
-/* Habit panel вЂ” bigger */
+/* Habit panel — bigger */
 .calendar-main-view .habit-tracker-panel {
   padding: 24px 26px;
 }
@@ -477,7 +477,7 @@
   }
 }
 
-/* Medium screens вЂ” compress but keep side-by-side */
+/* Medium screens — compress but keep side-by-side */
 @media (min-width: 801px) and (max-width: 1100px) {
   .calendar-main-view .calendar-layout {
     gap: 16px;
@@ -535,7 +535,7 @@
   box-shadow: 0 2px 8px var(--mcp-accent-faint);
 }
 
-/* в”Ђв”Ђ Month goals indicator в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Month goals indicator ────────────────────────────── */
 .month-goals-indicator {
   margin-bottom: 8px;
 }
@@ -592,7 +592,7 @@
   z-index: 10000;
 }
 
-/* в”Ђв”Ђ Goals modal в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+/* ── Goals modal ─────────────────────────────────────── */
 .goals-modal-overlay {
   position: fixed;
   inset: 0;
@@ -1002,11 +1002,18 @@
    ============================================ */
 .task-tracker-panel,
 .habit-tracker-panel {
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  padding: 20px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 16px 16px 12px;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
+  border-radius: 18px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.035) 0%,
+    rgba(255, 255, 255, 0.015) 100%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .task-tracker-panel {
@@ -1025,6 +1032,16 @@
   max-height: 55vh;
   overflow-y: auto;
   overflow-x: hidden;
+  padding: 2px 0 4px;
+}
+
+.task-tracker-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.task-tracker-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
 }
 
 /* ============================================
@@ -1035,10 +1052,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: 6px 4px 12px;
   user-select: none;
   gap: 10px;
-  border-radius: var(--mcp-radius-sm);
+  border-radius: 12px;
 }
 
 .habit-tracker-header:hover {
@@ -1053,7 +1070,7 @@
 .habit-tracker-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -1061,7 +1078,7 @@
 .habit-tracker-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
 }
 
@@ -1070,22 +1087,35 @@
   font-weight: 700;
   font-size: 15px;
   color: var(--mcp-text);
-  letter-spacing: -0.3px;
+  letter-spacing: -0.02em;
 }
 
 .task-tracker-date {
   font-size: 12px;
+  font-weight: 550;
   color: var(--mcp-text-muted);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.task-tracker-date:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--mcp-text);
 }
 
 .task-tracker-count {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 650;
   color: var(--mcp-text-muted);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.06);
   padding: 4px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  letter-spacing: 0.02em;
 }
 
 .habit-tracker-streak {
@@ -1102,31 +1132,47 @@
    ============================================ */
 .task-tracker-btn,
 .habit-tracker-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--mcp-text-muted);
   cursor: pointer;
-  padding: 6px 12px;
-  font-size: 16px;
+  padding: 6px 11px;
+  font-size: 15px;
   line-height: 1;
   border-radius: 10px;
-  transition: all var(--mcp-transition-fast);
+  transition: all 0.18s ease;
 }
 
 .task-tracker-btn:hover,
 .habit-tracker-btn:hover {
   color: var(--mcp-text);
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.task-tracker-btn:active,
+.habit-tracker-btn:active {
+  transform: scale(0.96);
+}
+
+.task-tracker-btn.active {
+  color: var(--mcp-text);
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 18%, transparent);
+  border-color: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 40%, transparent);
 }
 
 /* Unified add button for task and habit panels */
 .add-btn {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
   padding: 5px 14px;
   white-space: nowrap;
-  background: var(--mcp-accent);
+  background: linear-gradient(
+    145deg,
+    var(--mcp-accent, #7c5cfc),
+    color-mix(in srgb, var(--mcp-accent, #7c5cfc) 72%, #5b3fd4 28%)
+  );
   color: #fff;
   border-color: transparent;
 }
@@ -1144,7 +1190,7 @@
   color: var(--mcp-accent);
 }
 
-/* Dropdown labels вЂ” desktop shows full, mobile shows short */
+/* Dropdown labels — desktop shows full, mobile shows short */
 .dropdown-label-full {
   display: inline;
 }
@@ -1476,15 +1522,15 @@
 }
 
 .task-tracker-filter-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
   color: var(--mcp-text-muted);
   cursor: pointer;
-  padding: 6px 14px;
+  padding: 6px 13px;
   font-size: 12px;
-  font-weight: 500;
-  border-radius: 20px;
-  transition: all var(--mcp-transition-fast);
+  font-weight: 600;
+  border-radius: 999px;
+  transition: all 0.18s ease;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1493,13 +1539,20 @@
 
 .task-tracker-filter-btn:hover {
   color: var(--mcp-text);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
 }
 
 .task-tracker-filter-btn.active {
   color: #fff;
-  background: var(--mcp-accent);
+  background: linear-gradient(
+    145deg,
+    var(--mcp-accent, #7c5cfc),
+    color-mix(in srgb, var(--mcp-accent, #7c5cfc) 70%, #5b3fd4 30%)
+  );
   border-color: transparent;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--mcp-accent, #7c5cfc) 35%, transparent);
 }
 
 .filter-project-icon {
@@ -1539,27 +1592,34 @@
 
 .task-tracker-empty {
   text-align: center;
-  padding: 40px 20px;
+  padding: 48px 20px;
   color: var(--mcp-text-muted);
   font-size: 13px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  margin-top: 8px;
 }
 
 .task-tracker-empty .empty-illustration {
-  opacity: 0.6;
-  margin-bottom: 12px;
-  filter: drop-shadow(0 0 8px rgba(124, 92, 252, 0.1));
+  opacity: 0.75;
+  margin-bottom: 14px;
+  filter: drop-shadow(0 4px 16px rgba(124, 92, 252, 0.18));
+  font-size: 28px;
 }
 
 .task-tracker-empty .empty-title {
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 650;
   color: var(--mcp-text);
   margin-bottom: 6px;
+  letter-spacing: -0.01em;
 }
 
 .task-tracker-empty .empty-subtitle {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--mcp-text-muted);
+  opacity: 0.85;
 }
 
 .task-group-header {
@@ -1585,43 +1645,52 @@
 }
 
 /* ============================================
-   TASK ITEM
+   TASK ITEM — modern glass cards
    ============================================ */
 .task-item {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: default;
-  transition: background var(--mcp-transition-fast), border-color var(--mcp-transition-fast), box-shadow var(--mcp-transition-fast);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
   gap: 8px;
   min-width: 0;
-  margin-bottom: 6px;
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-left: 3px solid var(--task-color, rgba(255, 255, 255, 0.08));
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 3px solid color-mix(in srgb, var(--task-color, var(--mcp-accent, #7c5cfc)) 70%, transparent);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
 
 .task-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: color-mix(in srgb, var(--task-color, var(--mcp-accent)) 50%, transparent);
-  border-left-color: var(--task-color, var(--mcp-accent));
-  box-shadow: 0 0 20px color-mix(in srgb, var(--task-color, var(--mcp-accent)) 30%, transparent), 0 0 40px color-mix(in srgb, var(--task-color, var(--mcp-accent)) 10%, transparent);
+  background: rgba(255, 255, 255, 0.055);
+  border-color: color-mix(in srgb, var(--task-color, var(--mcp-accent, #7c5cfc)) 40%, transparent);
+  border-left-color: var(--task-color, var(--mcp-accent, #7c5cfc));
+  box-shadow:
+    0 4px 16px color-mix(in srgb, var(--task-color, var(--mcp-accent, #7c5cfc)) 18%, transparent),
+    0 1px 3px rgba(0, 0, 0, 0.18);
+  transform: translateY(-1px);
 }
 
 .task-item.completed {
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 .task-item.completed:hover {
-  opacity: 0.65;
+  opacity: 0.72;
+  transform: none;
 }
 
 .task-item-row-main {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -1631,26 +1700,26 @@
   gap: 6px;
   min-width: 0;
   flex-wrap: wrap;
-  padding-left: 28px;
+  padding-left: 32px;
 }
 
 .task-item[data-status="done"] {
   opacity: 0.5;
 }
 
-/* Status button */
+/* Status button — rounded, animated */
 .task-status-btn {
   width: 22px;
   height: 22px;
-  border-radius: 6px;
-  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  border: 1.5px solid rgba(255, 255, 255, 0.16);
   background: transparent;
   color: transparent;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.15s ease;
+  transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   flex-shrink: 0;
   font-size: 11px;
   padding: 0;
@@ -1658,20 +1727,20 @@
 }
 
 .task-status-btn:hover {
-  transform: scale(1.1);
-  border-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.08);
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .task-status-btn.status-todo {
-  border-color: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.18);
   background: transparent;
   color: transparent;
 }
 
 .task-status-btn.status-todo:hover {
-  border-color: #3DD68C;
-  background: rgba(61, 214, 140, 0.12);
-  color: #3DD68C;
+  border-color: #3dd68c;
+  background: rgba(61, 214, 140, 0.14);
+  color: #3dd68c;
 }
 
 .task-status-btn.status-todo .check-hover {
@@ -1684,20 +1753,21 @@
 }
 
 .task-status-btn.status-progress {
-  border-color: #F5A623;
-  color: #F5A623;
-  background: rgba(245, 166, 35, 0.08);
+  border-color: #f5a623;
+  color: #f5a623;
+  background: rgba(245, 166, 35, 0.12);
+  border-radius: 50%;
 }
 
 .task-status-btn.status-progress:hover {
-  border-color: #F5A623;
-  background: rgba(245, 166, 35, 0.15);
+  border-color: #f5a623;
+  background: rgba(245, 166, 35, 0.2);
 }
 
 .task-status-btn.status-done {
-  border-color: #3DD68C;
-  color: #3DD68C;
-  background: rgba(61, 214, 140, 0.1);
+  border-color: #3dd68c;
+  color: #3dd68c;
+  background: rgba(61, 214, 140, 0.16);
 }
 
 .task-status-btn.status-done:disabled {
@@ -1863,9 +1933,10 @@
 /* Title */
 .task-title {
   flex: 1;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13.5px;
+  font-weight: 550;
   color: var(--mcp-text);
+  letter-spacing: -0.005em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2379,7 +2450,7 @@ body > .task-actions-menu {
   z-index: 15;
 }
 
-/* Note: do NOT set z-index on bare .modal вЂ” it conflicts with Obsidian's own modal styles */
+/* Note: do NOT set z-index on bare .modal — it conflicts with Obsidian's own modal styles */
 
 .wf-dialog-container {
   position: relative;
@@ -2457,7 +2528,7 @@ body > .task-actions-menu {
 }
 
 /* ============================================
-   TASK MODAL вЂ” POLISHED
+   TASK MODAL — POLISHED
    ============================================ */
 .wf-task-modal {
   width: 480px;
@@ -2549,7 +2620,7 @@ h2.tm-title.tm-title {
   color: rgba(255, 255, 255, 0.25);
 }
 
-/* Date/time pickers вЂ” dark theme */
+/* Date/time pickers — dark theme */
 .tm-input[type="date"],
 .tm-input[type="time"] {
   color-scheme: dark;
@@ -2567,7 +2638,7 @@ h2.tm-title.tm-title {
   opacity: 0.8;
 }
 
-/* Select dropdown вЂ” dark theme */
+/* Select dropdown — dark theme */
 .tm-select {
   color-scheme: dark;
   appearance: none;
@@ -2656,7 +2727,7 @@ h2.tm-title.tm-title {
   background: var(--pri-dot-color, currentColor);
 }
 
-/* Task modal вЂ” static max-width helpers */
+/* Task modal — static max-width helpers */
 .tm-input-narrow-60 {
   max-width: 60px;
 }
@@ -2669,7 +2740,7 @@ h2.tm-title.tm-title {
   max-width: 120px;
 }
 
-/* Task modal вЂ” validation error states */
+/* Task modal — validation error states */
 .tm-input-error {
   border-color: var(--text-error, #ef4436);
 }
@@ -3112,7 +3183,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   PROJECT MODAL вЂ” POLISHED
+   PROJECT MODAL — POLISHED
    ============================================ */
 .wf-project-modal {
   width: 540px;
@@ -3929,7 +4000,7 @@ h2.tm-title.tm-title {
   border-color: var(--mcp-danger);
 }
 
-/* РћС‚РґРµР»СЊРЅР°СЏ РІРєР»Р°РґРєР° В«РџСЂРёРІС‹С‡РєРёВ» вЂ” Р±РµР· С„РёРєСЃРёСЂРѕРІР°РЅРЅРѕР№ РІС‹СЃРѕС‚С‹ */
+/* РћС‚РґРµР»СЊРЅР°СЏ РІРєР»Р°РґРєР° В«РџСЂРёРІС‹С‡РєРёВ» — Р±РµР· С„РёРєСЃРёСЂРѕРІР°РЅРЅРѕР№ РІС‹СЃРѕС‚С‹ */
 .habit-panel-view-container {
   height: 100%;
   overflow-y: auto;
@@ -4006,7 +4077,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   RESPONSIVE вЂ” LARGE SCREENS
+   RESPONSIVE — LARGE SCREENS
    ============================================ */
 @media (min-width: 1400px) {
 
@@ -4019,11 +4090,11 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   RESPONSIVE вЂ” SMALL DESKTOP (в‰¤1100px)
+   RESPONSIVE — SMALL DESKTOP (в‰¤1100px)
    ============================================ */
 @media (max-width: 1100px) {
 
-  /* Task items вЂ” tighter */
+  /* Task items — tighter */
   .task-tracker-panel .task-item {
     padding: 7px 10px;
     gap: 6px;
@@ -4090,7 +4161,7 @@ h2.tm-title.tm-title {
     font-size: 10px;
   }
 
-  /* Habit items вЂ” tighter */
+  /* Habit items — tighter */
   .habit-tracker-panel .habit-item {
     padding: 8px 10px;
     gap: 8px;
@@ -4127,7 +4198,7 @@ h2.tm-title.tm-title {
     min-height: 24px;
   }
 
-  /* Header вЂ” tighter */
+  /* Header — tighter */
   .task-tracker-panel .task-tracker-header,
   .habit-tracker-panel .habit-tracker-header {
     padding: 8px 10px;
@@ -4168,7 +4239,7 @@ h2.tm-title.tm-title {
     font-size: 13px;
   }
 
-  /* Kanban dropdown вЂ” tighter */
+  /* Kanban dropdown — tighter */
   .kanban-dropdown-trigger {
     padding: 5px 10px;
     font-size: 12px;
@@ -4192,7 +4263,7 @@ h2.tm-title.tm-title {
     font-size: 12px;
   }
 
-  /* Filter bar вЂ” tighter */
+  /* Filter bar — tighter */
   .task-tracker-panel .task-tracker-filter-bar {
     gap: 4px;
     padding: 6px 0;
@@ -4204,7 +4275,7 @@ h2.tm-title.tm-title {
     min-height: 32px;
   }
 
-  /* Search вЂ” tighter */
+  /* Search — tighter */
   .task-tracker-panel .task-tracker-search-bar {
     padding: 6px 0;
   }
@@ -4214,7 +4285,7 @@ h2.tm-title.tm-title {
     font-size: 12px;
   }
 
-  /* Task actions вЂ” tighter */
+  /* Task actions — tighter */
   .task-tracker-panel .task-actions-toggle {
     padding: 3px 6px;
     font-size: 12px;
@@ -4227,7 +4298,7 @@ h2.tm-title.tm-title {
     font-size: 12px;
   }
 
-  /* Dropdown вЂ” tighter */
+  /* Dropdown — tighter */
   .task-tracker-panel .task-tracker-dropdown-item {
     padding: 7px 12px;
     font-size: 12px;
@@ -4236,7 +4307,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   RESPONSIVE вЂ” TABLET (481вЂ“768px)
+   RESPONSIVE — TABLET (481–768px)
    ============================================ */
 @media (min-width: 481px) and (max-width: 768px) {
   #calendar-container .day[data-task-count]::after {
@@ -4253,11 +4324,11 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   RESPONSIVE вЂ” PHONE (в‰¤480px)
+   RESPONSIVE — PHONE (в‰¤480px)
    ============================================ */
 @media (max-width: 480px) {
 
-  /* Calendar вЂ” more air between cells */
+  /* Calendar — more air between cells */
   #calendar-container .calendar {
     border-spacing: 5px;
   }
@@ -4290,7 +4361,7 @@ h2.tm-title.tm-title {
     border-radius: 6px;
   }
 
-  /* в”Ђв”Ђ Panels: full scroll, bottom safe area в”Ђв”Ђ */
+  /* ── Panels: full scroll, bottom safe area ── */
   .task-tracker-panel {
     padding: 14px 12px;
   }
@@ -4314,7 +4385,7 @@ h2.tm-title.tm-title {
     padding-bottom: 80px;
   }
 
-  /* Header вЂ” more space */
+  /* Header — more space */
   .task-tracker-header,
   .habit-tracker-header {
     padding: 8px 8px;
@@ -4346,7 +4417,7 @@ h2.tm-title.tm-title {
     padding: 3px 10px;
   }
 
-  /* Buttons вЂ” larger touch targets */
+  /* Buttons — larger touch targets */
   .task-tracker-btn,
   .habit-tracker-btn {
     padding: 7px 10px;
@@ -4358,7 +4429,7 @@ h2.tm-title.tm-title {
     justify-content: center;
   }
 
-  /* Search bar вЂ” bigger */
+  /* Search bar — bigger */
   .task-tracker-search-bar {
     gap: 8px;
     padding: 10px 0;
@@ -4377,7 +4448,7 @@ h2.tm-title.tm-title {
     font-size: 14px;
   }
 
-  /* Filter bar вЂ” horizontal scroll with more space */
+  /* Filter bar — horizontal scroll with more space */
   .task-tracker-filter-bar {
     display: flex;
     gap: 6px;
@@ -4407,7 +4478,7 @@ h2.tm-title.tm-title {
     flex-shrink: 0;
   }
 
-  /* ===== MOBILE TASK ITEM вЂ” spacious ===== */
+  /* ===== MOBILE TASK ITEM — spacious ===== */
   .task-item {
     padding: 10px 10px;
     gap: 6px;
@@ -4573,7 +4644,7 @@ h2.tm-title.tm-title {
   font-size: 10px;
 }
 
-/* Actions toggle вЂ” always visible on mobile */
+/* Actions toggle — always visible on mobile */
 .task-actions-toggle {
   opacity: 1;
   min-width: 36px;
@@ -4581,7 +4652,7 @@ h2.tm-title.tm-title {
   padding: 6px;
 }
 
-/* Checklist вЂ” larger touch targets */
+/* Checklist — larger touch targets */
 .checklist-section {
   padding: 8px 4px 8px 30px;
 }
@@ -4625,7 +4696,7 @@ h2.tm-title.tm-title {
   min-width: 36px;
 }
 
-/* ===== MOBILE HABIT ITEM вЂ” spacious ===== */
+/* ===== MOBILE HABIT ITEM — spacious ===== */
 .habit-item {
   padding: 10px 8px;
   gap: 8px;
@@ -4715,14 +4786,14 @@ h2.tm-title.tm-title {
   font-size: 16px;
 }
 
-/* Row 2 вЂ” stack vertically on mobile */
+/* Row 2 — stack vertically on mobile */
 .tm-row-2 {
   flex-direction: column;
   gap: 8px;
   padding: 0 14px 8px;
 }
 
-/* Priority buttons вЂ” wrap with larger touch targets */
+/* Priority buttons — wrap with larger touch targets */
 .tm-pri-btns {
   gap: 4px;
 }
@@ -4743,7 +4814,7 @@ h2.tm-title.tm-title {
   font-size: 14px;
 }
 
-/* Duration вЂ” larger touch targets */
+/* Duration — larger touch targets */
 .tm-dur-row {
   padding: 6px 12px;
   gap: 6px;
@@ -4778,7 +4849,7 @@ h2.tm-title.tm-title {
   font-size: 13px;
 }
 
-/* Advanced rows вЂ” stack label + input vertically on mobile */
+/* Advanced rows — stack label + input vertically on mobile */
 .tm-adv-row {
   gap: 6px;
   padding: 10px 14px;
@@ -4814,7 +4885,7 @@ h2.tm-title.tm-title {
   font-size: 16px;
 }
 
-/* Toggle switch вЂ” larger for touch */
+/* Toggle switch — larger for touch */
 .tm-toggle {
   width: 50px;
   height: 28px;
@@ -4831,7 +4902,7 @@ h2.tm-title.tm-title {
   transform: translateX(22px);
 }
 
-/* Days buttons вЂ” wrap on small screens */
+/* Days buttons — wrap on small screens */
 .tm-days-btns {
   flex-wrap: wrap;
   gap: 4px;
@@ -4844,7 +4915,7 @@ h2.tm-title.tm-title {
   border-radius: 8px;
 }
 
-/* Footer вЂ” full width buttons */
+/* Footer — full width buttons */
 .tm-footer {
   flex-direction: column;
   gap: 8px;
@@ -4864,7 +4935,7 @@ h2.tm-title.tm-title {
   border-radius: 12px;
 }
 
-/* ===== MOBILE PROJECT MODAL вЂ” full width, touch-friendly ===== */
+/* ===== MOBILE PROJECT MODAL — full width, touch-friendly ===== */
 .task-tracker-project-modal {
   padding: 14px;
   overflow-y: auto;
@@ -4891,7 +4962,7 @@ h2.tm-title.tm-title {
   margin-bottom: 14px;
 }
 
-/* New project form вЂ” compact */
+/* New project form — compact */
 .pm-new-project {
   padding: 14px;
   margin-bottom: 14px;
@@ -4922,14 +4993,14 @@ h2.tm-title.tm-title {
   border-radius: 10px;
 }
 
-/* Color + Icon row вЂ” stack vertically */
+/* Color + Icon row — stack vertically */
 .pm-row {
   flex-direction: column;
   gap: 14px;
   margin-bottom: 12px;
 }
 
-/* Color grid вЂ” larger swatches for touch */
+/* Color grid — larger swatches for touch */
 .pm-color-swatch {
   width: 40px;
   height: 40px;
@@ -5024,7 +5095,7 @@ h2.tm-title.tm-title {
   justify-content: center;
 }
 
-/* ===== MOBILE TASK ACTIONS вЂ” ultra compact ===== */
+/* ===== MOBILE TASK ACTIONS — ultra compact ===== */
 .task-actions-toggle {
   padding: 2px 4px;
   font-size: 11px;
@@ -5041,7 +5112,7 @@ h2.tm-title.tm-title {
   font-size: 12px;
 }
 
-/* Task status button вЂ” compact on mobile */
+/* Task status button — compact on mobile */
 .task-status-btn {
   width: 20px;
   height: 20px;
@@ -5049,7 +5120,7 @@ h2.tm-title.tm-title {
   flex-shrink: 0;
 }
 
-/* Note icon вЂ” compact on mobile */
+/* Note icon — compact on mobile */
 .note-icon {
   font-size: 12px;
   min-width: 20px;
@@ -5057,7 +5128,7 @@ h2.tm-title.tm-title {
   flex-shrink: 0;
 }
 
-/* Modals вЂ” full width mobile, scrollable */
+/* Modals — full width mobile, scrollable */
 .task-tracker-modal,
 .task-tracker-project-modal {
   padding: 24px 20px;
@@ -5086,7 +5157,7 @@ h2.tm-title.tm-title {
   min-height: 48px;
 }
 
-/* Color picker вЂ” bigger touch targets */
+/* Color picker — bigger touch targets */
 .task-tracker-color-swatch {
   width: 44px;
   height: 44px;
@@ -5137,7 +5208,7 @@ h2.tm-title.tm-title {
   display: flex;
 }
 
-/* Kanban dropdown вЂ” compact on mobile */
+/* Kanban dropdown — compact on mobile */
 .kanban-dropdown-trigger {
   padding: 4px 10px;
   font-size: 11px;
@@ -5171,7 +5242,7 @@ h2.tm-title.tm-title {
   font-size: 12px;
 }
 
-/* Task tracker header вЂ” compact on mobile */
+/* Task tracker header — compact on mobile */
 .task-tracker-header {
   padding: 6px 8px;
   gap: 6px;
@@ -5437,7 +5508,7 @@ h2.tm-title.tm-title {
   color: var(--mcp-accent);
 }
 
-/* Filter bar вЂ” compact on mobile */
+/* Filter bar — compact on mobile */
 .task-tracker-filter-bar {
   padding: 4px 0;
   gap: 4px;
@@ -5449,7 +5520,7 @@ h2.tm-title.tm-title {
   min-height: 26px;
 }
 
-/* Search bar вЂ” compact on mobile */
+/* Search bar — compact on mobile */
 .task-tracker-search-bar {
   padding: 4px 0;
 }
@@ -5474,11 +5545,11 @@ h2.tm-title.tm-title {
 
 
 /* ============================================
-   RESPONSIVE вЂ” SMALL PHONE (в‰¤360px) вЂ” WIDGET
+   RESPONSIVE — SMALL PHONE (в‰¤360px) — WIDGET
    ============================================ */
 @media (max-width: 360px) {
 
-  /* в”Ђв”Ђ Calendar container вЂ” no overflow в”Ђв”Ђ */
+  /* ── Calendar container — no overflow ── */
   #calendar-container {
     overflow: hidden;
     width: 100%;
@@ -5490,7 +5561,7 @@ h2.tm-title.tm-title {
     width: 100%;
   }
 
-  /* в”Ђв”Ђ Calendar grid вЂ” match reference в”Ђв”Ђ */
+  /* ── Calendar grid — match reference ── */
   #calendar-container .day,
   #calendar-container .week-num {
     min-height: 38px;
@@ -5507,7 +5578,7 @@ h2.tm-title.tm-title {
     font-weight: 600;
   }
 
-  /* в”Ђв”Ђ Nav вЂ” match reference в”Ђв”Ђ */
+  /* ── Nav — match reference ── */
   #calendar-container .nav {
     padding: 0 4px 8px;
     align-items: center;
@@ -5552,7 +5623,7 @@ h2.tm-title.tm-title {
     height: 10px;
   }
 
-  /* в”Ђв”Ђ Main view layout вЂ” match reference в”Ђв”Ђ */
+  /* ── Main view layout — match reference ── */
   .calendar-main-view {
     padding: 0 4px;
     overflow-x: visible;
@@ -5581,7 +5652,7 @@ h2.tm-title.tm-title {
     padding: 2px 5px;
   }
 
-  /* в”Ђв”Ђ Panels вЂ” match reference в”Ђв”Ђ */
+  /* ── Panels — match reference ── */
   .task-tracker-panel,
   .habit-tracker-panel {
     padding: 10px 12px;
@@ -5619,7 +5690,7 @@ h2.tm-title.tm-title {
     padding: 2px 6px;
   }
 
-  /* в”Ђв”Ђ Task items вЂ” match reference в”Ђв”Ђ */
+  /* ── Task items — match reference ── */
   .task-item {
     padding: 6px 8px;
     gap: 4px;
@@ -5627,7 +5698,7 @@ h2.tm-title.tm-title {
     border-radius: 8px;
   }
 
-  /* в”Ђв”Ђ calendar-main-view task items вЂ” compact inline в”Ђв”Ђ */
+  /* ── calendar-main-view task items — compact inline ── */
   .calendar-main-view .task-tracker-panel .task-item {
     padding: 3px 5px;
     gap: 2px;
@@ -5735,7 +5806,7 @@ h2.tm-title.tm-title {
     font-size: 11px;
   }
 
-  /* в”Ђв”Ђ Habit items вЂ” match reference в”Ђв”Ђ */
+  /* ── Habit items — match reference ── */
   .habit-item {
     padding: 5px 8px;
     gap: 5px;
@@ -5778,7 +5849,7 @@ h2.tm-title.tm-title {
     justify-content: center;
   }
 
-  /* в”Ђв”Ђ Filter & search вЂ” match reference в”Ђв”Ђ */
+  /* ── Filter & search — match reference ── */
   .task-tracker-filter-bar {
     padding: 3px 0;
     gap: 3px;
@@ -5815,7 +5886,7 @@ h2.tm-title.tm-title {
     font-size: 11px;
   }
 
-  /* в”Ђв”Ђ Kanban tabs вЂ” match reference в”Ђв”Ђ */
+  /* ── Kanban tabs — match reference ── */
   .kanban-dropdown-trigger {
     padding: 3px 8px;
     font-size: 10px;
@@ -5846,7 +5917,7 @@ h2.tm-title.tm-title {
     font-size: 10px;
   }
 
-  /* в”Ђв”Ђ Action buttons вЂ” match reference в”Ђв”Ђ */
+  /* ── Action buttons — match reference ── */
   .task-tracker-btn,
   .habit-tracker-btn {
     min-width: 28px;
@@ -5872,7 +5943,7 @@ h2.tm-title.tm-title {
     font-size: 10px;
   }
 
-  /* в”Ђв”Ђ Modals вЂ” match reference в”Ђв”Ђ */
+  /* ── Modals — match reference ── */
   .task-tracker-modal,
   .task-tracker-project-modal {
     padding: 12px;
@@ -5910,7 +5981,7 @@ h2.tm-title.tm-title {
     padding: 10px 12px;
   }
 
-  /* в”Ђв”Ђ CalendarNav вЂ” match reference в”Ђв”Ђ */
+  /* ── CalendarNav — match reference ── */
   .calendar-nav {
     gap: 4px;
   }
@@ -5926,7 +5997,7 @@ h2.tm-title.tm-title {
     font-size: 10px;
   }
 
-  /* в”Ђв”Ђ Task modal (tm) вЂ” match reference в”Ђв”Ђ */
+  /* ── Task modal (tm) — match reference ── */
   .tm-title {
     font-size: 18px;
   }
@@ -5986,7 +6057,7 @@ h2.tm-title.tm-title {
     border-radius: 10px;
   }
 
-  /* в”Ђв”Ђ Project modal вЂ” match reference в”Ђв”Ђ */
+  /* ── Project modal — match reference ── */
   .pm-input {
     font-size: 16px;
     padding: 8px 10px;
@@ -6028,14 +6099,14 @@ h2.tm-title.tm-title {
     border-radius: 6px;
   }
 
-  /* в”Ђв”Ђ Holiday modal вЂ” match reference в”Ђв”Ђ */
+  /* ── Holiday modal — match reference ── */
   .holiday-list-modal {
     width: 98%;
   }
 }
 
 /* ============================================
-   RESPONSIVE вЂ” MOBILE LANDSCAPE (keyboard open)
+   RESPONSIVE — MOBILE LANDSCAPE (keyboard open)
    ============================================ */
 @media (max-width: 480px) and (orientation: landscape) {
   .task-tracker-panel .task-tracker-list {
@@ -6048,7 +6119,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   TASK TRACKER вЂ” Date Navigation
+   TASK TRACKER — Date Navigation
    ============================================ */
 .task-tracker-date-nav {
   display: flex;
@@ -6146,11 +6217,11 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   TOUCH DEVICES вЂ” always show action buttons
+   TOUCH DEVICES — always show action buttons
    ============================================ */
 @media (hover: none) and (pointer: coarse) {
 
-  /* Quick action buttons вЂ” always visible on touch */
+  /* Quick action buttons — always visible on touch */
   .task-tracker-panel .task-quick-actions {
     opacity: 1;
   }
@@ -6161,14 +6232,14 @@ h2.tm-title.tm-title {
     font-size: 13px;
   }
 
-  /* Task status button вЂ” touch-friendly but compact */
+  /* Task status button — touch-friendly but compact */
   .task-tracker-panel .task-status-btn {
     min-width: 32px;
     min-height: 32px;
     font-size: 12px;
   }
 
-  /* Note icon вЂ” touch-friendly but compact */
+  /* Note icon — touch-friendly but compact */
   .task-tracker-panel .note-icon {
     min-width: 24px;
     min-height: 24px;
@@ -6217,7 +6288,7 @@ h2.tm-title.tm-title {
     height: 36px;
   }
 
-  /* Filter dots вЂ” slightly larger */
+  /* Filter dots — slightly larger */
   .task-tracker-panel .filter-dot {
     width: 10px;
     height: 10px;
@@ -6232,7 +6303,7 @@ h2.tm-title.tm-title {
     transform: scale(0.98);
   }
 
-  /* Checklist вЂ” larger touch targets */
+  /* Checklist — larger touch targets */
   .checklist-item input[type="checkbox"] {
     width: 22px;
     height: 22px;
@@ -6272,7 +6343,7 @@ h2.tm-title.tm-title {
    Schedule View (FullCalendar)
    ============================ */
 
-/* FullCalendar event harnesses вЂ” pass clicks through to actual events */
+/* FullCalendar event harnesses — pass clicks through to actual events */
 .schedule-view-container .fc .fc-timegrid-event-harness {
   pointer-events: none;
 }
@@ -6450,7 +6521,7 @@ h2.tm-title.tm-title {
   opacity: 0.85;
 }
 
-/* РЎРµРіРѕРґРЅСЏ вЂ” Р±РµР· Р·Р°Р»РёРІРєРё, С‚РѕР»СЊРєРѕ Р±РѕСЂРґРµСЂ */
+/* РЎРµРіРѕРґРЅСЏ — Р±РµР· Р·Р°Р»РёРІРєРё, С‚РѕР»СЊРєРѕ Р±РѕСЂРґРµСЂ */
 .schedule-view-container .fc .fc-day-today {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--mcp-accent, rgba(95, 153, 225, 0.48));
@@ -6525,7 +6596,7 @@ h2.tm-title.tm-title {
   border-bottom-color: rgba(255, 255, 255, 0.04);
 }
 
-/* Schedule view вЂ” tablet */
+/* Schedule view — tablet */
 @media (min-width: 481px) and (max-width: 768px) {
   .schedule-view-container .fc .fc-toolbar {
     flex-direction: row;
@@ -6570,7 +6641,7 @@ h2.tm-title.tm-title {
   }
 }
 
-/* Schedule view вЂ” phone */
+/* Schedule view — phone */
 @media (max-width: 480px) {
   .schedule-view-container {
     border-radius: 8px;
@@ -6652,7 +6723,7 @@ h2.tm-title.tm-title {
   }
 }
 
-/* Schedule view вЂ” touch devices */
+/* Schedule view — touch devices */
 @media (hover: none) and (pointer: coarse) {
   .schedule-view-container .fc .fc-button {
     min-height: 44px;
@@ -6688,7 +6759,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   SCHEDULED TIME вЂ” DONE BADGE
+   SCHEDULED TIME — DONE BADGE
    ============================================ */
 .task-scheduled.done {
   background: rgba(61, 214, 140, 0.1);
@@ -6938,7 +7009,7 @@ h2.tm-title.tm-title {
    ============================================ */
 @media (hover: none) and (pointer: coarse) {
 
-  /* Calendar day cells вЂ” touch feedback */
+  /* Calendar day cells — touch feedback */
   #calendar-container .day {
     -webkit-tap-highlight-color: var(--mcp-accent-faint);
     transition: transform 0.1s ease, background 0.1s ease;
@@ -7001,7 +7072,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   SCHEDULE VIEW вЂ” MONTH VIEW PROJECT COLORS
+   SCHEDULE VIEW — MONTH VIEW PROJECT COLORS
    ============================================ */
 .schedule-view-container .fc .fc-daygrid-event {
   border-left-width: 3px;
@@ -7025,7 +7096,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   HOLIDAY MODAL вЂ” РњРѕРґР°Р»РєР° РїСЂР°Р·РґРЅРёРєРѕРІ
+   HOLIDAY MODAL — РњРѕРґР°Р»РєР° РїСЂР°Р·РґРЅРёРєРѕРІ
    ============================================ */
 
 .holiday-colors {
@@ -7074,7 +7145,7 @@ h2.tm-title.tm-title {
   font-weight: 600;
 }
 
-/* Completed tasks in schedule вЂ” strikethrough */
+/* Completed tasks in schedule — strikethrough */
 .sch-event-done .sch-event-title {
   text-decoration: line-through;
   opacity: 0.55;
@@ -7098,7 +7169,7 @@ h2.tm-title.tm-title {
   gap: 6px;
 }
 
-/* РЎРїРёСЃРѕРє РїСЂР°Р·РґРЅРёРєРѕРІ вЂ” РјРѕРґР°Р»РєР° */
+/* РЎРїРёСЃРѕРє РїСЂР°Р·РґРЅРёРєРѕРІ — РјРѕРґР°Р»РєР° */
 .holiday-list-overlay {
   position: fixed;
   inset: 0;
@@ -7207,7 +7278,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   DATETIME-WEATHER вЂ” GLOBAL BAR (below tabs)
+   DATETIME-WEATHER — GLOBAL BAR (below tabs)
    ============================================ */
 
 .mcp-dtw-global {
@@ -7227,7 +7298,7 @@ h2.tm-title.tm-title {
   box-sizing: border-box;
 }
 
-/* DTW tooltip вЂ” rendered in document.body via JS */
+/* DTW tooltip — rendered in document.body via JS */
 .dtw-tooltip {
   position: fixed;
   min-width: 200px;
@@ -7309,7 +7380,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   HELLO VIEW вЂ” Search Portal Dropdown
+   HELLO VIEW — Search Portal Dropdown
    ============================================ */
 
 .hello-search-portal {
@@ -7359,7 +7430,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   DASHBOARD вЂ” Velocity Style
+   DASHBOARD — Velocity Style
    ============================================ */
 
 .dashboard {
@@ -8019,7 +8090,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   TASK VIEW вЂ” tasks + projects tab
+   TASK VIEW — tasks + projects tab
    ============================================ */
 
 .task-view {
@@ -8187,7 +8258,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   SETTINGS вЂ” format info & helpers
+   SETTINGS — format info & helpers
    ============================================ */
 
 .mcp-format-info {
@@ -8221,27 +8292,41 @@ h2.tm-title.tm-title {
    ============================================ */
 
 .modal-container .modal.quick-add-shell {
-  width: min(540px, calc(100vw - 24px));
-  border-radius: 18px;
+  width: min(560px, calc(100vw - 24px));
+  border-radius: 20px;
   padding: 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 20px 56px rgba(0, 0, 0, 0.45);
-  background: var(--mcp-surface, var(--background-primary));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.2),
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--mcp-surface, var(--background-primary)) 92%, #7c5cfc 8%) 0%,
+    var(--mcp-surface, var(--background-primary)) 40%
+  );
+}
+
+/* No native close (×) — close via Esc / Cancel */
+.modal-container .modal.quick-add-shell .modal-close-button,
+.modal-container .modal.wf-task-modal .modal-close-button {
+  display: none !important;
 }
 
 .quick-add-shell .modal-content {
   padding: 0;
-  background: var(--mcp-surface, var(--background-primary));
+  background: transparent;
 }
 
 .qa2 {
   padding: 0;
   overflow: visible;
-  background: var(--mcp-surface, var(--background-primary));
+  background: transparent;
   display: flex;
   flex-direction: column;
   gap: 0;
+  font-size: 13px;
 }
 
 /* Header */
@@ -8249,25 +8334,30 @@ h2.tm-title.tm-title {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 18px 14px;
-  border-bottom: 1px solid var(--mcp-glass-border, rgba(255, 255, 255, 0.06));
+  padding: 18px 20px 14px;
 }
 
 .qa2-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 16%, transparent);
-  border: 1px solid color-mix(in srgb, var(--interactive-accent, #7c5cfc) 28%, transparent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--interactive-accent, #7c5cfc) 35%, transparent),
+    color-mix(in srgb, var(--interactive-accent, #7c5cfc) 12%, transparent)
+  );
+  border: 1px solid color-mix(in srgb, var(--interactive-accent, #7c5cfc) 35%, transparent);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 25%, transparent);
 }
 
 .qa2-icon-glyph {
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.25));
 }
 
 .qa2-top-text {
@@ -8276,10 +8366,10 @@ h2.tm-title.tm-title {
 }
 
 .qa2-top-title {
-  font-size: 15px;
-  font-weight: 650;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--text-normal);
-  letter-spacing: 0.01em;
+  letter-spacing: -0.01em;
 }
 
 .qa2-date-chip {
@@ -8287,14 +8377,15 @@ h2.tm-title.tm-title {
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  padding: 5px 10px 5px 8px;
+  padding: 6px 12px 6px 10px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
   color: var(--text-muted);
-  background: var(--mcp-surface-2, var(--background-secondary));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  max-width: 46%;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  max-width: 48%;
 }
 
 .qa2-date-chip-icon {
@@ -8307,6 +8398,498 @@ h2.tm-title.tm-title {
   text-overflow: ellipsis;
   white-space: nowrap;
   text-transform: capitalize;
+}
+
+/* AI switch — modern pill toggle */
+.qa2-ai-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 4px 20px 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.qa2-ai-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  user-select: none;
+  width: 100%;
+  justify-content: space-between;
+}
+
+.qa2-ai-checkbox {
+  appearance: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+  flex-shrink: 0;
+}
+
+.qa2-ai-checkbox::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.18s ease;
+}
+
+.qa2-ai-checkbox:checked {
+  background: var(--interactive-accent, #7c5cfc);
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 70%, transparent);
+}
+
+.qa2-ai-checkbox:checked::after {
+  transform: translateX(16px);
+}
+
+.qa2-ai-label {
+  letter-spacing: 0.01em;
+  order: -1;
+}
+
+/* Description + extra parameters (create modal) */
+.qa2-desc {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 12px 20px 0;
+}
+
+.qa2-desc-label {
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Description field with embedded AI button */
+.qa2-desc-box {
+  position: relative;
+  display: block;
+}
+
+.qa2-desc-input {
+  width: 100%;
+  resize: vertical;
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-normal);
+  padding: 10px 36px 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-sizing: border-box;
+}
+
+.qa2-desc-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 18%, transparent);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.qa2-desc-ai-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.18s ease;
+  padding: 0;
+}
+
+.qa2-desc-ai-btn:hover {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 55%, transparent);
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 16%, transparent);
+}
+
+.qa2-desc-ai-btn.is-busy {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.qa2-desc-ai-btn:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+/* Loading effect while AI writes the description (no button spin) */
+.qa2-desc-box.is-ai-loading .qa2-desc-input {
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 18%, transparent);
+  background:
+    linear-gradient(
+      100deg,
+      transparent 20%,
+      color-mix(in srgb, var(--interactive-accent, #7c5cfc) 14%, transparent) 40%,
+      color-mix(in srgb, var(--interactive-accent, #7c5cfc) 22%, transparent) 50%,
+      color-mix(in srgb, var(--interactive-accent, #7c5cfc) 14%, transparent) 60%,
+      transparent 80%
+    ),
+    rgba(255, 255, 255, 0.04);
+  background-size: 200% 100%;
+  animation: qa2-desc-shimmer 1.4s ease-in-out infinite;
+}
+
+.qa2-desc-box.is-ai-loading::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 8px;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 22%, transparent);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.qa2-desc-box.is-ai-loading::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  height: 2px;
+  width: 36%;
+  border-radius: 2px;
+  background: var(--interactive-accent, #7c5cfc);
+  animation: qa2-desc-progress 1.15s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+@keyframes qa2-desc-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@keyframes qa2-desc-progress {
+  0% { transform: translateX(0); opacity: 0.55; }
+  50% { opacity: 1; }
+  100% { transform: translateX(180%); opacity: 0.55; }
+}
+
+.qa2-desc-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 18%, transparent);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.qa2-extra {
+  margin: 14px 20px 0;
+}
+
+.qa2-extra-toggle {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 7px 12px;
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  border-radius: 10px;
+  font-family: inherit;
+}
+
+.qa2-extra-toggle:hover {
+  color: var(--text-normal);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.qa2-extra-toggle::before {
+  content: "▾";
+  font-size: 10px;
+  line-height: 1;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  /* closed: point right */
+  transform: rotate(-90deg);
+  opacity: 0.85;
+}
+
+.qa2-extra-toggle.open {
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 12%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 35%, transparent);
+}
+
+.qa2-extra-toggle.open::before {
+  /* open: point down */
+  transform: rotate(0deg);
+}
+
+.qa2-extra-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  animation: qa2-fade-in 0.22s ease;
+}
+
+@keyframes qa2-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.qa2-extra-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.qa2-extra-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1 1 120px;
+  min-width: 100px;
+}
+
+.qa2-extra-field--full {
+  flex: 1 1 100%;
+}
+
+.qa2-extra-work {
+  flex: 1 1 100%;
+  justify-content: space-between;
+  align-items: center;
+  min-width: auto;
+  flex-direction: row !important;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.qa2-extra-work .qa2-extra-label {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* Work toggle uses Obsidian native .checkbox-container — no custom switch */
+
+.qa2-work-label {
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--text-muted) !important;
+}
+
+.qa2-extra-label {
+  font-size: 10px;
+  font-weight: 650;
+  color: var(--text-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.qa2-extra-input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.18);
+  color: var(--text-normal);
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+select.qa2-extra-input {
+  padding: 6px 8px;
+  cursor: pointer;
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--text-faint) 50%),
+    linear-gradient(135deg, var(--text-faint) 50%, transparent 50%);
+  background-position: calc(100% - 14px) 55%, calc(100% - 9px) 55%;
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 24px;
+}
+
+.qa2-extra-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 55%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 16%, transparent);
+}
+
+.qa2-extra-checkbox {
+  appearance: none;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.22s ease, border-color 0.22s ease;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.qa2-extra-checkbox::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.qa2-extra-checkbox:checked {
+  background: var(--interactive-accent, #7c5cfc);
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 70%, transparent);
+}
+
+.qa2-extra-checkbox:checked::after {
+  transform: translateX(16px);
+}
+
+.qa2-pri-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.qa2-pri-btn {
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qa2-pri-btn:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: var(--text-normal);
+}
+
+.qa2-pri-btn.is-active {
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 70%, transparent);
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 18%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 12%, transparent);
+}
+
+.qa2-rec-days {
+  flex: 1 1 100%;
+  flex-direction: row !important;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.qa2-day-btn {
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qa2-day-btn.is-active {
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 70%, transparent);
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 18%, transparent);
+}
+
+.qa2-extra-work-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.qa2-note-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.qa2-note-input {
+  flex: 1;
+}
+
+.qa2-note-btn {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.qa2-note-btn:hover {
+  color: var(--text-normal);
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 55%, transparent);
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 12%, transparent);
 }
 
 /* Mode switch */
@@ -8365,20 +8948,24 @@ h2.tm-title.tm-title {
 /* Input */
 .qa2-input-wrap {
   position: relative;
-  margin: 12px 18px 0;
+  margin: 12px 20px 0;
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 0 14px;
-  border-radius: 14px;
+  padding: 0 16px;
+  border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  background: var(--mcp-surface-2, var(--background-secondary));
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .qa2-input-wrap:focus-within {
-  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 55%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 18%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 60%, transparent);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 18%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .qa2-caret {
@@ -8387,10 +8974,10 @@ h2.tm-title.tm-title {
   font-weight: 700;
   line-height: 1;
   flex-shrink: 0;
-  opacity: 0.85;
+  opacity: 0.9;
   user-select: none;
   align-self: flex-start;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 input.qa2-input.qa2-input,
@@ -8400,62 +8987,67 @@ textarea.qa2-textarea.qa2-textarea {
   border: none;
   background: transparent;
   box-shadow: none;
-  padding: 13px 0;
-  font-size: 14.5px;
+  padding: 14px 0;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--text-normal);
   outline: none;
   font-family: inherit;
   resize: none;
+  letter-spacing: -0.005em;
 }
 
 .qa2-input::placeholder,
 .qa2-textarea::placeholder {
   color: var(--text-faint);
+  font-weight: 400;
 }
 
 .qa2-textarea {
   width: 100%;
-  min-height: 104px;
-  line-height: 1.5;
+  min-height: 112px;
+  line-height: 1.55;
   padding: 12px 0;
 }
 
 .qa2-input-wrap--multi {
   align-items: flex-start;
-  padding: 2px 14px;
+  padding: 4px 16px;
 }
 
 .qa2-proj-suggest {
   position: absolute;
   left: 0;
   right: 0;
-  top: calc(100% + 6px);
+  top: calc(100% + 8px);
   z-index: 20;
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 6px;
-  border-radius: 12px;
-  background: var(--mcp-surface-2, var(--background-secondary));
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--mcp-surface-2, var(--background-secondary)) 92%, #000 8%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
 }
 
 .qa2-proj-row {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 10px;
-  border-radius: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 13px;
   color: var(--text-normal);
   background: transparent;
+  transition: background 0.12s ease;
 }
 
 .qa2-proj-row:hover,
 .qa2-proj-row.is-active {
-  background: var(--mcp-surface-hover, rgba(255, 255, 255, 0.06));
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 14%, transparent);
 }
 
 .qa2-proj-at {
@@ -8471,13 +9063,13 @@ textarea.qa2-textarea.qa2-textarea {
 
 /* Status */
 .qa2-status {
-  padding: 10px 18px 0;
+  padding: 10px 20px 0;
   font-size: 12px;
   color: var(--text-faint);
 }
 
 .qa2-status.is-busy {
-  color: #8ec0ff;
+  color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 70%, var(--text-normal));
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -8514,7 +9106,7 @@ textarea.qa2-textarea.qa2-textarea {
 
 /* Live visual parse (single mode) */
 .qa2-parse {
-  margin: 10px 18px 0;
+  margin: 10px 20px 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -8530,13 +9122,14 @@ textarea.qa2-textarea.qa2-textarea {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 9px;
+  padding: 4px 10px;
   border-radius: 999px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 650;
   line-height: 1.4;
   border: 1px solid transparent;
   animation: qa2-chip-in 0.16s ease;
+  backdrop-filter: blur(6px);
 }
 
 @keyframes qa2-chip-in {
@@ -8592,63 +9185,95 @@ textarea.qa2-textarea.qa2-textarea {
   white-space: nowrap;
 }
 
-/* Syntax help */
+/* Syntax help / hints */
 .qa2-syntax {
-  padding: 12px 18px 0;
+  padding: 12px 20px 0;
 }
 
 .qa2-syntax-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  border: none;
+  gap: 7px;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--text-faint);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 650;
   cursor: pointer;
-  padding: 4px;
+  padding: 5px 8px;
   font-family: inherit;
-  border-radius: 6px;
+  border-radius: 8px;
+  transition: color 0.18s ease, background 0.18s ease;
 }
 
 .qa2-syntax-toggle:hover {
   color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .qa2-syntax-toggle::before {
-  content: "›";
+  content: "▾";
   display: inline-block;
-  font-size: 13px;
+  font-size: 10px;
   line-height: 1;
-  transition: transform 0.15s ease;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  /* closed: point right */
+  transform: rotate(-90deg);
+}
+
+.qa2-syntax-toggle.open {
+  color: var(--text-muted);
 }
 
 .qa2-syntax-toggle.open::before {
-  transform: rotate(90deg);
+  /* open: point down */
+  transform: rotate(0deg);
 }
 
 .qa2-syntax-body {
   margin-top: 8px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  background: var(--mcp-surface-2, var(--background-secondary));
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  animation: qa2-fade-in 0.2s ease;
 }
 
 .qa2-hints {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px 14px;
+  gap: 8px;
   padding: 2px 0;
 }
 
 .qa2-hint {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   font-size: 11px;
-  color: var(--text-faint);
+  color: var(--text-muted);
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.qa2-hint:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.qa2-hint kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: ui-monospace, monospace;
+  background: rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: var(--text-normal);
+  box-shadow: none;
 }
 
 .qa2-example {
@@ -8665,12 +9290,96 @@ textarea.qa2-textarea.qa2-textarea {
 
 .qa2-example code {
   font-size: 11px;
-  padding: 2px 7px;
-  background: var(--mcp-surface, var(--background-primary));
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 6px;
+  padding: 3px 8px;
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--interactive-accent, #7c5cfc) 22%, transparent);
+  border-radius: 8px;
   color: var(--text-muted);
-  font-family: monospace;
+  font-family: ui-monospace, monospace;
+}
+
+/* AI review / confirmation panel */
+.qa2-review {
+  margin: 12px 20px 4px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  animation: qa2-fade-in 0.22s ease;
+}
+
+.qa2-review-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-normal);
+  letter-spacing: -0.01em;
+}
+
+.qa2-review-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin: 2px 0 10px;
+}
+
+.qa2-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.qa2-review-card {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: opacity 0.18s ease, border-color 0.18s ease;
+}
+
+.qa2-review-card.is-off {
+  opacity: 0.45;
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.qa2-review-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.qa2-review-check {
+  margin: 2px 0 0;
+  width: 15px;
+  height: 15px;
+  accent-color: var(--interactive-accent, #7c5cfc);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.qa2-review-card-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.qa2-review-task-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+  word-break: break-word;
+}
+
+.qa2-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+  padding-left: 25px;
+}
+
+.qa2-btn.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 /* Actions */
@@ -8678,7 +9387,7 @@ textarea.qa2-textarea.qa2-textarea {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 16px 18px 18px;
+  padding: 16px 20px 20px;
 }
 
 .qa2-kbd {
@@ -8695,14 +9404,15 @@ textarea.qa2-textarea.qa2-textarea {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 16px;
-  border-radius: 11px;
-  font-size: 12.5px;
+  padding: 10px 18px;
+  border-radius: 12px;
+  font-size: 13px;
   font-weight: 650;
   font-family: inherit;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: background 0.15s ease, color 0.15s ease, filter 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease, color 0.15s ease, filter 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  letter-spacing: 0.01em;
 }
 
 .qa2-btn:active {
@@ -8721,18 +9431,27 @@ textarea.qa2-textarea.qa2-textarea {
 }
 
 .qa2-btn-ghost:hover {
-  background: var(--mcp-surface-hover, rgba(255, 255, 255, 0.06));
+  background: rgba(255, 255, 255, 0.06);
   color: var(--text-normal);
 }
 
 .qa2-btn-primary {
-  background: var(--interactive-accent, #7c5cfc);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--interactive-accent, #7c5cfc) 100%, #fff 0%),
+    color-mix(in srgb, var(--interactive-accent, #7c5cfc) 78%, #5b3fd4 22%)
+  );
   color: var(--text-on-accent, #fff);
-  box-shadow: 0 2px 10px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 35%, transparent);
+  box-shadow:
+    0 4px 16px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 40%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .qa2-btn-primary:hover {
   filter: brightness(1.08);
+  box-shadow:
+    0 6px 20px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 50%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .qa2 kbd {
@@ -8740,7 +9459,7 @@ textarea.qa2-textarea.qa2-textarea {
   padding: 1px 6px;
   font-size: 10px;
   font-family: monospace;
-  background: var(--mcp-surface, var(--background-primary));
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 5px;
   color: var(--text-muted);
@@ -8777,7 +9496,7 @@ textarea.qa2-textarea.qa2-textarea {
 }
 
 /* ============================================
-   SETTINGS вЂ” input width helpers
+   SETTINGS — input width helpers
    ============================================ */
 
 .mcp-input-sm {
@@ -8894,7 +9613,7 @@ textarea.qa2-textarea.qa2-textarea {
 }
 
 /* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
-   QUICK ADD вЂ” DATE BADGE
+   QUICK ADD — DATE BADGE
    в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 
 .weather-detail-container {
@@ -9011,7 +9730,7 @@ textarea.qa2-textarea.qa2-textarea {
 
 /* в•ђв•ђв•ђ VIEW SWITCH MOTION в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
 /* РџР»Р°РІРЅРѕ: С‚РѕР»СЊРєРѕ opacity + Р»С‘РіРєРёР№ Y, Р±РµР· scale.
-   Header РїРѕС‡С‚Рё РЅРµ РґРІРёРіР°РµС‚СЃСЏ вЂ” РїРµСЂРµРєР»СЋС‡Р°С‚РµР»СЊ РѕС‰СѓС‰Р°РµС‚СЃСЏ СЃС‚Р°Р±РёР»СЊРЅС‹Рј. */
+   Header РїРѕС‡С‚Рё РЅРµ РґРІРёРіР°РµС‚СЃСЏ — РїРµСЂРµРєР»СЋС‡Р°С‚РµР»СЊ РѕС‰СѓС‰Р°РµС‚СЃСЏ СЃС‚Р°Р±РёР»СЊРЅС‹Рј. */
 .view-switch-leave {
   animation: view-switch-leave 0.18s cubic-bezier(0.4, 0, 0.6, 1) forwards;
   pointer-events: none;
@@ -9507,7 +10226,7 @@ textarea.qa2-textarea.qa2-textarea {
   }
 }
 
-/* ===== AI Extract Modal вЂ” fully standalone, no tm-* dependency ===== */
+/* ===== AI Extract Modal — fully standalone, no tm-* dependency ===== */
 
 /* Inputs must accept typing (incl. Space) regardless of parent user-select */
 .ai-extract-modal input,
@@ -9835,7 +10554,7 @@ input.ai-task-time-input.ai-task-time-input {
   background: rgba(95, 153, 225, 0.15);
 }
 
-/* Subtasks list вЂ” sibling of ai-task-row, indented */
+/* Subtasks list — sibling of ai-task-row, indented */
 .ai-subtasks-list {
   padding: 2px 0 4px 34px;
   margin: 0 10px;
@@ -9920,7 +10639,7 @@ input.ai-task-time-input.ai-task-time-input {
   user-select: none;
 }
 
-/* Toggle checkbox вЂ” native */
+/* Toggle checkbox — native */
 .ai-toggle-cb {
   cursor: pointer;
 }
@@ -10091,7 +10810,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-analysis-stream:not(:empty)::after {
-  content: "в–Ќ";
+  content: "■";
   display: inline-block;
   margin-left: 1px;
   color: #5f99e1;
@@ -10332,7 +11051,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 /* Prompt window locked while analysis / command is running.
-   Keep pointer-events so the textarea can hold focus вЂ” a disabled/pointer-events
+   Keep pointer-events so the textarea can hold focus — a disabled/pointer-events
    lock blurs the field and Space then scrolls the modal content. */
 .ai-ask-disabled {
   opacity: 0.5;
@@ -10508,7 +11227,7 @@ input.ai-task-time-input.ai-task-time-input {
   }
 }
 
-/* в”Ђв”Ђ Cyber scanning shell в”Ђв”Ђ */
+/* ── Cyber scanning shell ── */
 .ai-summary-modal {
   position: relative;
   overflow: hidden;
@@ -10600,7 +11319,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-summary-modal.scanning .ai-summary-status.busy::after {
-  content: "в–Њ";
+  content: "□";
   margin-left: 2px;
   animation: ai-blink 0.9s step-end infinite;
   color: #00f0ff;
@@ -10698,7 +11417,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 /* ============================================
-   MOBILE TASK PANEL вЂ” polish (в‰¤768px)
+   MOBILE TASK PANEL — polish (в‰¤768px)
    ============================================ */
 @media (max-width: 768px) {
   .task-tracker-panel {

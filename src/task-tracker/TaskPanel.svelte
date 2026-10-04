@@ -7,7 +7,7 @@
   import type { ITask, IProject } from "./types";
   import {
     tasks, projects, selectedDate, activeTab, taskFilter,
-    addTask, updateTask, updateTaskStatus, removeTask,
+    updateTask, updateTaskStatus, removeTask,
     createNextRecurringInstance, clearAllRecurringTasks, clearRecurringByProject, clearRecurringByName, resetTaskTimer,
     carryOverOverdueTasks, updateRecurringSeries,
   } from "./stores";
@@ -244,23 +244,24 @@
   }
 
   function openCreateTask() {
-    const modal = new TaskModal(appInstance, async (taskData) => {
-      const task = addTask({
-        ...taskData,
-        completed: false,
-        status: "todo",
-        notePath: null,
-        boundNotePath: taskData.boundNotePath || null,
-        tags: [],
-        sortOrder: allTasksForDate.length,
-      } as Omit<ITask, "id" | "createdAt" | "updatedAt">);
-      if (shouldSyncTaskToNote(task)) {
-        const project = $projects.find((p) => p.id === task.projectId);
-        const file = await createNoteTask(task, project, appInstance);
-        if (file) updateTask(task.id, { notePath: file.path });
-      }
+    void import("./QuickAddModal").then(({ QuickAddModal }) => {
+      const uid = $selectedDate;
+      const match = uid ? /(\d{4}-\d{2}-\d{2})/.exec(uid) : null;
+      const m = match ? moment(match[1], "YYYY-MM-DD", true) : moment();
+      new QuickAddModal(appInstance, m.isValid() ? m : moment(), () => {
+        /* list is store-driven */
+      }, {
+        onTaskCreated: (task) => {
+          void (async () => {
+            if (shouldSyncTaskToNote(task)) {
+              const project = $projects.find((p) => p.id === task.projectId);
+              const file = await createNoteTask(task, project, appInstance);
+              if (file) updateTask(task.id, { notePath: file.path });
+            }
+          })();
+        },
+      }).open();
     });
-    modal.open();
   }
 
   async function handleTaskDelete(task: ITask) {

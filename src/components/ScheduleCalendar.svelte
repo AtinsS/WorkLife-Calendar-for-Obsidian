@@ -18,7 +18,6 @@
     updateTask,
     updateTaskStatus,
     removeTask,
-    addTask,
     resetTaskTimer,
     carryOverOverdueTasks,
   } from "../task-tracker/stores";
@@ -1158,12 +1157,18 @@
           (info.end.getTime() - info.start.getTime()) / 1000 / 60,
         );
         if (durationMin > 0) {
-          estimatedTime = Math.max(15, durationMin);
+          estimatedTime = durationMin;
         }
-        // Calculate end time — use UTC getters because FullCalendar
-        // provides selection end boundary in UTC regardless of calendar timeZone
-        const endDate = info.end as Date;
-        initialEndTime = `${String(endDate.getUTCHours()).padStart(2, "0")}:${String(endDate.getUTCMinutes()).padStart(2, "0")}`;
+        // Prefer endStr (calendar timezone) so start/end stay consistent;
+        // fall back to local getters on the Date objects.
+        const endStr = info.endStr || "";
+        const endMatch = endStr.match(/T(\d{2}):(\d{2})/);
+        if (endMatch) {
+          initialEndTime = `${endMatch[1]}:${endMatch[2]}`;
+        } else {
+          const endDate = info.end as Date;
+          initialEndTime = `${String(endDate.getHours()).padStart(2, "0")}:${String(endDate.getMinutes()).padStart(2, "0")}`;
+        }
       }
     }
 
@@ -1293,10 +1298,11 @@
     dropDebounceTimer = setTimeout(() => {
       dropDebounceTimer = null;
       try {
+        // Stretch/resize always locks the visible slot: start + end + duration.
         const updates: Record<string, any> = {
-          estimatedTime: Math.max(15, durationMin),
-          endTime: endTime,
-          scheduledTime: scheduledTime,
+          scheduledTime,
+          endTime,
+          estimatedTime: durationMin > 0 ? durationMin : undefined,
         };
         updateTask(task.id, updates);
         const updatedTask = get(tasks).find((t) => t.id === task.id);
@@ -1349,66 +1355,43 @@
   async function openTaskCreator(
     dateStr: string,
     timeStr?: string,
-    prefillEstimatedTime?: number,
+    _prefillEstimatedTime?: number,
     endTimeStr?: string,
   ): Promise<void> {
     const moment = window.moment(dateStr, "YYYY-MM-DD", true);
     if (!moment.isValid()) return;
 
-    const dateUID = getDateUID(moment, "day");
-
-    // Определяем текущий вид: time-based (неделя/день) или месяц
+    // Time-based create (week/day drag or click) keeps the stretched slot.
     const viewType = calendar?.view?.type || "";
     const isTimeView = viewType.startsWith("timeGrid");
-    const initialDate = dateStr;
     const initialTime = isTimeView ? timeStr : undefined;
 
     suppressRefetch = true;
-    const noTimeMode = timeStr === undefined;
-    new TaskModal(
+    const { QuickAddModal } = await import("../task-tracker/QuickAddModal");
+    new QuickAddModal(
       plugin.app,
-      async (data) => {
-        const task = addTask({
-          title: data.title || tRaw("schedule.newTask"),
-          description: data.description,
-          completed: false,
-          status: "todo",
-          dateUID: data.dateUID || dateUID,
-          projectId: data.projectId || null,
-          notePath: null,
-          boundNotePath: data.boundNotePath || null,
-          priority: data.priority || "medium",
-          tags: [],
-          sortOrder: 0,
-          recurrence: data.recurrence,
-          estimatedTime: noTimeMode ? null : (data.estimatedTime || prefillEstimatedTime),
-          scheduledTime: noTimeMode ? null : (data.scheduledTime || initialTime),
-          endTime: data.endTime || null,
-        });
-
-        // Всегда создаём Task заметку в Tasks/ если включена синхронизация
-        if (shouldSyncTaskToNote(task)) {
-          const project = get(projects).find((p) => p.id === data.projectId);
-          try {
-            const file = await createNoteTask(task, project, plugin.app);
-            if (file) {
-              updateTask(task.id, { notePath: file.path });
-            }
-          } catch (error) {
-            console.error(
-              "[ScheduleCalendar] failed to create note task:",
-              error,
-            );
-          }
-        }
-
+      moment,
+      () => {
         suppressRefetch = false;
         applyEventsUpdate();
       },
-      undefined,
-      initialDate,
-      initialTime,
-      endTimeStr,
+      {
+        scheduledTime: initialTime ?? null,
+        endTime: endTimeStr ?? null,
+        onTaskCreated: (task) => {
+          void (async () => {
+            if (shouldSyncTaskToNote(task)) {
+              const project = get(projects).find((p) => p.id === task.projectId);
+              try {
+                const file = await createNoteTask(task, project, plugin.app);
+                if (file) updateTask(task.id, { notePath: file.path });
+              } catch (error) {
+                console.error("[ScheduleCalendar] failed to create note task:", error);
+              }
+            }
+          })();
+        },
+      },
     ).open();
     // If modal is closed without submitting, restore refetch
     setTimeout(() => {

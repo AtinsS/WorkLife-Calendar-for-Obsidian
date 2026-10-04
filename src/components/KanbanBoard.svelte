@@ -260,34 +260,14 @@
   }
 
   function createTaskWithStatus(status: TaskStatus): void {
-    void import("../task-tracker/TaskModal").then(({ TaskModal }) => {
-      const todayUID = `day-${momentFn().format("YYYY-MM-DD")}`;
-      new TaskModal(appInstance, (taskData) => {
-        addTask({
-          title: taskData.title || "",
-          description: taskData.description || "",
-          projectId: taskData.projectId || null,
-          notePath: taskData.notePath || null,
-          boundNotePath: taskData.boundNotePath || null,
-          dateUID: taskData.dateUID || todayUID,
-          priority: taskData.priority || "medium",
-          tags: taskData.tags || [],
-          sortOrder: 0,
-          status,
-          completed: status === "done",
-          scheduledTime: taskData.scheduledTime,
-          endTime: taskData.endTime,
-          estimatedTime: taskData.estimatedTime,
-          deadline: taskData.deadline,
-          deadlineTime: taskData.deadlineTime,
-          recurrence: taskData.recurrence,
-          isWorkTask: taskData.isWorkTask,
-          paymentType: taskData.paymentType,
-          rate: taskData.rate,
-          overtimeStart: taskData.overtimeStart,
-          overtimeMultiplier: taskData.overtimeMultiplier,
-        });
-      }, undefined, momentFn().format("YYYY-MM-DD")).open();
+    void import("../task-tracker/QuickAddModal").then(({ QuickAddModal }) => {
+      new QuickAddModal(appInstance, momentFn(), () => {
+        /* store-driven */
+      }, {
+        onTaskCreated: (task) => {
+          if (task.status !== status) updateTask(task.id, { status, completed: status === "done" });
+        },
+      }).open();
     });
   }
 </script>

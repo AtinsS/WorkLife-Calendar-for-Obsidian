@@ -4,14 +4,20 @@ import { getDateUID } from "obsidian-daily-notes-interface";
 import { get } from "svelte/store";
 import { tRaw, locale } from "../i18n";
 import { addTask, projects } from "./stores";
+import { settings } from "../ui/stores";
+import type { ITask } from "./types";
 import { sanitizeTitle } from "../utils/sanitize";
 import {
   isAiQuickAddAvailable,
   parseQuickTasksWithAI,
+  generateTaskDescription,
   resolveNotePath,
+  type AiQuickAddContext,
   type AiQuickTaskDraft,
 } from "../services/aiQuickAdd";
 import type { RecurrenceConfig } from "./types";
+import { FileSuggestModal } from "../modals/FileSuggestModal";
+import { FolderSuggestModal } from "../modals/FolderSuggestModal";
 
 const wm = window.moment as (inp?: unknown, format?: string, strict?: boolean) => Moment;
 
@@ -273,6 +279,79 @@ function splitTaskLines(raw: string): string[] {
 
 type Mode = "single" | "multi";
 
+export interface QuickAddPrefill {
+  /** HH:MM from schedule selection / drag-create */
+  scheduledTime?: string | null;
+  endTime?: string | null;
+  /** Called after each created task (note sync, analytics, …) */
+  onTaskCreated?: (task: ITask) => void;
+  /** Override AI on/off for this modal instance (defaults to settings) */
+  aiEnabled?: boolean;
+}
+
+/** User-touched form fields — these win over regex/parse. */
+interface ExtraForm {
+  date: string | null; // YYYY-MM-DD
+  scheduledTime: string | null;
+  endTime: string | null;
+  priority: "low" | "medium" | "high" | null;
+  projectId: string | null;
+  notePath: string | null;
+  recurrenceType: "none" | "daily" | "weekly" | "monthly";
+  recurrenceDays: number[];
+  recurrenceUntil: string | null; // YYYY-MM-DD
+  deadlineDate: string | null;
+  isWorkTask: boolean;
+  paymentType: "hour" | "day";
+  rate: string;
+  overtimeStart: string;
+  overtimeMultiplier: string;
+  dirty: {
+    date: boolean;
+    scheduledTime: boolean;
+    endTime: boolean;
+    priority: boolean;
+    projectId: boolean;
+    notePath: boolean;
+    recurrence: boolean;
+    deadline: boolean;
+    isWorkTask: boolean;
+    workPay: boolean;
+  };
+}
+
+function emptyExtraForm(prefillTime?: string | null, prefillEnd?: string | null): ExtraForm {
+  return {
+    date: null,
+    scheduledTime: prefillTime ?? null,
+    endTime: prefillEnd ?? null,
+    priority: null,
+    projectId: null,
+    notePath: null,
+    recurrenceType: "none",
+    recurrenceDays: [],
+    recurrenceUntil: null,
+    deadlineDate: null,
+    isWorkTask: false,
+    paymentType: "hour",
+    rate: "",
+    overtimeStart: "",
+    overtimeMultiplier: "",
+    dirty: {
+      date: false,
+      scheduledTime: !!prefillTime,
+      endTime: !!prefillEnd,
+      priority: false,
+      projectId: false,
+      notePath: false,
+      recurrence: false,
+      deadline: false,
+      isWorkTask: false,
+      workPay: false,
+    },
+  };
+}
+
 export class QuickAddModal extends Modal {
   private date: Moment;
   private onSubmit: () => void;
@@ -290,11 +369,37 @@ export class QuickAddModal extends Modal {
   private chipsEl: HTMLElement | null = null;
   private titlePreviewEl: HTMLElement | null = null;
   private parseEl: HTMLElement | null = null;
+  private modeBarEl: HTMLElement | null = null;
+  private prefillTime: string | null;
+  private prefillEndTime: string | null;
+  private onTaskCreated: ((task: ITask) => void) | null;
+  private descEl: HTMLTextAreaElement | null = null;
+  private extraBody: HTMLElement | null = null;
+  private extra: ExtraForm;
+  private extraCtrls: {
+    date?: HTMLInputElement;
+    start?: HTMLInputElement;
+    end?: HTMLInputElement;
+    project?: HTMLSelectElement;
+    recType?: HTMLSelectElement;
+    recDays?: HTMLElement;
+    recUntil?: HTMLElement;
+    recUntilInput?: HTMLInputElement;
+    deadline?: HTMLInputElement;
+    note?: HTMLInputElement;
+    work?: HTMLInputElement;
+    workSub?: HTMLElement;
+    priorityBtns?: HTMLElement;
+  } = {};
 
-  constructor(app: App, date: Moment, onSubmit?: () => void) {
+  constructor(app: App, date: Moment, onSubmit?: () => void, prefill: QuickAddPrefill = {}) {
     super(app);
     this.date = date;
     this.onSubmit = onSubmit ?? (() => { /* noop */ });
+    this.prefillTime = prefill.scheduledTime ?? null;
+    this.prefillEndTime = prefill.endTime ?? null;
+    this.onTaskCreated = prefill.onTaskCreated ?? null;
+    this.extra = emptyExtraForm(this.prefillTime, this.prefillEndTime);
   }
 
   onOpen(): void {
@@ -313,38 +418,24 @@ export class QuickAddModal extends Modal {
 
     const dateChip = header.createDiv({ cls: "qa2-date-chip" });
     dateChip.createSpan({ text: "📅", cls: "qa2-date-chip-icon" });
+    let dateLabel = this.date.format("dddd, D MMMM");
+    if (this.prefillTime) {
+      dateLabel += this.prefillEndTime
+        ? ` · ${this.prefillTime}–${this.prefillEndTime}`
+        : ` · ${this.prefillTime}`;
+    }
     this.dateLabelEl = dateChip.createSpan({
-      text: this.date.format("dddd, D MMMM"),
+      text: dateLabel,
       cls: "date-label",
     });
 
-    // ── Mode switch — only when smart quick-add (AI) is available ──
-    // Without AI (settings off / mobile) the modal is single-task only.
-    // Default is always single-task; multi is opt-in.
-    this.multiAvailable = isAiQuickAddAvailable();
-    this.mode = "single";
-
-    if (this.multiAvailable) {
-      const modeBar = contentEl.createDiv({ cls: "qa2-modes" });
-      const modeTabs = modeBar.createDiv({ cls: "qa2-modes-tabs", attr: { role: "tablist" } });
-      const singleBtn = modeTabs.createEl("button", {
-        cls: "qa2-mode is-active",
-        text: tRaw("tasks.quickAdd.modeSingle"),
-        attr: { type: "button", role: "tab" },
-      });
-      const multiBtn = modeTabs.createEl("button", {
-        cls: "qa2-mode",
-        attr: { type: "button", role: "tab" },
-      });
-      multiBtn.createSpan({ text: tRaw("tasks.quickAdd.modeMulti") });
-      this.modeButtons = { single: singleBtn, multi: multiBtn };
-      singleBtn.addEventListener("click", () => this.setMode("single"));
-      multiBtn.addEventListener("click", () => this.setMode("multi"));
-    }
+    // ── Mode switch — multi ("AI-задачи") only when Ollama is available ──
+    this.modeBarEl = contentEl.createDiv({ cls: "qa2-modes" });
+    this.renderModeTabs();
 
     // ── Command input (always starts as single-task) ──
     const inputWrap = contentEl.createDiv({ cls: "qa2-input-wrap" });
-    inputWrap.createSpan({ text: "›", cls: "qa2-caret" });
+    inputWrap.createSpan({ text: ">", cls: "qa2-caret" });
     this.inputEl = inputWrap.createEl("input", {
       type: "text",
       cls: "qa2-input",
@@ -359,6 +450,45 @@ export class QuickAddModal extends Modal {
     this.titlePreviewEl = this.parseEl.createDiv({ cls: "qa2-title-preview mcp-hidden" });
 
     this.statusEl = contentEl.createDiv({ cls: "qa2-status mcp-hidden" });
+
+    // ── Description (AI button lives inside the field) ──
+    const descWrap = contentEl.createDiv({ cls: "qa2-desc" });
+    descWrap.createEl("label", { text: tRaw("tasks.quickAdd.description"), cls: "qa2-desc-label" });
+    const descBox = descWrap.createDiv({ cls: "qa2-desc-box" });
+    this.descEl = descBox.createEl("textarea", {
+      cls: "qa2-desc-input",
+      placeholder: tRaw("tasks.quickAdd.descriptionPlaceholder"),
+      attr: { rows: "2", spellcheck: "false" },
+    });
+    if (isAiQuickAddAvailable()) {
+      const genBtn = descBox.createEl("button", {
+        cls: "qa2-desc-ai-btn",
+        text: "✨",
+        attr: {
+          type: "button",
+          title: tRaw("tasks.quickAdd.descriptionAi"),
+          "aria-label": tRaw("tasks.quickAdd.descriptionAi"),
+        },
+      });
+      genBtn.addEventListener("click", () => {
+        void this.fillDescriptionWithAI(genBtn);
+      });
+    }
+
+    // ── Extra parameters (collapsible) ──
+    const extraWrap = contentEl.createDiv({ cls: "qa2-extra" });
+    const extraToggle = extraWrap.createEl("button", {
+      cls: "qa2-extra-toggle",
+      text: tRaw("tasks.quickAdd.extra"),
+      attr: { type: "button" },
+    });
+    this.extraBody = extraWrap.createDiv({ cls: "qa2-extra-body mcp-hidden" });
+    extraToggle.addEventListener("click", () => {
+      const hidden = this.extraBody?.classList.contains("mcp-hidden");
+      this.extraBody?.toggleClass("mcp-hidden", !hidden);
+      extraToggle.toggleClass("open", !!hidden);
+    });
+    this.buildExtraFields(this.extraBody);
 
     // ── Syntax help (collapsible; hidden in multi mode) ──
     this.syntaxEl = contentEl.createDiv({ cls: "qa2-syntax" });
@@ -395,15 +525,6 @@ export class QuickAddModal extends Modal {
     kbdHint.createEl("kbd", { text: "Enter" });
     kbdHint.createSpan({ text: ` ${tRaw("tasks.quickAdd.add")}` });
 
-    const manualBtn = actions.createEl("button", {
-      cls: "qa2-btn qa2-btn-ghost",
-      text: tRaw("tasks.quickAdd.manual"),
-      attr: { type: "button" },
-    });
-    manualBtn.addEventListener("click", () => {
-      this.openAdvancedModal(this.inputValue());
-    });
-
     const addBtn = actions.createEl("button", {
       cls: "qa2-btn qa2-btn-primary",
       text: tRaw("tasks.quickAdd.add"),
@@ -427,15 +548,46 @@ export class QuickAddModal extends Modal {
     window.requestAnimationFrame(() => this.inputEl.focus());
   }
 
+  /** Multi ("AI-задачи") tabs only when Ollama + flag are available. */
+  private renderModeTabs(): void {
+    const bar = this.modeBarEl;
+    if (!bar) return;
+    bar.empty();
+    this.multiAvailable = isAiQuickAddAvailable();
+    if (!this.multiAvailable) {
+      this.modeButtons = { single: null, multi: null };
+      if (this.mode === "multi") this.setMode("single");
+      bar.addClass("mcp-hidden");
+      return;
+    }
+    bar.removeClass("mcp-hidden");
+    const modeTabs = bar.createDiv({ cls: "qa2-modes-tabs", attr: { role: "tablist" } });
+    const singleBtn = modeTabs.createEl("button", {
+      cls: "qa2-mode" + (this.mode === "single" ? " is-active" : ""),
+      text: tRaw("tasks.quickAdd.modeSingle"),
+      attr: { type: "button", role: "tab" },
+    });
+    const multiBtn = modeTabs.createEl("button", {
+      cls: "qa2-mode" + (this.mode === "multi" ? " is-active" : ""),
+      text: tRaw("tasks.quickAdd.modeMulti"),
+      attr: { type: "button", role: "tab" },
+    });
+    this.modeButtons = { single: singleBtn, multi: multiBtn };
+    singleBtn.addEventListener("click", () => this.setMode("single"));
+    multiBtn.addEventListener("click", () => this.setMode("multi"));
+  }
+
   private setMode(mode: Mode): void {
     if (!this.multiAvailable && mode === "multi") return;
     if (this.mode === mode) return;
     this.mode = mode;
     this.modeButtons.single?.toggleClass("is-active", mode === "single");
     this.modeButtons.multi?.toggleClass("is-active", mode === "multi");
-    // Hints are for single-task syntax only
+    // Multi ("AI-задачи"): only the prompt input — hide description / extras / hints
     this.syntaxEl?.toggleClass("mcp-hidden", mode === "multi");
     this.parseEl?.toggleClass("mcp-hidden", mode !== "single");
+    this.extraBody?.parentElement?.toggleClass("mcp-hidden", mode === "multi");
+    this.descEl?.closest(".qa2-desc")?.toggleClass("mcp-hidden", mode === "multi");
     this.swapInputMode();
     if (mode === "single") this.updateVisualParse(this.inputValue());
   }
@@ -476,7 +628,10 @@ export class QuickAddModal extends Modal {
         if (this.mode === "multi" && !(e.ctrlKey || e.metaKey || e.shiftKey)) return;
         e.preventDefault();
         if (this.mode === "single" && (e.shiftKey || e.ctrlKey || e.metaKey)) {
-          this.openAdvancedModal(this.inputValue());
+          // Modifier+Enter opens extra parameters instead of submitting
+          const toggle = this.contentEl.querySelector<HTMLElement>(".qa2-extra-toggle");
+          if (this.extraBody?.classList.contains("mcp-hidden")) toggle?.click();
+          this.extraBody?.querySelector<HTMLElement>("input, select")?.focus();
         } else {
           void this.submit();
         }
@@ -615,6 +770,375 @@ export class QuickAddModal extends Modal {
     } else {
       titleEl.addClass("mcp-hidden");
     }
+
+    this.syncFormFromParse(parsed);
+  }
+
+  /** Fill extra fields from regex parse unless the user already touched them. */
+  private syncFormFromParse(parsed: ReturnType<typeof parseQuickInput>): void {
+    const d = this.extra.dirty;
+    if (!d.date && parsed.date) {
+      this.extra.date = parsed.date.format("YYYY-MM-DD");
+      if (this.extraCtrls.date) this.extraCtrls.date.value = this.extra.date;
+    }
+    if (!d.scheduledTime && parsed.scheduledTime) {
+      this.extra.scheduledTime = formatTime(parsed.scheduledTime);
+      if (this.extraCtrls.start) this.extraCtrls.start.value = this.extra.scheduledTime;
+    }
+    if (!d.endTime && parsed.endTime) {
+      this.extra.endTime = formatTime(parsed.endTime);
+      if (this.extraCtrls.end) this.extraCtrls.end.value = this.extra.endTime;
+    }
+    if (!d.priority && parsed.priority) {
+      this.extra.priority = parsed.priority;
+      this.highlightPriority(parsed.priority);
+    }
+    if (!d.projectId && parsed.projectName) {
+      const id = resolveProjectId(parsed.projectName);
+      this.extra.projectId = id;
+      if (this.extraCtrls.project) this.extraCtrls.project.value = id ?? "";
+    }
+    if (!this.dateLabelEl) return;
+    // Keep header chip in sync with the effective day
+    const eff = this.extra.dirty.date && this.extra.date
+      ? wm(this.extra.date, "YYYY-MM-DD", true)
+      : parsed.date || this.date;
+    let label = (eff.isValid() ? eff : this.date).format("dddd, D MMMM");
+    const st = this.extra.scheduledTime;
+    const en = this.extra.endTime;
+    if (st) label += en ? ` · ${st}–${en}` : ` · ${st}`;
+    this.dateLabelEl.setText(label);
+  }
+
+  private highlightPriority(p: "low" | "medium" | "high"): void {
+    const row = this.extraCtrls.priorityBtns;
+    if (!row) return;
+    row.querySelectorAll<HTMLElement>(".qa2-pri-btn").forEach((b) => {
+      b.toggleClass("is-active", b.dataset.pri === p);
+    });
+  }
+
+  private buildExtraFields(body: HTMLElement): void {
+    // Date + start + end
+    const timeRow = body.createDiv({ cls: "qa2-extra-row" });
+    const dateWrap = timeRow.createDiv({ cls: "qa2-extra-field" });
+    dateWrap.createEl("label", { text: tRaw("tasks.modal.date"), cls: "qa2-extra-label" });
+    const dateIn = dateWrap.createEl("input", {
+      type: "date",
+      cls: "qa2-extra-input",
+      value: this.extra.date ?? this.date.format("YYYY-MM-DD"),
+    });
+    if (!this.extra.date) this.extra.date = this.date.format("YYYY-MM-DD");
+    dateIn.addEventListener("change", () => {
+      this.extra.date = dateIn.value || null;
+      this.extra.dirty.date = true;
+    });
+    this.extraCtrls.date = dateIn;
+
+    const startWrap = timeRow.createDiv({ cls: "qa2-extra-field" });
+    startWrap.createEl("label", { text: tRaw("tasks.modal.time"), cls: "qa2-extra-label" });
+    const startIn = startWrap.createEl("input", {
+      type: "time",
+      cls: "qa2-extra-input",
+      value: this.extra.scheduledTime ?? "",
+    });
+    startIn.addEventListener("change", () => {
+      this.extra.scheduledTime = startIn.value || null;
+      this.extra.dirty.scheduledTime = true;
+    });
+    this.extraCtrls.start = startIn;
+
+    const endWrap = timeRow.createDiv({ cls: "qa2-extra-field" });
+    endWrap.createEl("label", { text: tRaw("tasks.modal.endTime"), cls: "qa2-extra-label" });
+    const endIn = endWrap.createEl("input", {
+      type: "time",
+      cls: "qa2-extra-input",
+      value: this.extra.endTime ?? "",
+    });
+    endIn.addEventListener("change", () => {
+      this.extra.endTime = endIn.value || null;
+      this.extra.dirty.endTime = true;
+    });
+    this.extraCtrls.end = endIn;
+
+    // Priority
+    const priRow = body.createDiv({ cls: "qa2-extra-row" });
+    const priWrap = priRow.createDiv({ cls: "qa2-extra-field qa2-extra-field--full" });
+    priWrap.createEl("label", { text: tRaw("tasks.modal.priority"), cls: "qa2-extra-label" });
+    const priBtns = priWrap.createDiv({ cls: "qa2-pri-btns" });
+    this.extraCtrls.priorityBtns = priBtns;
+    const priDefs: Array<{ v: "low" | "medium" | "high"; l: string }> = [
+      { v: "low", l: tRaw("tasks.modal.priorityLow") },
+      { v: "medium", l: tRaw("tasks.modal.priorityMedium") },
+      { v: "high", l: tRaw("tasks.modal.priorityHigh") },
+    ];
+    for (const p of priDefs) {
+      const btn = priBtns.createEl("button", {
+        cls: "qa2-pri-btn" + (this.extra.priority === p.v ? " is-active" : ""),
+        text: p.l,
+        attr: { type: "button" },
+      });
+      btn.dataset.pri = p.v;
+      btn.addEventListener("click", () => {
+        this.extra.priority = p.v;
+        this.extra.dirty.priority = true;
+        this.highlightPriority(p.v);
+      });
+    }
+
+    // Project + work
+    const projRow = body.createDiv({ cls: "qa2-extra-row" });
+    const projWrap = projRow.createDiv({ cls: "qa2-extra-field" });
+    projWrap.createEl("label", { text: tRaw("tasks.modal.project"), cls: "qa2-extra-label" });
+    const projSel = projWrap.createEl("select", { cls: "qa2-extra-input" });
+    projSel.createEl("option", { value: "", text: tRaw("tasks.modal.noProject") });
+    for (const p of get(projects)) {
+      const opt = projSel.createEl("option", { value: p.id, text: `${p.icon} ${p.name}` });
+      if (p.id === this.extra.projectId) opt.selected = true;
+    }
+    projSel.addEventListener("change", () => {
+      this.extra.projectId = projSel.value || null;
+      this.extra.dirty.projectId = true;
+    });
+    this.extraCtrls.project = projSel;
+
+    const workWrap = projRow.createDiv({ cls: "qa2-extra-field qa2-extra-work" });
+    workWrap.createEl("label", {
+      text: tRaw("tasks.modal.isWorkTask"),
+      cls: "qa2-extra-label qa2-work-label",
+    });
+    // Obsidian native toggle (Setting-style checkbox-container)
+    const workToggle = workWrap.createEl("label", {
+      cls: "checkbox-container" + (this.extra.isWorkTask ? " is-enabled" : ""),
+    });
+    const workIn = workToggle.createEl("input", { type: "checkbox" });
+    workIn.checked = this.extra.isWorkTask;
+    workIn.addEventListener("change", () => {
+      this.extra.isWorkTask = workIn.checked;
+      this.extra.dirty.isWorkTask = true;
+      workToggle.toggleClass("is-enabled", workIn.checked);
+      this.updateWorkSub();
+    });
+    this.extraCtrls.work = workIn;
+
+    // Work pay inputs (shown when work is on)
+    const workSub = body.createDiv({ cls: "qa2-extra-work-sub mcp-hidden" });
+    this.extraCtrls.workSub = workSub;
+
+    const payRow = workSub.createDiv({ cls: "qa2-extra-row" });
+    const payWrap = payRow.createDiv({ cls: "qa2-extra-field" });
+    payWrap.createEl("label", { text: tRaw("tasks.modal.paymentType"), cls: "qa2-extra-label" });
+    const paySel = payWrap.createEl("select", { cls: "qa2-extra-input" });
+    paySel.createEl("option", { value: "hour", text: tRaw("tasks.modal.paymentHour") });
+    paySel.createEl("option", { value: "day", text: tRaw("tasks.modal.paymentDay") });
+    paySel.value = this.extra.paymentType;
+    paySel.addEventListener("change", () => {
+      this.extra.paymentType = paySel.value as "hour" | "day";
+      this.extra.dirty.workPay = true;
+      this.updateWorkSub();
+    });
+
+    const rateWrap = payRow.createDiv({ cls: "qa2-extra-field" });
+    rateWrap.createEl("label", {
+      text: tRaw("tasks.modal.rate", { currency: "₽" }),
+      cls: "qa2-extra-label",
+    });
+    const rateIn = rateWrap.createEl("input", {
+      type: "number",
+      cls: "qa2-extra-input",
+      placeholder: "0",
+      value: this.extra.rate,
+      attr: { min: "0" },
+    });
+    rateIn.addEventListener("input", () => {
+      this.extra.rate = rateIn.value.replace(/[^0-9.,]/g, "");
+      this.extra.dirty.workPay = true;
+    });
+
+    const otRow = workSub.createDiv({ cls: "qa2-extra-row qa2-extra-ot" });
+    const otStartWrap = otRow.createDiv({ cls: "qa2-extra-field" });
+    otStartWrap.createEl("label", { text: tRaw("tasks.modal.overtimeFrom"), cls: "qa2-extra-label" });
+    const otStartIn = otStartWrap.createEl("input", {
+      type: "number",
+      cls: "qa2-extra-input",
+      placeholder: "8",
+      value: this.extra.overtimeStart,
+      attr: { min: "1", max: "24" },
+    });
+    otStartIn.addEventListener("input", () => {
+      this.extra.overtimeStart = otStartIn.value.replace(/[^0-9]/g, "");
+      this.extra.dirty.workPay = true;
+    });
+
+    const otMulWrap = otRow.createDiv({ cls: "qa2-extra-field" });
+    otMulWrap.createEl("label", { text: tRaw("tasks.modal.multiplier"), cls: "qa2-extra-label" });
+    const otMulIn = otMulWrap.createEl("input", {
+      type: "number",
+      cls: "qa2-extra-input",
+      placeholder: "1.5",
+      value: this.extra.overtimeMultiplier,
+      attr: { min: "1", max: "10", step: "0.1" },
+    });
+    otMulIn.addEventListener("input", () => {
+      this.extra.overtimeMultiplier = otMulIn.value.replace(/[^0-9.,]/g, "");
+      this.extra.dirty.workPay = true;
+    });
+    this.updateWorkSub();
+
+    // Recurrence
+    const recRow = body.createDiv({ cls: "qa2-extra-row" });
+    const recWrap = recRow.createDiv({ cls: "qa2-extra-field" });
+    recWrap.createEl("label", { text: tRaw("tasks.modal.recurrence"), cls: "qa2-extra-label" });
+    const recSel = recWrap.createEl("select", { cls: "qa2-extra-input" });
+    recSel.createEl("option", { value: "none", text: tRaw("tasks.modal.recurrenceNone") });
+    recSel.createEl("option", { value: "daily", text: tRaw("tasks.modal.recurrenceDaily") });
+    recSel.createEl("option", { value: "weekly", text: tRaw("tasks.modal.recurrenceWeekly") });
+    recSel.createEl("option", { value: "monthly", text: tRaw("tasks.modal.recurrenceMonthly") });
+    recSel.value = this.extra.recurrenceType;
+    recSel.addEventListener("change", () => {
+      this.extra.recurrenceType = recSel.value as ExtraForm["recurrenceType"];
+      this.extra.dirty.recurrence = true;
+      this.renderRecDays();
+      this.updateRecUntil();
+    });
+    this.extraCtrls.recType = recSel;
+
+    const recDays = recRow.createDiv({ cls: "qa2-extra-field qa2-rec-days mcp-hidden" });
+    this.extraCtrls.recDays = recDays;
+    this.renderRecDays();
+
+    // Repeat until
+    const recUntilWrap = body.createDiv({ cls: "qa2-extra-row qa2-rec-until mcp-hidden" });
+    this.extraCtrls.recUntil = recUntilWrap;
+    const untilField = recUntilWrap.createDiv({ cls: "qa2-extra-field" });
+    untilField.createEl("label", { text: tRaw("tasks.modal.repeatUntil"), cls: "qa2-extra-label" });
+    const untilIn = untilField.createEl("input", {
+      type: "date",
+      cls: "qa2-extra-input",
+      value: this.extra.recurrenceUntil ?? "",
+    });
+    untilIn.addEventListener("change", () => {
+      this.extra.recurrenceUntil = untilIn.value || null;
+      this.extra.dirty.recurrence = true;
+    });
+    this.extraCtrls.recUntilInput = untilIn;
+    this.updateRecUntil();
+
+    // Deadline + note
+    const dlRow = body.createDiv({ cls: "qa2-extra-row" });
+    const dlWrap = dlRow.createDiv({ cls: "qa2-extra-field" });
+    dlWrap.createEl("label", { text: tRaw("tasks.modal.deadline"), cls: "qa2-extra-label" });
+    const dlIn = dlWrap.createEl("input", {
+      type: "date",
+      cls: "qa2-extra-input",
+      value: this.extra.deadlineDate ?? "",
+    });
+    dlIn.addEventListener("change", () => {
+      this.extra.deadlineDate = dlIn.value || null;
+      this.extra.dirty.deadline = true;
+    });
+    this.extraCtrls.deadline = dlIn;
+
+    // Note + browse/create buttons
+    const noteWrap = dlRow.createDiv({ cls: "qa2-extra-field" });
+    noteWrap.createEl("label", { text: tRaw("tasks.modal.linkNote"), cls: "qa2-extra-label" });
+    const noteRow = noteWrap.createDiv({ cls: "qa2-note-row" });
+    const noteIn = noteRow.createEl("input", {
+      type: "text",
+      cls: "qa2-extra-input qa2-note-input",
+      placeholder: tRaw("tasks.modal.notePlaceholder"),
+      value: this.extra.notePath ?? "",
+    });
+    noteIn.addEventListener("change", () => {
+      this.extra.notePath = noteIn.value.trim() || null;
+      this.extra.dirty.notePath = true;
+    });
+    this.extraCtrls.note = noteIn;
+
+    const browseBtn = noteRow.createEl("button", {
+      text: "…",
+      cls: "qa2-note-btn",
+      attr: { type: "button", title: tRaw("tasks.modal.linkNote") },
+    });
+    browseBtn.addEventListener("click", () => {
+      new FileSuggestModal(this.app, (filePath) => {
+        this.extra.notePath = filePath;
+        this.extra.dirty.notePath = true;
+        noteIn.value = filePath;
+      }).open();
+    });
+
+    const createBtn = noteRow.createEl("button", {
+      text: "+",
+      cls: "qa2-note-btn",
+      attr: { type: "button", title: tRaw("tasks.modal.createNote") },
+    });
+    createBtn.addEventListener("click", () => {
+      new FolderSuggestModal(this.app, (folder) => {
+        void (async () => {
+          const title = (this.inputValue() || tRaw("tasks.modal.note")).trim();
+          const filename = title.replace(/[\\/:*?"<>|]/g, "_") + ".md";
+          const path = `${folder}/${filename}`;
+          const parts = path.split("/");
+          if (parts.length > 1) {
+            const folderPath = parts.slice(0, -1).join("/");
+            if (!this.app.vault.getAbstractFileByPath(folderPath)) {
+              await this.app.vault.createFolder(folderPath);
+            }
+          }
+          let file = this.app.vault.getAbstractFileByPath(path);
+          if (!file) {
+            file = await this.app.vault.create(path, "");
+          }
+          this.extra.notePath = path;
+          this.extra.dirty.notePath = true;
+          noteIn.value = path;
+        })();
+      }).open();
+    });
+  }
+
+  private updateWorkSub(): void {
+    const sub = this.extraCtrls.workSub;
+    if (!sub) return;
+    const show = this.extra.isWorkTask;
+    sub.toggleClass("mcp-hidden", !show);
+    const ot = sub.querySelector<HTMLElement>(".qa2-extra-ot");
+    if (ot) ot.toggleClass("mcp-hidden", this.extra.paymentType !== "hour");
+  }
+
+  private updateRecUntil(): void {
+    const wrap = this.extraCtrls.recUntil;
+    if (!wrap) return;
+    wrap.toggleClass("mcp-hidden", this.extra.recurrenceType === "none");
+  }
+
+  private renderRecDays(): void {
+    const wrap = this.extraCtrls.recDays;
+    if (!wrap) return;
+    wrap.empty();
+    if (this.extra.recurrenceType !== "weekly") {
+      wrap.addClass("mcp-hidden");
+      return;
+    }
+    wrap.removeClass("mcp-hidden");
+    const labels = tRaw("common.weekdays.short").split(", ");
+    for (let i = 0; i < 7; i++) {
+      const momentIdx = i === 6 ? 0 : i + 1; // Mon=1 … Sun=0
+      const btn = wrap.createEl("button", {
+        cls: "qa2-day-btn" + (this.extra.recurrenceDays.includes(momentIdx) ? " is-active" : ""),
+        text: labels[i] || String(i),
+        attr: { type: "button" },
+      });
+      btn.addEventListener("click", () => {
+        const idx = this.extra.recurrenceDays.indexOf(momentIdx);
+        if (idx >= 0) this.extra.recurrenceDays.splice(idx, 1);
+        else this.extra.recurrenceDays.push(momentIdx);
+        this.extra.recurrenceDays.sort();
+        this.extra.dirty.recurrence = true;
+        btn.toggleClass("is-active", this.extra.recurrenceDays.includes(momentIdx));
+      });
+    }
   }
 
   private addHint(parent: HTMLElement, kbd: string, label: string): void {
@@ -700,28 +1224,14 @@ export class QuickAddModal extends Modal {
       return;
     }
 
-    // Regex fast path (always available) — single task only
+    // Single mode is pure regex — AI runs only in multi ("AI-задачи").
     const parsed = parseQuickInput(raw);
     if (!parsed.title) {
       this.close();
       return;
     }
 
-    // Optional AI enrichment for work / note / recurrence.
-    // Skip the round-trip when the text has no hint of those smart fields.
-    let draft: AiQuickTaskDraft | null = null;
-    if (isAiQuickAddAvailable() && looksLikeSmartFields(raw)) {
-      try {
-        this.setStatus(tRaw("tasks.quickAdd.aiBusy"), "busy");
-        const drafts = await parseQuickTasksWithAI(raw);
-        draft = drafts[0] ?? null;
-        this.setStatus("", "hide");
-      } catch {
-        this.setStatus("", "hide");
-      }
-    }
-
-    this.createTaskFromParsed(parsed, draft);
+    this.createTaskFromParsed(parsed, null);
     this.close();
     this.onSubmit();
   }
@@ -733,17 +1243,22 @@ export class QuickAddModal extends Modal {
     if (isAiQuickAddAvailable()) {
       this.setStatus(tRaw("tasks.quickAdd.aiBusy"), "busy");
       try {
-        const drafts = await parseQuickTasksWithAI(raw);
+        const drafts = await parseQuickTasksWithAI(raw, this.aiContext());
+        this.setStatus("", "hide");
         if (drafts.length === 0) {
           this.createTasksFromLines(raw);
+          this.close();
+          this.onSubmit();
+        } else if (this.confirmBeforeAdd()) {
+          // Show how AI understood the tasks — user confirms first
+          this.showReviewPanel(drafts);
         } else {
           for (const draft of drafts) {
             this.createTaskFromDraft(draft);
           }
+          this.close();
+          this.onSubmit();
         }
-        this.setStatus("", "hide");
-        this.close();
-        this.onSubmit();
       } catch (e: unknown) {
         console.error("[QuickAddModal] AI multi-add failed:", e);
         // Fall back to line-by-line regex so the user still gets tasks
@@ -774,6 +1289,102 @@ export class QuickAddModal extends Modal {
     }
   }
 
+  private confirmBeforeAdd(): boolean {
+    const opts = get(settings) as { aiConfirmBeforeAdd?: boolean };
+    return opts.aiConfirmBeforeAdd !== false;
+  }
+
+  /** Preview panel: show how AI parsed each task, let the user approve. */
+  private showReviewPanel(drafts: AiQuickTaskDraft[]): void {
+    // Hide input area actions; show review card list
+    const root = this.contentEl.createDiv({ cls: "qa2-review" });
+    root.createDiv({ text: tRaw("tasks.quickAdd.reviewTitle"), cls: "qa2-review-title" });
+    root.createDiv({ text: tRaw("tasks.quickAdd.reviewHint"), cls: "qa2-review-hint" });
+
+    const list = root.createDiv({ cls: "qa2-review-list" });
+    const selected: boolean[] = drafts.map(() => true);
+
+    drafts.forEach((d, i) => {
+      const card = list.createDiv({ cls: "qa2-review-card" });
+      const head = card.createDiv({ cls: "qa2-review-card-head" });
+      const check = head.createEl("input", {
+        type: "checkbox",
+        cls: "qa2-review-check",
+        attr: { checked: "checked" },
+      });
+      check.checked = true;
+      check.addEventListener("change", () => {
+        selected[i] = check.checked;
+        card.toggleClass("is-off", !check.checked);
+        this.updateReviewCount(countBtn, selected);
+      });
+
+      const titleBox = head.createDiv({ cls: "qa2-review-card-title" });
+      titleBox.createSpan({ text: d.title, cls: "qa2-review-task-title" });
+
+      const meta = card.createDiv({ cls: "qa2-review-meta" });
+      const chip = (cls: string, text: string) => {
+        if (text) meta.createSpan({ cls: `qa2-chip ${cls}`, text });
+      };
+      if (d.date) chip("qa2-chip-date", `📅 ${d.date}`);
+      if (d.scheduledTime) {
+        chip("qa2-chip-time", `🕐 ${d.scheduledTime}${d.endTime ? `–${d.endTime}` : ""}`);
+      }
+      if (d.priority && d.priority !== "medium") {
+        chip("qa2-chip-priority", d.priority === "high" ? "!! high" : "− low");
+      }
+      if (d.projectName) chip("qa2-chip-project", `@${d.projectName}`);
+      if (d.isWorkTask) chip("qa2-chip-project", "work");
+      if (d.recurrence) {
+        chip("qa2-chip-date", `↻ ${d.recurrence.type}${d.recurrence.daysOfWeek?.length ? ` [${d.recurrence.daysOfWeek.join(",")}]` : ""}`);
+      }
+      if (d.deadline) chip("qa2-chip-date", `⏰ ${d.deadline}`);
+      if (d.estimatedMinutes) chip("qa2-chip-time", `⏱ ${d.estimatedMinutes}m`);
+      if (d.rate != null) {
+        chip("qa2-chip-project", `💰 ${d.rate}${d.paymentType === "day" ? "/день" : "/час"}`);
+      }
+      if (d.noteName) chip("qa2-chip-project", `📄 ${d.noteName}`);
+      if (d.tags && d.tags.length) chip("qa2-chip-project", d.tags.map((t) => `#${t}`).join(" "));
+    });
+
+    const actions = root.createDiv({ cls: "qa2-actions" });
+    const cancelBtn = actions.createEl("button", {
+      cls: "qa2-btn qa2-btn-ghost",
+      text: tRaw("tasks.quickAdd.reviewCancel"),
+      attr: { type: "button" },
+    });
+    cancelBtn.addEventListener("click", () => {
+      root.remove();
+      this.setStatus("", "hide");
+    });
+    const countBtn = actions.createEl("button", {
+      cls: "qa2-btn qa2-btn-primary",
+      text: tRaw("tasks.quickAdd.reviewSelected", {
+        count: String(drafts.length),
+      }),
+      attr: { type: "button" },
+    });
+    this.updateReviewCount(countBtn, selected);
+    countBtn.addEventListener("click", () => {
+      const chosen = drafts.filter((_, i) => selected[i]);
+      for (const draft of chosen) this.createTaskFromDraft(draft);
+      root.remove();
+      this.close();
+      this.onSubmit();
+    });
+
+    // Scroll review into view
+    root.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  private updateReviewCount(btn: HTMLElement, selected: boolean[]): void {
+    const n = selected.filter(Boolean).length;
+    btn.setText(tRaw("tasks.quickAdd.reviewSelected", { count: String(n) }));
+    btn.toggleClass("is-disabled", n === 0);
+    if (n === 0) btn.setAttribute("disabled", "true");
+    else btn.removeAttribute("disabled");
+  }
+
   private createTasksFromLines(raw: string): void {
     const lines = splitTaskLines(raw);
     if (lines.length === 0) {
@@ -787,24 +1398,133 @@ export class QuickAddModal extends Modal {
     }
   }
 
+  private async fillDescriptionWithAI(btn: HTMLElement): Promise<void> {
+    const raw = this.inputValue().trim();
+    const parsed = parseQuickInput(raw);
+    const title = parsed.title || raw;
+    if (!title) {
+      this.setStatus(tRaw("tasks.quickAdd.aiError"), "error");
+      return;
+    }
+    const descBox = btn.closest(".qa2-desc-box");
+    btn.setAttribute("disabled", "true");
+    btn.addClass("is-busy");
+    descBox?.addClass("is-ai-loading");
+    this.setStatus(tRaw("tasks.quickAdd.descriptionAiBusy"), "busy");
+    try {
+      const text = await generateTaskDescription(title, this.descEl?.value || null);
+      if (text && this.descEl) this.descEl.value = text;
+      this.setStatus("", "hide");
+    } catch {
+      this.setStatus(tRaw("tasks.quickAdd.aiError"), "error");
+    } finally {
+      btn.removeAttribute("disabled");
+      btn.removeClass("is-busy");
+      descBox?.removeClass("is-ai-loading");
+    }
+  }
+
+  /** Project / note names for the AI prompt so it matches real vault data. */
+  private aiContext(): AiQuickAddContext {
+    return {
+      projectNames: get(projects).map((p) => p.name),
+    };
+  }
+
   private createTaskFromParsed(
     parsed: ReturnType<typeof parseQuickInput>,
     draft: AiQuickTaskDraft | null,
   ): void {
-    const targetDate = parsed.date || this.date;
+    const d = this.extra.dirty;
+
+    // Date: form > parse > AI > modal default
+    let targetDate = this.date;
+    if (d.date && this.extra.date) {
+      const m = wm(this.extra.date, "YYYY-MM-DD", true);
+      if (m.isValid()) targetDate = m;
+    } else if (parsed.date) {
+      targetDate = parsed.date;
+    } else if (draft?.date) {
+      const m = wm(draft.date, "YYYY-MM-DD", true);
+      if (m.isValid()) targetDate = m;
+    }
     const dateUID = getDateUID(targetDate, "day");
 
+    // Times: form (if dirty) > parse > AI > prefill
     let scheduledTime: string | undefined;
     let endTime: string | undefined;
-    if (parsed.scheduledTime) scheduledTime = formatTime(parsed.scheduledTime);
-    if (parsed.endTime) endTime = formatTime(parsed.endTime);
+    if (d.scheduledTime && this.extra.scheduledTime) scheduledTime = formatTime(this.extra.scheduledTime);
+    else if (parsed.scheduledTime) scheduledTime = formatTime(parsed.scheduledTime);
+    else if (draft?.scheduledTime) scheduledTime = formatTime(draft.scheduledTime);
+    else if (this.prefillTime) scheduledTime = formatTime(this.prefillTime);
 
-    const projectId = resolveProjectId(parsed.projectName);
-    const boundNotePath = draft?.noteName ? resolveNotePath(this.app, draft.noteName) : null;
-    const recurrence = draft?.recurrence ? normalizeRecurrence(draft.recurrence) : undefined;
+    if (d.endTime && this.extra.endTime) endTime = formatTime(this.extra.endTime);
+    else if (parsed.endTime) endTime = formatTime(parsed.endTime);
+    else if (draft?.endTime) endTime = formatTime(draft.endTime);
+    else if (this.prefillEndTime) endTime = formatTime(this.prefillEndTime);
+
+    // Project / priority / note / recurrence / deadline / work
+    let projectId: string | null;
+    if (d.projectId) projectId = this.extra.projectId;
+    else projectId = resolveProjectId(parsed.projectName || draft?.projectName || null);
+
+    let priority: "low" | "medium" | "high";
+    if (d.priority && this.extra.priority) priority = this.extra.priority;
+    else priority = parsed.priority || draft?.priority || "medium";
+
+    let boundNotePath: string | null = null;
+    if (d.notePath && this.extra.notePath) {
+      boundNotePath = this.extra.notePath.includes("/")
+        ? this.extra.notePath
+        : resolveNotePath(this.app, this.extra.notePath);
+    } else if (draft?.noteName) {
+      boundNotePath = resolveNotePath(this.app, draft.noteName);
+    }
+
+    let recurrence: RecurrenceConfig | undefined;
+    if (d.recurrence && this.extra.recurrenceType !== "none") {
+      recurrence = { type: this.extra.recurrenceType, interval: 1 };
+      if (this.extra.recurrenceType === "weekly" && this.extra.recurrenceDays.length > 0) {
+        recurrence.daysOfWeek = [...this.extra.recurrenceDays];
+      }
+      if (this.extra.recurrenceUntil) recurrence.until = toDateUID(this.extra.recurrenceUntil);
+    } else if (draft?.recurrence) {
+      recurrence = normalizeRecurrence(draft.recurrence);
+    }
+
+    let deadline: string | undefined;
+    if (d.deadline && this.extra.deadlineDate) deadline = toDateUID(this.extra.deadlineDate);
+    else if (draft?.deadline) deadline = toDateUID(draft.deadline);
+
+    let isWorkTask: boolean | undefined;
+    if (d.isWorkTask) isWorkTask = this.extra.isWorkTask || undefined;
+    else isWorkTask = draft?.isWorkTask || undefined;
+    if (draft?.rate != null) isWorkTask = true;
+
+    const paymentType = isWorkTask ? (draft?.paymentType || this.extra.paymentType) : undefined;
+    const rate = isWorkTask
+      ? (draft?.rate != null
+          ? draft.rate
+          : this.extra.rate
+            ? parseFloat(this.extra.rate.replace(",", "."))
+            : undefined)
+      : undefined;
+    const overtimeStart = isWorkTask && this.extra.paymentType === "hour" && this.extra.overtimeStart
+      ? parseInt(this.extra.overtimeStart, 10)
+      : undefined;
+    const overtimeMultiplier = isWorkTask && this.extra.paymentType === "hour" && this.extra.overtimeMultiplier
+      ? parseFloat(this.extra.overtimeMultiplier.replace(",", "."))
+      : undefined;
+
+    const description = (this.descEl?.value || draft?.description || "").trim();
+
+    let estimatedTime = draft?.estimatedMinutes ?? undefined;
+    if (estimatedTime === undefined && scheduledTime && endTime) {
+      estimatedTime = minutesBetween(scheduledTime, endTime);
+    }
 
     try {
-      addTask({
+      const task = addTask({
         title: sanitizeTitle(parsed.title),
         dateUID,
         status: "todo",
@@ -812,15 +1532,23 @@ export class QuickAddModal extends Modal {
         projectId,
         notePath: null,
         boundNotePath,
-        priority: parsed.priority || draft?.priority || "medium",
-        tags: [],
+        priority,
+        tags: draft?.tags ?? [],
         sortOrder: 0,
-        description: draft?.description || "",
+        description,
         scheduledTime,
         endTime,
-        isWorkTask: draft?.isWorkTask || undefined,
+        estimatedTime,
+        deadline,
+        deadlineTime: draft?.deadlineTime || undefined,
+        isWorkTask,
+        paymentType,
+        rate,
+        overtimeStart,
+        overtimeMultiplier,
         recurrence,
       });
+      this.onTaskCreated?.(task);
     } catch (e: unknown) {
       console.error("[QuickAddModal] Failed to create task:", e);
     }
@@ -840,14 +1568,20 @@ export class QuickAddModal extends Modal {
     const projectId = resolveProjectId(draft.projectName ?? null);
     const boundNotePath = draft.noteName ? resolveNotePath(this.app, draft.noteName) : null;
     const recurrence = draft.recurrence ? normalizeRecurrence(draft.recurrence) : undefined;
+    const deadline = draft.deadline ? toDateUID(draft.deadline) : undefined;
 
     let scheduledTime: string | undefined;
     let endTime: string | undefined;
     if (draft.scheduledTime) scheduledTime = formatTime(draft.scheduledTime);
     if (draft.endTime) endTime = formatTime(draft.endTime);
 
+    let estimatedTime = draft.estimatedMinutes ?? undefined;
+    if (estimatedTime === undefined && scheduledTime && endTime) {
+      estimatedTime = minutesBetween(scheduledTime, endTime);
+    }
+
     try {
-      addTask({
+      const task = addTask({
         title,
         dateUID,
         status: "todo",
@@ -856,67 +1590,41 @@ export class QuickAddModal extends Modal {
         notePath: null,
         boundNotePath,
         priority: draft.priority || "medium",
-        tags: [],
+        tags: draft.tags ?? [],
         sortOrder: 0,
         description: draft.description || "",
         scheduledTime,
         endTime,
-        isWorkTask: draft.isWorkTask || undefined,
+        estimatedTime,
+        deadline,
+        deadlineTime: draft.deadlineTime || undefined,
+        isWorkTask: draft.isWorkTask || draft.rate != null || undefined,
+        paymentType: draft.paymentType || (draft.rate != null ? "hour" : undefined),
+        rate: draft.rate ?? undefined,
         recurrence,
       });
+      this.onTaskCreated?.(task);
     } catch (e: unknown) {
       console.error("[QuickAddModal] Failed to create AI task:", e);
     }
   }
 
-  private openAdvancedModal(raw: string): void {
-    const parsed = parseQuickInput(raw);
-    const targetDate = parsed.date || this.date;
-    const dateUID = getDateUID(targetDate, "day");
-    const dateStr = targetDate.format("YYYY-MM-DD");
-
-    let scheduledTime: string | undefined;
-    let endTime: string | undefined;
-    if (parsed.scheduledTime) scheduledTime = formatTime(parsed.scheduledTime);
-    if (parsed.endTime) endTime = formatTime(parsed.endTime);
-
-    const projectId = resolveProjectId(parsed.projectName);
-
-    this.close();
-
-    void import("./TaskModal").then(({ TaskModal }) => {
-      new TaskModal(this.app, (taskData) => {
-        addTask({
-          title: sanitizeTitle(taskData.title || parsed.title || ""),
-          description: taskData.description || "",
-          projectId: taskData.projectId || projectId || null,
-          notePath: taskData.notePath || null,
-          boundNotePath: taskData.boundNotePath || null,
-          dateUID: taskData.dateUID || dateUID,
-          priority: taskData.priority || parsed.priority || "medium",
-          tags: taskData.tags || [],
-          sortOrder: 0,
-          status: "todo",
-          completed: false,
-          scheduledTime: taskData.scheduledTime || scheduledTime,
-          endTime: taskData.endTime || endTime,
-          estimatedTime: taskData.estimatedTime,
-          deadline: taskData.deadline,
-          deadlineTime: taskData.deadlineTime,
-          recurrence: taskData.recurrence,
-          isWorkTask: taskData.isWorkTask,
-          paymentType: taskData.paymentType,
-          rate: taskData.rate,
-          overtimeStart: taskData.overtimeStart,
-          overtimeMultiplier: taskData.overtimeMultiplier,
-        });
-      }, undefined, dateStr, scheduledTime, endTime).open();
-    });
-  }
-
   onClose(): void {
     this.contentEl.empty();
   }
+}
+
+function toDateUID(date: string): string {
+  return date.startsWith("day-") ? date : `day-${date}`;
+}
+
+function minutesBetween(start: string, end: string): number | undefined {
+  const toMin = (t: string) => {
+    const [h, m] = t.split(":").map((x) => parseInt(x, 10));
+    return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+  };
+  const delta = toMin(end) - toMin(start);
+  return delta > 0 ? delta : undefined;
 }
 
 function normalizeRecurrence(
@@ -930,12 +1638,6 @@ function normalizeRecurrence(
   if (type === "weekly" && Array.isArray(rec.daysOfWeek) && rec.daysOfWeek.length > 0) {
     out.daysOfWeek = rec.daysOfWeek.filter((d) => d >= 0 && d <= 6);
   }
+  if (rec.until) out.until = toDateUID(rec.until);
   return out;
-}
-
-/** Cheap gate: only hit Ollama when the text may contain work / note / recurrence. */
-function looksLikeSmartFields(raw: string): boolean {
-  return /работ|созвон|встреч|отч[её]т|клиент|дедлайн|ТЗ|спринт|презент|смет|кажд|повтор|заметк|\[\[|note|meeting|report|client|deadline|every\s|daily|weekly|monthly|recur/i.test(
-    raw,
-  );
 }

@@ -43,6 +43,8 @@
   let showChecklist = false;
   let newChecklistTitle = "";
   let showDescription = false;
+  // Mobile: description is always visible
+  $: if (isMobile) showDescription = true;
 
   function handleToggleChecklist(id: string) { toggleChecklistItem(id); }
   function handleAddChecklistItem() {
