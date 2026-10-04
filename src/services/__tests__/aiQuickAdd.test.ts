@@ -24,7 +24,6 @@ describe("parseAiQuickTasks", () => {
           isWorkTask: true,
           noteName: "Отчёты",
           description: null,
-          tags: ["#работа", "отчёт"],
           estimatedMinutes: 60,
           deadline: "2026-10-10",
           deadlineTime: "18:00",
@@ -42,7 +41,6 @@ describe("parseAiQuickTasks", () => {
     expect(tasks[0].priority).toBe("high");
     expect(tasks[0].scheduledTime).toBe("14:00");
     expect(tasks[0].endTime).toBe("15:00");
-    expect(tasks[0].tags).toEqual(["работа", "отчёт"]);
     expect(tasks[0].estimatedMinutes).toBe(60);
     expect(tasks[0].deadline).toBe("2026-10-10");
     expect(tasks[0].deadlineTime).toBe("18:00");
@@ -57,7 +55,6 @@ describe("parseAiQuickTasks", () => {
     expect(tasks).toHaveLength(2);
     expect(tasks[0].priority).toBe("medium");
     expect(tasks[1].isWorkTask).toBe(true);
-    expect(tasks[1].tags).toEqual([]);
   });
 
   it("falls back to line split on invalid JSON", () => {
@@ -72,11 +69,10 @@ describe("parseAiQuickTasks", () => {
   });
 
   it("accepts markdown-fenced JSON", () => {
-    const raw = '```json\n{"tasks":[{"title":"Позвонить маме","tags":["семья"]}]}\n```';
+    const raw = '```json\n{"tasks":[{"title":"Позвонить маме"}]}\n```';
     const tasks = parseAiQuickTasks(raw);
     expect(tasks).toHaveLength(1);
     expect(tasks[0].title).toBe("Позвонить маме");
-    expect(tasks[0].tags).toEqual(["семья"]);
   });
 
   it("accepts a bare tasks array root", () => {

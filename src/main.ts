@@ -44,11 +44,6 @@ import HabitPanelView from "./views/HabitPanelView";
 import WeatherDetailView from "./views/WeatherDetailView";
 import { initTaskStores, reloadTaskStores, immediateSave as immediateTaskSave } from "./task-tracker/stores";
 import { cleanupTimers } from "./task-tracker/TimerManager";
-import {
-  setupNoteTaskSync,
-  setupNoteRenameSync,
-  setupNoteDeleteSync,
-} from "./task-tracker/noteTasks";
 import { initHabitStores, reloadHabitStores, immediateSave as immediateHabitSave } from "./habit-tracker/stores";
 import { initFinanceStores, reloadFinanceStores, immediateFinanceSave } from "./finance/storage";
 import { initFinancialAnalyticsStores, reloadFinancialAnalyticsStores, immediateAnalyticsSave } from "./finance/financialAnalyticsStorage";
@@ -595,9 +590,6 @@ export default class CalendarPlugin extends Plugin {
 
     // Initialize task tracker (must await to prevent empty data from overwriting vault)
     await initTaskStores(this);
-    setupNoteTaskSync(this.app, this);
-    setupNoteRenameSync(this.app, this);
-    setupNoteDeleteSync(this.app, this);
 
     // Initialize habit tracker (must await to prevent empty data from overwriting vault)
     await initHabitStores(this);

@@ -120,23 +120,6 @@
 3. Плагин создаст Gist с `.ics` файлом и выдаст ссылку.
 4. Добавьте эту ссылку в свой календарь через функцию «Подписка по URL».
 
-### Интеграция с форматом Tasks (опционально)
-При включённой настройке «Tasks plugin sync» плагин создаёт `.md` файлы для задач, чтобы они были видны в плагинах Tasks и Dataview. Это **дополнительная** фича — основное хранение остаётся в JSON. Пример генерируемого файла:
-```markdown
----
-task_id: abc123
-title: Купить молоко
-status: todo
-date: day-2024-10-25
-priority: medium
----
-- [ ] Купить молоко 📅 2024-10-25 🛫 14:30 🔼
-```
-*(Поддерживаемые статусы: `- [ ]` todo, `- [/]` progress, `- [-]` paused, `- [x]` done)*
-
-> [!NOTE]
-> Опциональная синхронизация с `.md` файлами (через настройку «Tasks plugin sync») предназначена для совместимости с плагинами [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) и [Dataview](https://github.com/blacksmithgu/obsidian-dataview).
-
 </details>
 
 <details>

@@ -5,7 +5,6 @@ import type { ILocaleOverride } from "obsidian-calendar-ui";
 import { get } from "svelte/store";
 
 import { DEFAULT_WORDS_PER_DOT } from "src/constants";
-import { FolderSuggestModal } from "./modals/FolderSuggestModal";
 import {
   clearNotificationHistory,
   loadNotificationDiagnostics,
@@ -34,8 +33,6 @@ export interface ISettings {
 
   // Task Tracker settings
   taskTrackerCollapsed: boolean;
-  showTaskTracker?: boolean; // show/hide task tracker in sidebar
-  showSchedule?: boolean; // show/hide schedule view
 
   // Dashboard widget settings
   dashboardShowTasks?: boolean;
@@ -51,9 +48,7 @@ export interface ISettings {
   helloShowSearch?: boolean;
   helloShowWeight?: boolean;
 
-  // Task-Note sync settings
-  syncAllTasksToNotes: boolean;
-  tasksFolderPath: string;
+  // Data cleanup
   autoCleanupThreshold: number;
   timeLogCleanupThreshold: number;
 
@@ -202,11 +197,7 @@ export const defaultSettings = Object.freeze({
   helloShowWeight: true,
 
   taskTrackerCollapsed: false,
-  showTaskTracker: true,
-  showSchedule: true,
 
-  syncAllTasksToNotes: false,
-  tasksFolderPath: "Tasks",
   autoCleanupThreshold: 180,
   timeLogCleanupThreshold: 180,
 
@@ -538,6 +529,10 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addWorkTaskSettings(general);
     this.addCarryOverOverdueSetting(general);
 
+    // ── Data cleanup (not sync) ──
+    new Setting(general).setName(tRaw("settings.general.sectionDataCleanup")).setHeading();
+    this.addDataCleanupSettings(general);
+
     // Dashboard tab
     const dashboard = tabContainers["dashboard"];
     new Setting(dashboard).setName(tRaw("settings.dashboard.sectionWidgets")).setHeading();
@@ -609,8 +604,6 @@ export class CalendarSettingsTab extends PluginSettingTab {
     const sync = tabContainers["sync"];
     new Setting(sync).setName(tRaw("settings.sync.sectionVault")).setHeading();
     this.addSyncConflictCleanupSetting(sync);
-    new Setting(sync).setName(tRaw("settings.sync.sectionTaskNote")).setHeading();
-    this.addTaskNoteSyncSettings(sync);
     this.addGitHubGistSettings(sync);
 
     // Notifications tab
@@ -1038,16 +1031,6 @@ export class CalendarSettingsTab extends PluginSettingTab {
       })();
     });
 
-    const confirmBtn = btnRow.createEl("button", { text: tRaw("settings.weather.applyProvider") });
-    confirmBtn.addClass("mcp-btn", "mcp-btn-primary");
-    confirmBtn.addEventListener("click", () => {
-      void (async () => {
-        await this.plugin.writeOptions({ weatherProvider: provider });
-        confirmBtn.textContent = tRaw("settings.weather.applied");
-        window.setTimeout(() => { confirmBtn.textContent = tRaw("settings.weather.applyProvider"); }, 2000);
-      })();
-    });
-
     // Weather animation previews
     this.addWeatherPreviews(container);
   }
@@ -1394,94 +1377,55 @@ export class CalendarSettingsTab extends PluginSettingTab {
       );
   }
 
-  addTaskNoteSyncSettings(container: HTMLElement): void {
+  addWorkTaskSettings(container: HTMLElement): void {
     new Setting(container)
-      .setName(tRaw("settings.general.syncAllTasksToNotes"))
-      .setDesc(
-        tRaw("settings.general.syncAllTasksToNotesDesc"),
-      )
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.options.syncAllTasksToNotes);
-        toggle.onChange(async (value) => {
-          await this.plugin.writeOptions({ syncAllTasksToNotes: value });
-        });
-      })
-      .addButton((btn) =>
-        btn
-          .setButtonText(tRaw("settings.general.createAllNotes"))
-          .setTooltip(tRaw("settings.general.createAllNotesTooltip"))
-          .onClick(async () => {
-            const { tasks } = await import("./task-tracker/stores");
-            const { get } = await import("svelte/store");
-            const { createNoteTask, shouldSyncTaskToNote } =
-              await import("./task-tracker/noteTasks");
-
-            const allTasks = get(tasks);
-            const tasksFolderPath =
-              this.plugin.options.tasksFolderPath || "Tasks";
-            let created = 0;
-
-            for (const task of allTasks) {
-              // Пропускаем задачи у которых уже есть Task заметка
-              if (
-                task.notePath &&
-                task.notePath.startsWith(tasksFolderPath + "/")
-              ) {
-                continue;
-              }
-
-              if (shouldSyncTaskToNote(task)) {
-                try {
-                  const { projects } = await import("./task-tracker/stores");
-                  const { get: getS } = await import("svelte/store");
-                  const project = getS(projects).find(
-                    (p) => p.id === task.projectId,
-                  );
-                  const file = await createNoteTask(task, project, this.app);
-                  if (file) {
-                    const { updateTask } =
-                      await import("./task-tracker/stores");
-                    updateTask(task.id, { notePath: file.path });
-                    created++;
-                  }
-                } catch (error) {
-                  console.error(
-                    `[Settings] Failed to create note for task ${task.id}:`,
-                    error,
-                  );
-                }
-              }
-            }
-
-            new Notice(tRaw("settings.general.createdNotes", { count: created }));
-          }),
-      );
-
-    new Setting(container)
-      .setName(tRaw("settings.general.tasksFolderPath"))
-      .setDesc(tRaw("settings.general.tasksFolderPathDesc"))
+      .setName(tRaw("settings.general.defaultPaymentType"))
+      .setDesc(tRaw("settings.general.defaultPaymentTypeDesc"))
       .addDropdown((dropdown) => {
-        const folders = this.getVaultFolders();
-        folders.forEach((folder) => {
-          dropdown.addOption(folder, folder);
-        });
-        dropdown.addOption("__custom", tRaw("settings.sync.otherFolder"));
-        const current = this.plugin.options.tasksFolderPath || "Tasks";
-        if (!folders.includes(current)) {
-          dropdown.addOption(current, current);
-        }
-        dropdown.setValue(current);
+        dropdown.addOption("hour", tRaw("settings.general.paymentTypeHour"));
+        dropdown.addOption("day", tRaw("settings.general.paymentTypeDay"));
+        dropdown.setValue(this.plugin.options.defaultPaymentType);
         dropdown.onChange(async (value) => {
-          if (value === "__custom") {
-            const modal = new FolderSuggestModal(this.app, (folder) => {
-              void this.plugin.writeOptions({ tasksFolderPath: folder }).then(() => this.render());
-            });
-            modal.open();
-          } else {
-            await this.plugin.writeOptions({ tasksFolderPath: value });
-          }
+          await this.plugin.writeOptions({
+            defaultPaymentType: value as "hour" | "day",
+          });
         });
       });
+
+    new Setting(container)
+      .setName(tRaw("settings.general.defaultRate"))
+      .setDesc(tRaw("settings.general.defaultRateDesc"))
+      .addText((text) => {
+        text
+          .setPlaceholder("0")
+          .setValue(String(this.plugin.options.defaultRate || ""))
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ defaultRate: parseFloat(value) || 0 });
+          });
+        text.inputEl.type = "number";
+        text.inputEl.min = "0";
+        text.inputEl.addClass("mcp-input-md");
+      });
+  }
+
+  addCarryOverOverdueSetting(container: HTMLElement): void {
+    new Setting(container)
+      .setName(tRaw("settings.general.carryOverOverdue"))
+      .setDesc(tRaw("settings.general.carryOverOverdueDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(!!this.plugin.options.carryOverOverdue);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ carryOverOverdue: value });
+        });
+      });
+  }
+
+  /** Лимиты автоочистки — намеренно вне вкладки «Синхронизация». */
+  addDataCleanupSettings(container: HTMLElement): void {
+    container.createEl("p", {
+      cls: "setting-item-description mcp-cleanup-note",
+      text: tRaw("settings.general.sectionDataCleanupDesc"),
+    });
 
     new Setting(container)
       .setName(tRaw("settings.general.autoCleanupThreshold"))
@@ -1525,76 +1469,10 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.addClass("mcp-input-sm");
       });
 
-    // Информация о формате
-    const formatInfo = container.createDiv({ cls: "setting-item-description mcp-format-info" });
-
-    const p1 = formatInfo.createEl("p", { cls: "mcp-format-label" });
-    p1.createEl("b", { text: tRaw("settings.general.formatNote") });
-
-    const pre = formatInfo.createEl("pre", { cls: "mcp-format-code" });
-    pre.createEl("code", {
-      text: `---
-task_id: abc123
-title: ${tRaw("settings.general.exampleTaskTitle")}
-status: todo
-date: day-2024-10-25
-priority: medium
----
-
-- [ ] ${tRaw("settings.general.exampleTaskTitle")} 📅 2024-10-25 🛫 14:30 ⏫`,
+    container.createEl("p", {
+      cls: "setting-item-description mcp-cleanup-note",
+      text: tRaw("settings.general.formatCleanup"),
     });
-
-    const p2 = formatInfo.createEl("p", { cls: "mcp-format-label" });
-    p2.createEl("b", { text: tRaw("settings.general.formatStatuses") });
-
-    const p3 = formatInfo.createEl("p", { cls: "mcp-format-label" });
-    p3.createEl("b", { text: tRaw("settings.general.formatEmoji") });
-
-    const p4 = formatInfo.createEl("p", { cls: "mcp-format-label" });
-    p4.createEl("b", { text: tRaw("settings.general.formatCleanup") });
-  }
-
-  addWorkTaskSettings(container: HTMLElement): void {
-    new Setting(container)
-      .setName(tRaw("settings.general.defaultPaymentType"))
-      .setDesc(tRaw("settings.general.defaultPaymentTypeDesc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("hour", tRaw("settings.general.paymentTypeHour"));
-        dropdown.addOption("day", tRaw("settings.general.paymentTypeDay"));
-        dropdown.setValue(this.plugin.options.defaultPaymentType);
-        dropdown.onChange(async (value) => {
-          await this.plugin.writeOptions({
-            defaultPaymentType: value as "hour" | "day",
-          });
-        });
-      });
-
-    new Setting(container)
-      .setName(tRaw("settings.general.defaultRate"))
-      .setDesc(tRaw("settings.general.defaultRateDesc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("0")
-          .setValue(String(this.plugin.options.defaultRate || ""))
-          .onChange(async (value) => {
-            await this.plugin.writeOptions({ defaultRate: parseFloat(value) || 0 });
-          });
-        text.inputEl.type = "number";
-        text.inputEl.min = "0";
-        text.inputEl.addClass("mcp-input-md");
-      });
-  }
-
-  addCarryOverOverdueSetting(container: HTMLElement): void {
-    new Setting(container)
-      .setName(tRaw("settings.general.carryOverOverdue"))
-      .setDesc(tRaw("settings.general.carryOverOverdueDesc"))
-      .addToggle((toggle) => {
-        toggle.setValue(!!this.plugin.options.carryOverOverdue);
-        toggle.onChange(async (value) => {
-          await this.plugin.writeOptions({ carryOverOverdue: value });
-        });
-      });
   }
 
   addSyncConflictCleanupSetting(container: HTMLElement): void {
@@ -2139,7 +2017,7 @@ priority: medium
       });
 
     if (!this.plugin.options.ollamaEnabled) {
-      const hint = container.createDiv({ cls: "setting-item-description" });
+      const hint = container.createDiv({ cls: "setting-item-description ai-howto-text" });
       hint.setText(tRaw("settings.ai.howToSteps"));
       return;
     }
@@ -2386,12 +2264,12 @@ priority: medium
         });
       });
 
-    const quickAddHowTo = container.createDiv({ cls: "setting-item-description" });
+    const quickAddHowTo = container.createDiv({ cls: "setting-item-description ai-howto-text" });
     quickAddHowTo.setText(tRaw("settings.ai.quickAddHowTo"));
 
     // How-to
     new Setting(container).setName(tRaw("settings.ai.howToTitle")).setHeading();
-    const howTo = container.createDiv({ cls: "setting-item-description" });
+    const howTo = container.createDiv({ cls: "setting-item-description ai-howto-text" });
     howTo.setText(tRaw("settings.ai.howToSteps"));
   }
 }

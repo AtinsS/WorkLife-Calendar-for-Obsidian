@@ -15,10 +15,8 @@ export interface ITask {
   status: TaskStatus;
   dateUID: string;
   projectId: string | null;
-  notePath: string | null; // Task заметка в Tasks/
   boundNotePath?: string | null; // Привязанная заметка
   priority: "low" | "medium" | "high";
-  tags: string[];
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
@@ -39,7 +37,6 @@ export interface ITask {
   overtimeMultiplier?: number; // rate multiplier during overtime (e.g., 1.5 = 1.5x)
   deadline?: DateUID; // deadline date (format: "day-YYYY-MM-DD")
   deadlineTime?: string; // deadline time (format: "HH:MM")
-  isNoteTask?: boolean; // true = задача-заметка (файл создаётся/архивируется)
   carriedOverFrom?: string; // dateUID откуда была перенесена просроченная задача
 }
 

@@ -3,7 +3,7 @@ import type { Moment } from "moment";
 import { getDateUID } from "obsidian-daily-notes-interface";
 import { get } from "svelte/store";
 import { tRaw, locale } from "../i18n";
-import { addTask, projects } from "./stores";
+import { addTask, projects, setChecklistForTask, addChecklistItem } from "./stores";
 import { settings } from "../ui/stores";
 import type { ITask } from "./types";
 import { sanitizeTitle } from "../utils/sanitize";
@@ -365,7 +365,16 @@ export class QuickAddModal extends Modal {
   private projectMatches: Array<{ id: string; name: string }> = [];
   private projectSuggestIndex = 0;
   private modeButtons: Record<Mode, HTMLButtonElement | null> = { single: null, multi: null };
+  private modeHintEl: HTMLElement | null = null;
+  private primaryBtn: HTMLButtonElement | null = null;
+  private kbdHintEl: HTMLElement | null = null;
+  private reviewEl: HTMLElement | null = null;
+  private parseAgainBtn: HTMLButtonElement | null = null;
   private syntaxEl: HTMLElement | null = null;
+  private syntaxToggleEl: HTMLElement | null = null;
+  private extraToggleEl: HTMLElement | null = null;
+  private subtasksToggleEl: HTMLElement | null = null;
+  private panelBarEl: HTMLElement | null = null;
   private chipsEl: HTMLElement | null = null;
   private titlePreviewEl: HTMLElement | null = null;
   private parseEl: HTMLElement | null = null;
@@ -374,6 +383,9 @@ export class QuickAddModal extends Modal {
   private prefillEndTime: string | null;
   private onTaskCreated: ((task: ITask) => void) | null;
   private descEl: HTMLTextAreaElement | null = null;
+  private subtaskListEl: HTMLElement | null = null;
+  private subtaskTitles: string[] = [""];
+  private subtasksSyncCount: (() => void) | null = null;
   private extraBody: HTMLElement | null = null;
   private extra: ExtraForm;
   private extraCtrls: {
@@ -475,28 +487,63 @@ export class QuickAddModal extends Modal {
       });
     }
 
-    // ── Extra parameters (collapsible) ──
-    const extraWrap = contentEl.createDiv({ cls: "qa2-extra" });
-    const extraToggle = extraWrap.createEl("button", {
-      cls: "qa2-extra-toggle",
-      text: tRaw("tasks.quickAdd.extra"),
+    // ── Section toggles on one row: Subtasks · Syntax · Extra ──
+    const panelBar = contentEl.createDiv({ cls: "qa2-panels-row" });
+    this.panelBarEl = panelBar;
+
+    // Subtasks
+    const subToggle = panelBar.createEl("button", {
+      cls: "qa2-subtasks-toggle",
       attr: { type: "button" },
     });
-    this.extraBody = extraWrap.createDiv({ cls: "qa2-extra-body mcp-hidden" });
-    extraToggle.addEventListener("click", () => {
-      const hidden = this.extraBody?.classList.contains("mcp-hidden");
-      this.extraBody?.toggleClass("mcp-hidden", !hidden);
-      extraToggle.toggleClass("open", !!hidden);
+    this.subtasksToggleEl = subToggle;
+    subToggle.createSpan({ text: tRaw("tasks.modal.subtasks"), cls: "qa2-subtasks-toggle-label" });
+    const subToggleCount = subToggle.createSpan({ text: "", cls: "qa2-subtasks-count" });
+    const subWrap = contentEl.createDiv({ cls: "qa2-subtasks" });
+    this.subtaskListEl = subWrap.createDiv({ cls: "qa2-subtask-list mcp-hidden" });
+    const subActions = subWrap.createDiv({ cls: "qa2-subtasks-actions mcp-hidden" });
+    const addSubBtn = subActions.createEl("button", {
+      cls: "qa2-subtask-add",
+      text: `+ ${tRaw("tasks.modal.addSubtask")}`,
+      attr: { type: "button" },
     });
-    this.buildExtraFields(this.extraBody);
+    addSubBtn.addEventListener("click", () => {
+      this.subtaskTitles.push("");
+      this.renderSubtasks();
+      const inputs = this.subtaskListEl?.querySelectorAll<HTMLInputElement>("input");
+      inputs?.[inputs.length - 1]?.focus();
+    });
+    if (isAiQuickAddAvailable()) {
+      const aiSplitBtn = subActions.createEl("button", {
+        cls: "qa2-subtask-ai",
+        text: `✨ ${tRaw("tasks.modal.splitAi")}`,
+        attr: { type: "button" },
+      });
+      aiSplitBtn.addEventListener("click", () => {
+        void this.fillSubtasksWithAI(aiSplitBtn);
+      });
+    }
+    const syncSubCount = () => {
+      const n = this.subtaskTitles.filter((t) => t.trim()).length;
+      subToggleCount.textContent = n > 0 ? String(n) : "";
+    };
+    this.subtasksSyncCount = syncSubCount;
+    subToggle.addEventListener("click", () => {
+      const hidden = this.subtaskListEl?.classList.contains("mcp-hidden");
+      this.subtaskListEl?.toggleClass("mcp-hidden", !hidden);
+      subActions?.toggleClass("mcp-hidden", !hidden);
+      subToggle.toggleClass("open", !!hidden);
+    });
+    this.renderSubtasks();
 
-    // ── Syntax help (collapsible; hidden in multi mode) ──
+    // Syntax help (hidden in multi mode)
     this.syntaxEl = contentEl.createDiv({ cls: "qa2-syntax" });
-    const syntaxToggle = this.syntaxEl.createEl("button", {
+    const syntaxToggle = panelBar.createEl("button", {
       cls: "qa2-syntax-toggle",
       text: tRaw("tasks.quickAdd.syntax"),
       attr: { type: "button" },
     });
+    this.syntaxToggleEl = syntaxToggle;
     const syntaxBody = this.syntaxEl.createDiv({ cls: "qa2-syntax-body mcp-hidden" });
 
     const hintRow = syntaxBody.createDiv({ cls: "qa2-hints" });
@@ -518,18 +565,39 @@ export class QuickAddModal extends Modal {
       syntaxToggle.toggleClass("open", hidden);
     });
 
+    // Extra parameters
+    const extraToggle = panelBar.createEl("button", {
+      cls: "qa2-extra-toggle",
+      text: tRaw("tasks.quickAdd.extra"),
+      attr: { type: "button" },
+    });
+    this.extraToggleEl = extraToggle;
+    const extraWrap = contentEl.createDiv({ cls: "qa2-extra" });
+    this.extraBody = extraWrap.createDiv({ cls: "qa2-extra-body mcp-hidden" });
+    extraToggle.addEventListener("click", () => {
+      const hidden = this.extraBody?.classList.contains("mcp-hidden");
+      this.extraBody?.toggleClass("mcp-hidden", !hidden);
+      extraToggle.toggleClass("open", !!hidden);
+    });
+    this.buildExtraFields(this.extraBody);
+
     // ── Actions ──
     const actions = contentEl.createDiv({ cls: "qa2-actions" });
 
     const kbdHint = actions.createDiv({ cls: "qa2-kbd" });
+    this.kbdHintEl = kbdHint;
     kbdHint.createEl("kbd", { text: "Enter" });
-    kbdHint.createSpan({ text: ` ${tRaw("tasks.quickAdd.add")}` });
+    kbdHint.createSpan({
+      text: ` ${this.mode === "multi" ? tRaw("tasks.quickAdd.parseTasks") : tRaw("tasks.quickAdd.add")}`,
+      cls: "qa2-kbd-label",
+    });
 
     const addBtn = actions.createEl("button", {
       cls: "qa2-btn qa2-btn-primary",
-      text: tRaw("tasks.quickAdd.add"),
+      text: this.mode === "multi" ? tRaw("tasks.quickAdd.parseTasks") : tRaw("tasks.quickAdd.add"),
       attr: { type: "button" },
     });
+    this.primaryBtn = addBtn;
     addBtn.addEventListener("click", () => {
       void this.submit();
     });
@@ -548,12 +616,13 @@ export class QuickAddModal extends Modal {
     window.requestAnimationFrame(() => this.inputEl.focus());
   }
 
-  /** Multi ("AI-задачи") tabs only when Ollama + flag are available. */
+  /** Mode switcher: Normal / AI (AI only when Ollama + flag are available). */
   private renderModeTabs(): void {
     const bar = this.modeBarEl;
     if (!bar) return;
     bar.empty();
     this.multiAvailable = isAiQuickAddAvailable();
+    this.modeHintEl = null;
     if (!this.multiAvailable) {
       this.modeButtons = { single: null, multi: null };
       if (this.mode === "multi") this.setMode("single");
@@ -561,18 +630,33 @@ export class QuickAddModal extends Modal {
       return;
     }
     bar.removeClass("mcp-hidden");
-    const modeTabs = bar.createDiv({ cls: "qa2-modes-tabs", attr: { role: "tablist" } });
-    const singleBtn = modeTabs.createEl("button", {
+    const modeSwitch = bar.createDiv({
+      cls: "qa2-modes-tabs",
+      attr: { role: "radiogroup", "aria-label": tRaw("tasks.quickAdd.modeSingle") },
+    });
+    const singleBtn = modeSwitch.createEl("button", {
       cls: "qa2-mode" + (this.mode === "single" ? " is-active" : ""),
       text: tRaw("tasks.quickAdd.modeSingle"),
-      attr: { type: "button", role: "tab" },
+      attr: {
+        type: "button",
+        role: "radio",
+        "aria-checked": this.mode === "single" ? "true" : "false",
+      },
     });
-    const multiBtn = modeTabs.createEl("button", {
+    const multiBtn = modeSwitch.createEl("button", {
       cls: "qa2-mode" + (this.mode === "multi" ? " is-active" : ""),
       text: tRaw("tasks.quickAdd.modeMulti"),
-      attr: { type: "button", role: "tab" },
+      attr: {
+        type: "button",
+        role: "radio",
+        "aria-checked": this.mode === "multi" ? "true" : "false",
+      },
     });
     this.modeButtons = { single: singleBtn, multi: multiBtn };
+    this.modeHintEl = bar.createDiv({
+      cls: "qa2-modes-hint" + (this.mode === "multi" ? "" : " mcp-hidden"),
+      text: tRaw("tasks.quickAdd.modeAiHint"),
+    });
     singleBtn.addEventListener("click", () => this.setMode("single"));
     multiBtn.addEventListener("click", () => this.setMode("multi"));
   }
@@ -580,14 +664,36 @@ export class QuickAddModal extends Modal {
   private setMode(mode: Mode): void {
     if (!this.multiAvailable && mode === "multi") return;
     if (this.mode === mode) return;
+    // Block switching while the AI review panel is open
+    if (this.reviewEl) return;
     this.mode = mode;
     this.modeButtons.single?.toggleClass("is-active", mode === "single");
     this.modeButtons.multi?.toggleClass("is-active", mode === "multi");
-    // Multi ("AI-задачи"): only the prompt input — hide description / extras / hints
+    this.modeButtons.single?.setAttribute("aria-checked", mode === "single" ? "true" : "false");
+    this.modeButtons.multi?.setAttribute("aria-checked", mode === "multi" ? "true" : "false");
+    this.modeHintEl?.toggleClass("mcp-hidden", mode !== "multi");
+    if (this.primaryBtn) {
+      const label = mode === "multi" ? tRaw("tasks.quickAdd.parseTasks") : tRaw("tasks.quickAdd.add");
+      this.primaryBtn.setText(label);
+      this.kbdHintEl?.querySelector(".qa2-kbd-label")?.setText(` ${label}`);
+    }
+    // Multi ("AI-задачи"): only the prompt input — hide all section toggles/panels
+    this.panelBarEl?.toggleClass("mcp-hidden", mode === "multi");
     this.syntaxEl?.toggleClass("mcp-hidden", mode === "multi");
+    this.syntaxToggleEl?.toggleClass("mcp-hidden", mode === "multi");
+    this.extraToggleEl?.toggleClass("mcp-hidden", mode === "multi");
+    this.subtasksToggleEl?.toggleClass("mcp-hidden", mode === "multi");
     this.parseEl?.toggleClass("mcp-hidden", mode !== "single");
     this.extraBody?.parentElement?.toggleClass("mcp-hidden", mode === "multi");
     this.descEl?.closest(".qa2-desc")?.toggleClass("mcp-hidden", mode === "multi");
+    this.subtaskListEl?.closest(".qa2-subtasks")?.toggleClass("mcp-hidden", mode === "multi");
+    if (mode === "multi") {
+      // Collapse any open panels so they don't linger visually
+      this.extraBody?.addClass("mcp-hidden");
+      this.extraToggleEl?.removeClass("open");
+      this.subtaskListEl?.addClass("mcp-hidden");
+      this.subtasksToggleEl?.removeClass("open");
+    }
     this.swapInputMode();
     if (mode === "single") this.updateVisualParse(this.inputValue());
   }
@@ -682,6 +788,92 @@ export class QuickAddModal extends Modal {
     this.inputEl.value = current;
     this.bindInputEvents();
     this.inputEl.focus();
+  }
+
+  private renderSubtasks(): void {
+    const list = this.subtaskListEl;
+    if (!list) return;
+    list.empty();
+    this.subtaskTitles.forEach((title, i) => {
+      const row = list.createDiv({ cls: "qa2-subtask-row" });
+      const input = row.createEl("input", {
+        type: "text",
+        cls: "qa2-extra-input qa2-subtask-input",
+        value: title,
+        placeholder: tRaw("tasks.modal.subtaskPlaceholder"),
+        attr: { spellcheck: "false", autocomplete: "off" },
+      });
+      input.addEventListener("input", () => {
+        this.subtaskTitles[i] = input.value;
+      });
+      input.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          this.subtaskTitles.push("");
+          this.renderSubtasks();
+          const inputs = this.subtaskListEl?.querySelectorAll<HTMLInputElement>("input");
+          inputs?.[inputs.length - 1]?.focus();
+        } else if (e.key === "Backspace" && !input.value && this.subtaskTitles.length > 0) {
+          e.preventDefault();
+          this.subtaskTitles.splice(i, 1);
+          this.renderSubtasks();
+          const inputs = this.subtaskListEl?.querySelectorAll<HTMLInputElement>("input");
+          inputs?.[Math.max(0, i - 1)]?.focus();
+        }
+      });
+      const removeBtn = row.createEl("button", {
+        cls: "qa2-subtask-remove",
+        text: "✕",
+        attr: { type: "button", "aria-label": "Remove" },
+      });
+      removeBtn.addEventListener("click", () => {
+        this.subtaskTitles.splice(i, 1);
+        this.renderSubtasks();
+      });
+    });
+    this.subtasksSyncCount?.();
+  }
+
+  /** Subtask titles filled in the create form (empty lines dropped). */
+  private collectSubtasks(): string[] {
+    return this.subtaskTitles.map((t) => t.trim()).filter(Boolean);
+  }
+
+  /** Fill the subtask list via Ollama ("Разбить на подзадачи (ИИ)"). */
+  private async fillSubtasksWithAI(btn: HTMLElement): Promise<void> {
+    const parsed = parseQuickInput(this.inputValue());
+    const title = parsed.title || this.inputValue().trim();
+    if (!title) {
+      this.setStatus(tRaw("tasks.quickAdd.aiError"), "error");
+      return;
+    }
+    btn.setAttribute("disabled", "true");
+    btn.addClass("is-busy");
+    try {
+      const { generateSubtasks } = await import("../services/OllamaService");
+      const { settings } = await import("../ui/stores");
+      const opts = get(settings) as { ollamaUrl?: string; ollamaModel?: string };
+      const titles = await generateSubtasks(
+        opts.ollamaUrl || "http://localhost:11434",
+        opts.ollamaModel || "llama3.1",
+        title,
+        this.descEl?.value || null,
+        parsed.projectName || null,
+      );
+      if (titles.length) {
+        this.subtaskTitles = titles.map((t) => t.trim()).filter(Boolean);
+        this.renderSubtasks();
+        this.subtasksSyncCount?.();
+        this.setStatus("", "hide");
+      } else {
+        this.setStatus(tRaw("ai.subtasksEmpty"), "error");
+      }
+    } catch {
+      this.setStatus(tRaw("tasks.quickAdd.aiError"), "error");
+    } finally {
+      btn.removeAttribute("disabled");
+      btn.removeClass("is-busy");
+    }
   }
 
   private setStatus(text: string, kind: "busy" | "error" | "ok" | "hide"): void {
@@ -1212,6 +1404,8 @@ export class QuickAddModal extends Modal {
   }
 
   private async submit(): Promise<void> {
+    // Review already open — confirm/cancel/reparse from the panel instead
+    if (this.reviewEl) return;
     const raw = this.inputValue();
     if (!raw.trim()) {
       this.close();
@@ -1297,7 +1491,10 @@ export class QuickAddModal extends Modal {
   /** Preview panel: show how AI parsed each task, let the user approve. */
   private showReviewPanel(drafts: AiQuickTaskDraft[]): void {
     // Hide input area actions; show review card list
+    this.closeReviewPanel();
     const root = this.contentEl.createDiv({ cls: "qa2-review" });
+    this.reviewEl = root;
+    this.setReviewLock(true);
     root.createDiv({ text: tRaw("tasks.quickAdd.reviewTitle"), cls: "qa2-review-title" });
     root.createDiv({ text: tRaw("tasks.quickAdd.reviewHint"), cls: "qa2-review-hint" });
 
@@ -1344,17 +1541,31 @@ export class QuickAddModal extends Modal {
         chip("qa2-chip-project", `💰 ${d.rate}${d.paymentType === "day" ? "/день" : "/час"}`);
       }
       if (d.noteName) chip("qa2-chip-project", `📄 ${d.noteName}`);
-      if (d.tags && d.tags.length) chip("qa2-chip-project", d.tags.map((t) => `#${t}`).join(" "));
+      if (d.subtasks?.length) {
+        const stBox = card.createDiv({ cls: "qa2-review-subtasks" });
+        for (const st of d.subtasks) {
+          stBox.createDiv({ cls: "qa2-review-subtask", text: `☐ ${st}` });
+        }
+      }
     });
 
     const actions = root.createDiv({ cls: "qa2-actions" });
+    const parseAgainBtn = actions.createEl("button", {
+      cls: "qa2-btn qa2-btn-ghost",
+      text: tRaw("tasks.quickAdd.parseAgain"),
+      attr: { type: "button" },
+    });
+    this.parseAgainBtn = parseAgainBtn;
+    parseAgainBtn.addEventListener("click", () => {
+      void this.reparseMulti();
+    });
     const cancelBtn = actions.createEl("button", {
       cls: "qa2-btn qa2-btn-ghost",
       text: tRaw("tasks.quickAdd.reviewCancel"),
       attr: { type: "button" },
     });
     cancelBtn.addEventListener("click", () => {
-      root.remove();
+      this.closeReviewPanel();
       this.setStatus("", "hide");
     });
     const countBtn = actions.createEl("button", {
@@ -1368,13 +1579,40 @@ export class QuickAddModal extends Modal {
     countBtn.addEventListener("click", () => {
       const chosen = drafts.filter((_, i) => selected[i]);
       for (const draft of chosen) this.createTaskFromDraft(draft);
-      root.remove();
+      this.closeReviewPanel();
       this.close();
       this.onSubmit();
     });
 
     // Scroll review into view
     root.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  /** Hide primary action + lock "Одна задача" while the AI review is open. */
+  private setReviewLock(on: boolean): void {
+    this.primaryBtn?.toggleClass("mcp-hidden", on);
+    const singleBtn = this.modeButtons.single;
+    if (singleBtn) {
+      singleBtn.toggleClass("is-disabled", on);
+      if (on) singleBtn.setAttribute("disabled", "true");
+      else singleBtn.removeAttribute("disabled");
+    }
+    this.modeButtons.multi?.toggleClass("is-disabled", on);
+  }
+
+  private closeReviewPanel(): void {
+    this.reviewEl?.remove();
+    this.reviewEl = null;
+    this.parseAgainBtn = null;
+    this.setReviewLock(false);
+  }
+
+  /** Re-run AI parse on the same input ("Разобрать снова"). */
+  private async reparseMulti(): Promise<void> {
+    if (this.aiBusy) return;
+    this.closeReviewPanel();
+    this.setStatus("", "hide");
+    await this.submitMulti(this.inputValue());
   }
 
   private updateReviewCount(btn: HTMLElement, selected: boolean[]): void {
@@ -1530,10 +1768,8 @@ export class QuickAddModal extends Modal {
         status: "todo",
         completed: false,
         projectId,
-        notePath: null,
         boundNotePath,
         priority,
-        tags: draft?.tags ?? [],
         sortOrder: 0,
         description,
         scheduledTime,
@@ -1548,6 +1784,8 @@ export class QuickAddModal extends Modal {
         overtimeMultiplier,
         recurrence,
       });
+      const subtasks = this.mode === "single" ? this.collectSubtasks() : [];
+      if (subtasks.length) setChecklistForTask(task.id, subtasks);
       this.onTaskCreated?.(task);
     } catch (e: unknown) {
       console.error("[QuickAddModal] Failed to create task:", e);
@@ -1587,10 +1825,8 @@ export class QuickAddModal extends Modal {
         status: "todo",
         completed: false,
         projectId,
-        notePath: null,
         boundNotePath,
         priority: draft.priority || "medium",
-        tags: draft.tags ?? [],
         sortOrder: 0,
         description: draft.description || "",
         scheduledTime,
@@ -1603,6 +1839,12 @@ export class QuickAddModal extends Modal {
         rate: draft.rate ?? undefined,
         recurrence,
       });
+      if (draft.subtasks?.length) {
+        for (const st of draft.subtasks) {
+          const title = st.trim();
+          if (title) addChecklistItem(task.id, title);
+        }
+      }
       this.onTaskCreated?.(task);
     } catch (e: unknown) {
       console.error("[QuickAddModal] Failed to create AI task:", e);

@@ -1,5 +1,4 @@
 import { writable, get } from "svelte/store";
-import { TFile } from "obsidian";
 import { momentFn, type Moment } from "../utils/moment";
 
 import type CalendarPlugin from "src/main";
@@ -39,21 +38,6 @@ function autoCleanupCompleted(): void {
 
   const toRemove = completed.slice(0, completed.length - threshold);
   const removeIds = new Set(toRemove.map((t) => t.id));
-
-  // Удаляем Task заметки из Tasks/
-  const tasksFolderPath = get(settings).tasksFolderPath || "Tasks";
-  if (pluginInstance) {
-    for (const task of toRemove) {
-      if (task.notePath && task.notePath.startsWith(tasksFolderPath + "/")) {
-        const file = pluginInstance.app.vault.getAbstractFileByPath(task.notePath);
-        if (file instanceof TFile) {
-          pluginInstance.app.fileManager.trashFile(file).catch(() => {
-            // Игнорируем ошибки удаления
-          });
-        }
-      }
-    }
-  }
 
   tasks.update((current) => current.filter((t) => !removeIds.has(t.id)));
   debouncedSave();
@@ -247,17 +231,6 @@ export function addTask(
   tasks.update((current) => [...current, task]);
   debouncedSave();
 
-  // Auto-create note for task if syncAllTasksToNotes is enabled
-  const currentSettings = get(settings);
-  const appInstance = pluginInstance?.app;
-  if (currentSettings.syncAllTasksToNotes && appInstance) {
-    void import("./noteTasks").then(({ ensureNoteForTask }: typeof import("./noteTasks")) => {
-      void ensureNoteForTask(task, appInstance).catch((e: unknown) =>
-        console.error("[Calendar Plugin] Failed to create note for task:", e)
-      );
-    });
-  }
-
   // Если задача с повторением и не является экземпляром — генерируем до конца месяца
   if (task.recurrence && !task.isRecurringInstance) {
     // Даём время на обновление store, затем генерируем
@@ -274,20 +247,6 @@ export function updateTask(id: string, changes: Partial<ITask>): void {
     )
   );
   debouncedSave();
-
-  // Sync task changes to note if task has a notePath
-  if (changes.status !== undefined || changes.completed !== undefined || changes.title !== undefined) {
-    const allTasks = get(tasks);
-    const task = allTasks.find((t) => t.id === id);
-    const appForSync = pluginInstance?.app;
-    if (task?.notePath && appForSync) {
-      void import("./noteTasks").then(({ syncTaskToFrontmatter }: typeof import("./noteTasks")) => {
-        void syncTaskToFrontmatter(task, appForSync).catch((e: unknown) =>
-          console.error("[Calendar Plugin] Failed to sync task to note:", e)
-        );
-      });
-    }
-  }
 
   // Only run cleanup check if we're approaching the threshold
   if (changes.completed !== undefined) {
@@ -314,7 +273,6 @@ const RECURRING_INSTANCE_ONLY_KEYS = new Set<keyof ITask>([
   "pausedWorkTime",
   "isRecurringInstance",
   "parentTaskId",
-  "notePath",
   "carriedOverFrom",
   "sortOrder",
 ]);
@@ -493,20 +451,6 @@ export function updateTaskStatus(id: string, status: TaskStatus): void {
     setTaskStatus(id, status);
   }
 
-  // Sync status change to note if task has a notePath
-  const appForStatusSync = pluginInstance?.app;
-  if (task?.notePath && appForStatusSync) {
-    void import("./noteTasks").then(({ syncTaskToFrontmatter }: typeof import("./noteTasks")) => {
-      const updatedTasks = get(tasks);
-      const updatedTask = updatedTasks.find((t) => t.id === id);
-      if (updatedTask) {
-        void syncTaskToFrontmatter(updatedTask, appForStatusSync).catch((e: unknown) =>
-          console.error("[Calendar Plugin] Failed to sync task status to note:", e)
-        );
-      }
-    });
-  }
-
   debouncedSave();
 }
 
@@ -614,10 +558,8 @@ export function createNextRecurringInstance(taskId: string): void {
     status: "todo",
     dateUID: newDateUID,
     projectId: task.projectId,
-    notePath: task.notePath,
     boundNotePath: task.boundNotePath ?? null,
     priority: task.priority,
-    tags: [...task.tags],
     sortOrder: 0,
     recurrence: task.recurrence,
     scheduledTime: task.scheduledTime,
@@ -716,10 +658,8 @@ export function generateMonthlyRecurringTasks(taskId: string): void {
         status: "todo",
         dateUID: newDateUID,
         projectId: task.projectId,
-        notePath: task.notePath,
         boundNotePath: task.boundNotePath ?? null,
         priority: task.priority,
-        tags: [...task.tags],
         sortOrder: 0,
         recurrence: task.recurrence,
         scheduledTime: task.scheduledTime,
@@ -1020,4 +960,28 @@ export function getChecklistForTask(taskId: string): IChecklistItem[] {
   return get(checklists)
     .filter((c) => c.taskId === taskId)
     .sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+/** Replace the task checklist with the given titles (keeps checked state for matching titles). */
+export function setChecklistForTask(taskId: string, titles: string[]): void {
+  const trimmed = titles.map((t) => t.trim()).filter(Boolean);
+  const existing = get(checklists).filter((c) => c.taskId === taskId);
+  const next: IChecklistItem[] = trimmed.map((title, i) => {
+    const prev = existing.find((c) => c.title === title);
+    return prev
+      ? { ...prev, title, sortOrder: i, updatedAt: Date.now() }
+      : {
+          id: generateId(),
+          taskId,
+          title,
+          checked: false,
+          sortOrder: i,
+          updatedAt: Date.now(),
+        };
+  });
+  checklists.update((current) => [
+    ...current.filter((c) => c.taskId !== taskId),
+    ...next,
+  ]);
+  debouncedSave();
 }

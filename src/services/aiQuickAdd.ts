@@ -18,7 +18,6 @@ export interface AiQuickTaskDraft {
   isWorkTask?: boolean;
   noteName?: string | null;
   description?: string | null;
-  tags?: string[] | null;
   estimatedMinutes?: number | null;
   deadline?: string | null;
   deadlineTime?: string | null;
@@ -32,6 +31,8 @@ export interface AiQuickTaskDraft {
     daysOfWeek?: number[];
     until?: string | null;
   } | null;
+  /** Checklist subtasks derived from nested bullets / explicit breakdown */
+  subtasks?: string[] | null;
 }
 
 export interface AiQuickAddContext {
@@ -100,51 +101,51 @@ Do NOT split a single action that merely contains "и" inside its title.
 WEEK PLANS: a day header ("понедельник", "пн:", "вт —", "Monday") applies its date to every task listed under it until the next day header. Each task gets that day's date (absolute YYYY-MM-DD).
 
 For each task detect:
-- title: short actionable title in the user's language. Strip dates, times, @project, priority markers, tags, durations, "в заметке X" / [[X]], recurrence phrases. Keep the action verb/object. No trailing punctuation junk.
+- title: short actionable title in the user's language. Strip dates, times, @project, priority markers, durations, "в заметке X" / [[X]], recurrence phrases. Keep the action verb/object. No trailing punctuation junk.
 - date: absolute YYYY-MM-DD when the user names a day (today/tomorrow/weekday/date), else null. "в понедельник" = next Monday on/after today.
 - scheduledTime / endTime: HH:MM (24h). Ranges "14-15", "14:00-15:00", "с 14 до 15" → both. "в 9" → 09:00. Else null.
 - priority: high | medium | low. (! or !! = high, ~ = medium, - = low; also "важно/срочно/urgent" → high). Default medium.
 - projectName: match the user's @token to Known projects when possible; else the token after @; else null.
 - isWorkTask: true if work-related (созвон, встреча, отчёт, клиент, дедлайн, ТЗ, спринт, рабочий, работа, презентация, смета, invoice, meeting, report, client, deadline) OR if rate/payment is given
 - noteName: note/file if user says "в заметке X", "[[X]]", "note X", "привязать к X" — match Known notes when possible; else null
-- tags: short keywords from #tags or clear topic words (no # prefix). Empty array if none.
 - estimatedMinutes: integer minutes from duration ("на 2 часа", "30 мин", "2 ч", "for 2h"). If a time range is given and no explicit duration, compute from range. Else null.
 - deadline: absolute YYYY-MM-DD when user says "до / by / сдать к / deadline" + a date. Else null. (deadline ≠ date: date is when to work on it)
 - deadlineTime: HH:MM if a deadline time is given ("сдать до 18:00"), else null
 - rate + paymentType: COST of the task, NOT description. "400р в час", "400 ₽/час", "400/ч", "2000 в день", "2000/день", "400 руб/час" → rate 400 paymentType "hour" / rate 2000 paymentType "day". Strip this from title and description. isWorkTask = true when rate is set. paymentType "hour" for hour/h/час; "day" for day/день/сутки; if only a number with "р/₽/руб" and no period, use paymentType "hour". rate null if no price.
 - recurrence: "каждый день/ежедневно" → daily; "каждую неделю/по понедельникам/раз в неделю" → weekly (daysOfWeek 0=Sun..6=Sat from weekday names; "по будням" → [1,2,3,4,5]); "каждые 2 недели" → weekly interval 2; "каждый месяц/ежемесячно" → monthly; "до 1 декабря" on a repeat → until "YYYY-MM-DD"; else null
 - description: leftover details that don't belong in the title (keep short; null if none). NEVER put rate/price/payment here.
+- subtasks: checklist items when the user nests bullets under a task, writes "steps:", "этапы:", "включает:", or clearly lists 2–6 concrete steps of one action. Each item is a short imperative string. Empty array when the task is atomic. Do NOT invent subtasks for simple one-shot tasks.
 
 Return shape:
-{"tasks":[{"title":"string","date":"YYYY-MM-DD|null","scheduledTime":"HH:MM|null","endTime":"HH:MM|null","priority":"medium","projectName":null,"isWorkTask":false,"noteName":null,"description":null,"tags":[],"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"rate":null,"paymentType":null,"recurrence":null}]}
+{"tasks":[{"title":"string","date":"YYYY-MM-DD|null","scheduledTime":"HH:MM|null","endTime":"HH:MM|null","priority":"medium","projectName":null,"isWorkTask":false,"noteName":null,"description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"rate":null,"paymentType":null,"recurrence":null,"subtasks":[]}]}
 
 Examples (dates are illustrative — always use Current date):
 
 Input: "!Отчёт для клиента завтра 14:00 @Work рабочий, привязать к заметке Отчёты, каждый понедельник"
-Output: {"tasks":[{"title":"Отчёт для клиента","date":"<tomorrow>","scheduledTime":"14:00","endTime":null,"priority":"high","projectName":"Work","isWorkTask":true,"noteName":"Отчёты","description":null,"tags":[],"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"recurrence":{"type":"weekly","interval":1,"daysOfWeek":[1]}}]}
+Output: {"tasks":[{"title":"Отчёт для клиента","date":"<tomorrow>","scheduledTime":"14:00","endTime":null,"priority":"high","projectName":"Work","isWorkTask":true,"noteName":"Отчёты","description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"recurrence":{"type":"weekly","interval":1,"daysOfWeek":[1]}}]}
 
 Input: "купить молоко; созвон с командой в 10-11 и спортзал завтра"
-Output: {"tasks":[{"title":"Купить молоко","priority":"low","tags":[]},{"title":"Созвон с командой","scheduledTime":"10:00","endTime":"11:00","priority":"medium","isWorkTask":true,"tags":[],"estimatedMinutes":60},{"title":"Спортзал","date":"<tomorrow>","priority":"medium","tags":[]}]}
+Output: {"tasks":[{"title":"Купить молоко","priority":"low"},{"title":"Созвон с командой","scheduledTime":"10:00","endTime":"11:00","priority":"medium","isWorkTask":true,"estimatedMinutes":60},{"title":"Спортзал","date":"<tomorrow>","priority":"medium"}]}
 
-Input: "сдать отчёт до пятницы 18:00 на 2 часа #работа @Work"
-Output: {"tasks":[{"title":"Сдать отчёт","date":null,"scheduledTime":null,"endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"noteName":null,"description":null,"tags":["работа"],"estimatedMinutes":120,"deadline":"<friday>","deadlineTime":"18:00","recurrence":null}]}
+Input: "сдать отчёт до пятницы 18:00 на 2 часа @Work"
+Output: {"tasks":[{"title":"Сдать отчёт","date":null,"scheduledTime":null,"endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"noteName":null,"description":null,"estimatedMinutes":120,"deadline":"<friday>","deadlineTime":"18:00","recurrence":null}]}
 
 Input: "Дизайн лендинга, 400р в час @Work"
-Output: {"tasks":[{"title":"Дизайн лендинга","date":null,"scheduledTime":null,"endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"noteName":null,"description":null,"tags":[],"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"rate":400,"paymentType":"hour","recurrence":null}]}
+Output: {"tasks":[{"title":"Дизайн лендинга","date":null,"scheduledTime":null,"endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"noteName":null,"description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"rate":400,"paymentType":"hour","recurrence":null}]}
 
 Input: "монтаж видео 2000 в день"
-Output: {"tasks":[{"title":"Монтаж видео","priority":"medium","isWorkTask":true,"tags":[],"rate":2000,"paymentType":"day"}]}
+Output: {"tasks":[{"title":"Монтаж видео","priority":"medium","isWorkTask":true,"rate":2000,"paymentType":"day"}]}
 
 Input: "утренняя зарядка каждый день на 15 минут"
-Output: {"tasks":[{"title":"Утренняя зарядка","date":null,"scheduledTime":null,"endTime":null,"priority":"medium","projectName":null,"isWorkTask":false,"noteName":null,"description":null,"tags":[],"estimatedMinutes":15,"deadline":null,"deadlineTime":null,"recurrence":{"type":"daily","interval":1}}]}
+Output: {"tasks":[{"title":"Утренняя зарядка","date":null,"scheduledTime":null,"endTime":null,"priority":"medium","projectName":null,"isWorkTask":false,"noteName":null,"description":null,"estimatedMinutes":15,"deadline":null,"deadlineTime":null,"recurrence":{"type":"daily","interval":1}}]}
 
 Input: "team standup every weekday at 9:30"
-Output: {"tasks":[{"title":"Team standup","date":null,"scheduledTime":"09:30","endTime":null,"priority":"medium","projectName":null,"isWorkTask":true,"noteName":null,"description":null,"tags":[],"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"recurrence":{"type":"weekly","interval":1,"daysOfWeek":[1,2,3,4,5]}}]}
+Output: {"tasks":[{"title":"Team standup","date":null,"scheduledTime":"09:30","endTime":null,"priority":"medium","projectName":null,"isWorkTask":true,"noteName":null,"description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"recurrence":{"type":"weekly","interval":1,"daysOfWeek":[1,2,3,4,5]}}]}
 
 Input: "пн: созвон с командой в 10:00 @Work; отписать клиенту
 вт: черновик статьи на 2 часа
 пт: спортзал 18-19"
-Output: {"tasks":[{"title":"Созвон с командой","date":"<next Monday>","scheduledTime":"10:00","endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"tags":[],"estimatedMinutes":null},{"title":"Отписать клиенту","date":"<next Monday>","priority":"medium","isWorkTask":true,"tags":[]},{"title":"Черновик статьи","date":"<next Tuesday>","priority":"medium","tags":[],"estimatedMinutes":120},{"title":"Спортзал","date":"<next Friday>","scheduledTime":"18:00","endTime":"19:00","priority":"medium","tags":[],"estimatedMinutes":60}]}`;
+Output: {"tasks":[{"title":"Созвон с командой","date":"<next Monday>","scheduledTime":"10:00","endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"estimatedMinutes":null},{"title":"Отписать клиенту","date":"<next Monday>","priority":"medium","isWorkTask":true},{"title":"Черновик статьи","date":"<next Tuesday>","priority":"medium","estimatedMinutes":120},{"title":"Спортзал","date":"<next Friday>","scheduledTime":"18:00","endTime":"19:00","priority":"medium","estimatedMinutes":60}]}`;
 }
 
 /** Normalize "9", "9.30", "09:5", "23:59" → "HH:MM"; invalid → null. */
@@ -228,17 +229,6 @@ export function extractRateFromText(text: string): {
     paymentType: rate ? "hour" : null,
     matched: rate ? bare[0] : null,
   };
-}
-
-function normalizeAiTags(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  const out: string[] = [];
-  for (const t of raw) {
-    if (typeof t !== "string") continue;
-    const tag = t.trim().replace(/^#+/, "").trim();
-    if (tag && !out.includes(tag)) out.push(tag);
-  }
-  return out.slice(0, 12);
 }
 
 function normalizeAiPriority(raw: unknown): "low" | "medium" | "high" {
@@ -329,13 +319,13 @@ function draftsFromParsed(parsed: unknown): AiQuickTaskDraft[] {
       description: typeof (t as { description?: unknown }).description === "string"
         ? ((t as { description: string }).description.trim() || null)
         : null,
-      tags: normalizeAiTags((t as { tags?: unknown }).tags),
       estimatedMinutes: normalizeAiMinutes((t as { estimatedMinutes?: unknown }).estimatedMinutes),
       deadline: normalizeAiDate((t as { deadline?: unknown }).deadline),
       deadlineTime: normalizeAiTime((t as { deadlineTime?: unknown }).deadlineTime),
       rate: normalizeAiRate((t as { rate?: unknown }).rate),
       paymentType: normalizeAiPaymentType((t as { paymentType?: unknown }).paymentType),
       recurrence: normalizeAiRecurrence(rec),
+      subtasks: normalizeAiSubtasks((t as { subtasks?: unknown }).subtasks),
     };
     const enriched = enrichDraftRate(draft, t as Record<string, unknown>);
     if (enriched.rate != null) enriched.isWorkTask = true;
@@ -377,6 +367,22 @@ function enrichDraftRate(draft: AiQuickTaskDraft, rawItem: Record<string, unknow
   return draft;
 }
 
+/** Normalize subtasks array → string[]; invalid → null */
+export function normalizeAiSubtasks(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null;
+  const out: string[] = [];
+  for (const item of raw) {
+    let title = "";
+    if (typeof item === "string") title = item;
+    else if (item && typeof item === "object" && typeof (item as { title?: unknown }).title === "string") {
+      title = (item as { title: string }).title;
+    }
+    title = title.trim();
+    if (title) out.push(title);
+  }
+  return out.length ? out : null;
+}
+
 /** Parse raw model JSON into drafts (pure — unit-testable). */
 export function parseAiQuickTasks(raw: string): AiQuickTaskDraft[] {
   const text = raw.trim();
@@ -397,7 +403,6 @@ export function parseAiQuickTasks(raw: string): AiQuickTaskDraft[] {
     .map((title) => ({
       title: cleanAiTitle(title),
       priority: "medium" as const,
-      tags: [] as string[],
     }))
     .filter((t) => t.title);
 }

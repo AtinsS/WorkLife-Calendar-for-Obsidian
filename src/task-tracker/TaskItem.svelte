@@ -2,11 +2,10 @@
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import type { App } from "obsidian";
   import type { ITask, TaskStatus } from "./types";
-  import { updateTask, updateTaskStatus, removeTask, resetTaskTimer, projects, activeTab, tasks, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem } from "./stores";
+  import { updateTask, updateTaskStatus, removeTask, resetTaskTimer, projects, activeTab, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem } from "./stores";
   import { get } from "svelte/store";
   import { getActiveTimer, formatDuration, formatEstimate } from "./TimerManager";
   import { TaskModal } from "./TaskModal";
-  import { syncTaskToNote } from "./noteTasks";
   import { t } from "../i18n";
   import { settings } from "../ui/stores";
   import { errorMessage } from "../utils/sanitize";
@@ -40,6 +39,7 @@
   $: taskChecklistItems = $checklists.filter((c) => c.taskId === task.id).sort((a, b) => a.sortOrder - b.sortOrder);
   $: checklistDone = taskChecklistItems.filter((c) => c.checked).length;
   $: checklistTotal = taskChecklistItems.length;
+  $: taskProject = task.projectId ? $projects.find((p) => p.id === task.projectId) : null;
   let showChecklist = false;
   let newChecklistTitle = "";
   let showDescription = false;
@@ -124,17 +124,11 @@
   function handleEdit() {
     const modal = new TaskModal(appInstance, async (data) => {
       updateTask(task.id, data);
-      const updatedTask = get(tasks).find((t) => t.id === task.id);
-      if (updatedTask && appInstance) await syncTaskToNote(updatedTask, appInstance);
     }, task);
     modal.open();
   }
 
   async function handleDelete() {
-    if (task.notePath && appInstance) {
-      const { deleteNoteTask } = await import("./noteTasks");
-      await deleteNoteTask(task.notePath, appInstance);
-    }
     removeTask(task.id);
   }
 
@@ -348,6 +342,13 @@
   {/if}
 
   <div class="task-item-row-meta">
+    {#if taskProject}
+      <span class="task-project-chip" style="--pc:{taskProject.color}">
+        <span class="task-project-chip-dot"></span>
+        {taskProject.icon || "📁"} {taskProject.name}
+      </span>
+    {/if}
+
     {#if $activeTab === "all" && task.status !== "done"}
       <span class="task-status-badge status-badge-{task.status}">
         {#if task.status === "todo"}{$t("tasks.tabs.todo")}{:else if task.status === "progress"}{$t("tasks.item.progress")}{:else if task.status === "paused"}{$t("tasks.item.paused")}{/if}

@@ -7,12 +7,10 @@
   import type { ITask, IProject } from "./types";
   import {
     tasks, projects, selectedDate, activeTab, taskFilter,
-    updateTask, updateTaskStatus, removeTask,
+    updateTaskStatus, removeTask,
     createNextRecurringInstance, clearAllRecurringTasks, clearRecurringByProject, clearRecurringByName, resetTaskTimer,
     carryOverOverdueTasks, updateRecurringSeries,
   } from "./stores";
-  import { createNoteTask, deleteNoteTask, shouldSyncTaskToNote, syncTaskToNote } from "./noteTasks";
-  import { settings } from "../ui/stores";
   import TaskItem from "./TaskItem.svelte";
   import KanbanTabs from "./KanbanTabs.svelte";
   import TimeLogsModal from "./TimeLogsModal.svelte";
@@ -251,23 +249,14 @@
       new QuickAddModal(appInstance, m.isValid() ? m : moment(), () => {
         /* list is store-driven */
       }, {
-        onTaskCreated: (task) => {
-          void (async () => {
-            if (shouldSyncTaskToNote(task)) {
-              const project = $projects.find((p) => p.id === task.projectId);
-              const file = await createNoteTask(task, project, appInstance);
-              if (file) updateTask(task.id, { notePath: file.path });
-            }
-          })();
+        onTaskCreated: () => {
+          /* list is store-driven */
         },
       }).open();
     });
   }
 
   async function handleTaskDelete(task: ITask) {
-    if (task.notePath && task.notePath.startsWith($settings.tasksFolderPath + "/") && appInstance) {
-      await deleteNoteTask(task.notePath, appInstance);
-    }
     removeTask(task.id);
   }
 
@@ -285,8 +274,6 @@
   async function handleTaskComplete(task: ITask) {
     const newStatus = toggleTaskStatus(task);
     if (newStatus === "done") handleRecurringNext(task);
-    const updatedTask = get(tasks).find((t) => t.id === task.id);
-    if (updatedTask && appInstance) await syncTaskToNote(updatedTask, appInstance);
   }
 
   async function clearCompletedTasks() {
@@ -296,10 +283,6 @@
     if (completedTasks.length === 0) { alert($t("tasks.panel.noCompleted")); return; }
     if (!confirm($t("tasks.panel.deleteCompleted", { count: completedTasks.length }))) return;
     for (const task of completedTasks) {
-      if (task.notePath) {
-        const file = appInstance.vault.getAbstractFileByPath(task.notePath);
-        if (file) await appInstance.vault.delete(file);
-      }
       removeTask(task.id);
     }
   }
@@ -364,15 +347,6 @@
       appInstance,
       async (data) => {
         updateRecurringSeries(task.id, data);
-        if (!appInstance) return;
-        const members = get(tasks).filter(
-          (t) => t.id === task.id || (t.isRecurringInstance && t.parentTaskId === task.id)
-        );
-        for (const member of members) {
-          if (shouldSyncTaskToNote(member)) {
-            await syncTaskToNote(member, appInstance);
-          }
-        }
       },
       task,
     );
@@ -509,19 +483,34 @@
       </div>
       <div class="task-tracker-header-right">
         {#if totalCount > 0}
-          <span class="task-tracker-count">{doneCount}/{totalCount}</span>
+          <div class="task-tracker-progress" title="{doneCount}/{totalCount}">
+            <span class="task-tracker-count">{doneCount}/{totalCount}</span>
+            <div class="task-tracker-progress-bar">
+              <div class="task-tracker-progress-fill" style="width: {totalCount ? Math.round((doneCount / totalCount) * 100) : 0}%"></div>
+            </div>
+          </div>
         {/if}
         <button class="task-tracker-btn all-tasks-btn" class:active={!currentDate}
           on:click|stopPropagation={() => { currentDate ? selectedDate.set(null) : goToday(); }}
-          title={currentDate ? $t("tasks.panel.allTasks") : $t("tasks.panel.today")}>📋</button>
+          title={currentDate ? $t("tasks.panel.allTasks") : $t("tasks.panel.today")}>
+          <span class="btn-glyph">📋</span>
+          <span class="btn-label">{$t("tasks.panel.allTasks")}</span>
+        </button>
         <!-- Переключение Канбан/Расписание — только мобильные; на десктопе через меню -->
         <button class="task-tracker-btn sort-btn" class:active={sortMode === "priority"}
           on:click|stopPropagation={toggleSortMode}
           title={sortMode === "time" ? $t("tasks.panel.sortByTime") : $t("tasks.panel.sortByPriority")}>
-          {sortMode === "time" ? "🕐" : "🔺"}
+          <span class="btn-glyph">{sortMode === "time" ? "🕐" : "🔺"}</span>
+          <span class="btn-label">{sortMode === "time" ? $t("tasks.panel.sortByTime") : $t("tasks.panel.sortByPriority")}</span>
         </button>
-        <button class="task-tracker-btn icon-btn" class:active={showSearch} on:click|stopPropagation={toggleSearch} title={$t("tasks.panel.search")}>🔍</button>
-        <button class="task-tracker-btn add-btn" on:click|stopPropagation={openCreateTask}>+</button>
+        <button class="task-tracker-btn icon-btn" class:active={showSearch} on:click|stopPropagation={toggleSearch} title={$t("tasks.panel.search")}>
+          <span class="btn-glyph">🔍</span>
+          <span class="btn-label">{$t("tasks.panel.search")}</span>
+        </button>
+        <button class="task-tracker-btn add-btn" on:click|stopPropagation={openCreateTask} title={$t("tasks.modal.newTask")}>
+          <span class="btn-glyph">+</span>
+          <span class="btn-label">{$t("tasks.modal.newTask")}</span>
+        </button>
         <div class="task-tracker-menu-wrapper">
           <button class="task-tracker-btn" on:click|stopPropagation={toggleMenu}>⋮</button>
           {#if showMenu}
@@ -574,8 +563,10 @@
     <div class="task-tracker-list">
       {#if filteredTasks.length === 0}
         <div class="task-tracker-empty">
+          <div class="empty-illustration">✅</div>
           <div class="empty-title">{$t("tasks.panel.empty")}</div>
           <div class="empty-subtitle">{$t("tasks.panel.emptyHint")}</div>
+          <button class="empty-cta" on:click={openCreateTask}>+ {$t("tasks.modal.newTask")}</button>
         </div>
       {:else if showAllDates}
         {#each taskGroups as dateGroup (dateGroup.dateUID)}

@@ -7,7 +7,7 @@ import { CustomModal } from "../ui/CustomModal";
 import { tRaw, locale } from "../i18n";
 
 import type { ITask, RecurrenceConfig } from "./types";
-import { projects, selectedDate } from "./stores";
+import { projects, selectedDate, getChecklistForTask, setChecklistForTask } from "./stores";
 import { settings } from "../ui/stores";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { FolderSuggestModal } from "../modals/FolderSuggestModal";
@@ -20,7 +20,7 @@ const momentFn = moment as unknown as (inp?: unknown, format?: string, strict?: 
 
 export class TaskModal extends CustomModal {
   private task: ITask | null;
-  private onSubmit: (task: Partial<ITask>) => void;
+  private onSubmit: (task: Partial<ITask>, subtasks?: string[]) => void;
 
   private titleInput = "";
   private descriptionInput = "";
@@ -51,6 +51,9 @@ export class TaskModal extends CustomModal {
   private advancedBody: HTMLDivElement | null = null;
   private recurrenceSubEl: HTMLDivElement | null = null;
   private workTaskSubEl: HTMLDivElement | null = null;
+  private subtaskListEl: HTMLElement | null = null;
+  private subtaskTitles: string[] = [];
+  private subtasksSyncCount: (() => void) | null = null;
 
   private updateDescCounter(): void {
     if (!this.descCounterEl) return;
@@ -60,7 +63,7 @@ export class TaskModal extends CustomModal {
 
   constructor(
     app: App,
-    onSubmit: (task: Partial<ITask>) => void,
+    onSubmit: (task: Partial<ITask>, subtasks?: string[]) => void,
     task?: ITask,
     initialDate?: string,
     initialTime?: string,
@@ -101,6 +104,7 @@ export class TaskModal extends CustomModal {
         this.deadlineDateValue = this.extractDateValue(this.task.deadline);
       }
       if (this.task.deadlineTime) this.deadlineTime = this.task.deadlineTime;
+      this.subtaskTitles = getChecklistForTask(this.task.id).map((c) => c.title);
     } else {
       if (initialDate) {
         this.dateValue = initialDate;
@@ -132,7 +136,8 @@ export class TaskModal extends CustomModal {
       text: this.task ? tRaw("tasks.modal.editTask") : tRaw("tasks.modal.newTask"),
       cls: "qa2-top-title",
     });
-    const dateChip = header.createDiv({ cls: "qa2-date-chip" });
+    // Date under the title so the CustomModal close (×) never covers it
+    const dateChip = topText.createDiv({ cls: "qa2-date-chip qa2-date-chip--inline" });
     dateChip.createSpan({ text: "📅", cls: "qa2-date-chip-icon" });
     const chipDate = this.dateValue || this.extractDateValue(this.dateUID) || momentFn().format("YYYY-MM-DD");
     const mChip = momentFn(chipDate, "YYYY-MM-DD", true);
@@ -203,13 +208,60 @@ export class TaskModal extends CustomModal {
       });
     }
 
-    // ── Extra parameters ──
-    const extraWrap = this.contentEl.createDiv({ cls: "qa2-extra" });
-    const extraToggle = extraWrap.createEl("button", {
+    // ── Section toggles on one row: Subtasks · Extra ──
+    const panelBar = this.contentEl.createDiv({ cls: "qa2-panels-row" });
+
+    // Subtasks
+    const subToggle = panelBar.createEl("button", {
+      cls: "qa2-subtasks-toggle",
+      attr: { type: "button" },
+    });
+    subToggle.createSpan({ text: tRaw("tasks.modal.subtasks"), cls: "qa2-subtasks-toggle-label" });
+    const subToggleCount = subToggle.createSpan({ text: "", cls: "qa2-subtasks-count" });
+    const subWrap = this.contentEl.createDiv({ cls: "qa2-subtasks" });
+    this.subtaskListEl = subWrap.createDiv({ cls: "qa2-subtask-list mcp-hidden" });
+    const subActions = subWrap.createDiv({ cls: "qa2-subtasks-actions mcp-hidden" });
+    const addSubBtn = subActions.createEl("button", {
+      cls: "qa2-subtask-add",
+      text: `+ ${tRaw("tasks.modal.addSubtask")}`,
+      attr: { type: "button" },
+    });
+    addSubBtn.addEventListener("click", () => {
+      this.subtaskTitles.push("");
+      this.renderSubtasks();
+      const inputs = this.subtaskListEl?.querySelectorAll<HTMLInputElement>("input");
+      inputs?.[inputs.length - 1]?.focus();
+    });
+    if (isAiQuickAddAvailable()) {
+      const aiSplitBtn = subActions.createEl("button", {
+        cls: "qa2-subtask-ai",
+        text: `✨ ${tRaw("tasks.modal.splitAi")}`,
+        attr: { type: "button" },
+      });
+      aiSplitBtn.addEventListener("click", () => {
+        void this.fillSubtasksWithAI(aiSplitBtn);
+      });
+    }
+    const syncSubCount = () => {
+      const n = this.subtaskTitles.filter((t) => t.trim()).length;
+      subToggleCount.textContent = n > 0 ? String(n) : "";
+    };
+    this.subtasksSyncCount = syncSubCount;
+    subToggle.addEventListener("click", () => {
+      const hidden = this.subtaskListEl?.classList.contains("mcp-hidden");
+      this.subtaskListEl?.toggleClass("mcp-hidden", !hidden);
+      subActions?.toggleClass("mcp-hidden", !hidden);
+      subToggle.toggleClass("open", !!hidden);
+    });
+    this.renderSubtasks();
+
+    // Extra parameters
+    const extraToggle = panelBar.createEl("button", {
       cls: "qa2-extra-toggle open",
       text: tRaw("tasks.quickAdd.extra"),
       attr: { type: "button" },
     });
+    const extraWrap = this.contentEl.createDiv({ cls: "qa2-extra" });
     const extraBody = extraWrap.createDiv({ cls: "qa2-extra-body" });
     this.advancedBody = extraBody;
     extraToggle.addEventListener("click", () => {
@@ -577,6 +629,82 @@ export class TaskModal extends CustomModal {
     if (ot) ot.classList.toggle("mcp-hidden", this.paymentType !== "hour");
   }
 
+  private renderSubtasks(): void {
+    const list = this.subtaskListEl;
+    if (!list) return;
+    list.empty();
+    this.subtaskTitles.forEach((title, i) => {
+      const row = list.createDiv({ cls: "qa2-subtask-row" });
+      const input = row.createEl("input", {
+        type: "text",
+        cls: "qa2-extra-input qa2-subtask-input",
+        value: title,
+        placeholder: tRaw("tasks.modal.subtaskPlaceholder"),
+        attr: { spellcheck: "false", autocomplete: "off" },
+      });
+      input.addEventListener("input", () => {
+        this.subtaskTitles[i] = input.value;
+      });
+      input.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          this.subtaskTitles.push("");
+          this.renderSubtasks();
+          const inputs = this.subtaskListEl?.querySelectorAll<HTMLInputElement>("input");
+          inputs?.[inputs.length - 1]?.focus();
+        } else if (e.key === "Backspace" && !input.value && this.subtaskTitles.length > 0) {
+          e.preventDefault();
+          this.subtaskTitles.splice(i, 1);
+          this.renderSubtasks();
+          const inputs = this.subtaskListEl?.querySelectorAll<HTMLInputElement>("input");
+          inputs?.[Math.max(0, i - 1)]?.focus();
+        }
+      });
+      const removeBtn = row.createEl("button", {
+        cls: "qa2-subtask-remove",
+        text: "✕",
+        attr: { type: "button", "aria-label": "Remove" },
+      });
+      removeBtn.addEventListener("click", () => {
+        this.subtaskTitles.splice(i, 1);
+        this.renderSubtasks();
+      });
+    });
+    this.subtasksSyncCount?.();
+  }
+
+  /** Fill the subtask list via Ollama ("Разбить на подзадачи (ИИ)"). */
+  private async fillSubtasksWithAI(btn: HTMLElement): Promise<void> {
+    const title = (this.titleInputEl?.value || this.titleInput).trim();
+    if (!title) return;
+    btn.setAttribute("disabled", "true");
+    btn.addClass("is-busy");
+    try {
+      const { generateSubtasks } = await import("../services/OllamaService");
+      const opts = get(settings) as { ollamaUrl?: string; ollamaModel?: string };
+      const projectName = this.projectId
+        ? get(projects).find((p) => p.id === this.projectId)?.name ?? null
+        : null;
+      const titles = await generateSubtasks(
+        opts.ollamaUrl || "http://localhost:11434",
+        opts.ollamaModel || "llama3.1",
+        title,
+        this.descriptionInputEl?.value || null,
+        projectName,
+      );
+      if (titles.length) {
+        this.subtaskTitles = titles.map((t) => t.trim()).filter(Boolean);
+        this.renderSubtasks();
+        this.subtasksSyncCount?.();
+      }
+    } catch {
+      /* keep existing subtasks */
+    } finally {
+      btn.removeAttribute("disabled");
+      btn.removeClass("is-busy");
+    }
+  }
+
   private handleSubmit(): void {
     if (this.titleInputEl) this.titleInput = this.titleInputEl.value;
     if (this.descriptionInputEl) this.descriptionInput = this.descriptionInputEl.value;
@@ -650,7 +778,13 @@ export class TaskModal extends CustomModal {
       deadlineTime: this.deadlineTime || undefined,
     };
     console.debug("[TaskModal] submitData:", JSON.stringify(submitData));
-    this.onSubmit(submitData);
+    const subtasks = this.subtaskTitles.map((t) => t.trim()).filter(Boolean);
+    if (this.task) {
+      this.onSubmit(submitData);
+      setChecklistForTask(this.task.id, subtasks);
+    } else {
+      this.onSubmit(submitData, subtasks);
+    }
     this.close();
   }
 

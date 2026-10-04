@@ -21,12 +21,6 @@
     resetTaskTimer,
     carryOverOverdueTasks,
   } from "../task-tracker/stores";
-  import {
-    createNoteTask,
-    deleteNoteTask,
-    shouldSyncTaskToNote,
-    syncTaskToNote,
-  } from "../task-tracker/noteTasks";
   import { TaskModal } from "../task-tracker/TaskModal";
   import { getDateUID } from "obsidian-daily-notes-interface";
   import { tasksToEvents, getStatusColor } from "./scheduleUtils";
@@ -1111,10 +1105,6 @@
     if (nextStatus === "todo") {
       resetTaskTimer(task.id);
     }
-    const updatedTask = get(tasks).find((t) => t.id === task.id);
-    if (updatedTask) {
-      syncTaskToNote(updatedTask, plugin.app);
-    }
   }
 
   function handleCalendarSelect(info: any): void {
@@ -1255,8 +1245,6 @@
           }
         }
         updateTask(task.id, taskChanges);
-        const updatedTask = get(tasks).find((t) => t.id === task.id);
-        if (updatedTask) syncTaskToNote(updatedTask, plugin.app);
       } catch (e) {
         /* ignore */
       }
@@ -1305,8 +1293,6 @@
           estimatedTime: durationMin > 0 ? durationMin : undefined,
         };
         updateTask(task.id, updates);
-        const updatedTask = get(tasks).find((t) => t.id === task.id);
-        if (updatedTask) syncTaskToNote(updatedTask, plugin.app);
       } catch (e) {
         console.error("[handleEventResize] error:", e);
       }
@@ -1319,23 +1305,6 @@
       plugin.app,
       async (updates) => {
         updateTask(task.id, updates);
-        // Получаем обновлённую задачу
-        const updatedTask = get(tasks).find((t) => t.id === task.id);
-        if (!updatedTask) return;
-
-        // Если нет Task заметки — создаём
-        if (!updatedTask.notePath && shouldSyncTaskToNote(updatedTask)) {
-          const project = get(projects).find(
-            (p) => p.id === updatedTask.projectId,
-          );
-          const file = await createNoteTask(updatedTask, project, plugin.app);
-          if (file) {
-            updateTask(updatedTask.id, { notePath: file.path });
-          }
-        }
-
-        // Синхронизируем Task заметку
-        await syncTaskToNote(updatedTask, plugin.app);
         suppressRefetch = false;
         scheduleRefetch();
       },
@@ -1345,11 +1314,6 @@
     setTimeout(() => {
       suppressRefetch = false;
     }, 500);
-  }
-
-  async function deleteNoteFileIfNeeded(task: ITask): Promise<void> {
-    if (!shouldSyncTaskToNote(task) || !task.notePath) return;
-    await deleteNoteTask(task.notePath, plugin.app);
   }
 
   async function openTaskCreator(
@@ -1378,18 +1342,8 @@
       {
         scheduledTime: initialTime ?? null,
         endTime: endTimeStr ?? null,
-        onTaskCreated: (task) => {
-          void (async () => {
-            if (shouldSyncTaskToNote(task)) {
-              const project = get(projects).find((p) => p.id === task.projectId);
-              try {
-                const file = await createNoteTask(task, project, plugin.app);
-                if (file) updateTask(task.id, { notePath: file.path });
-              } catch (error) {
-                console.error("[ScheduleCalendar] failed to create note task:", error);
-              }
-            }
-          })();
+        onTaskCreated: () => {
+          /* list is store-driven */
         },
       },
     ).open();
@@ -1568,11 +1522,6 @@
       if (newStatus === "todo") {
         resetTaskTimer(contextMenuTask.id);
       }
-      // Синхронизируем заметку
-      const updatedTask = get(tasks).find((t) => t.id === contextMenuTask!.id);
-      if (updatedTask) {
-        syncTaskToNote(updatedTask, plugin.app);
-      }
     }
     closeContextMenu();
   }
@@ -1588,7 +1537,6 @@
 
   async function contextDeleteTask(): Promise<void> {
     if (contextMenuTask) {
-      await deleteNoteFileIfNeeded(contextMenuTask);
       removeTask(contextMenuTask.id);
     }
     closeContextMenu();

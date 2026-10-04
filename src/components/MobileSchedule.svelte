@@ -255,7 +255,7 @@
 
     const items = [
       { label: `${priorityPrefix}${tRaw("schedule.edit")}`, action: () => contextEditTask() },
-      ...(task.notePath ? [{ label: `${priorityPrefix}${tRaw("schedule.openNote")}`, action: () => contextOpenNote() }] : []),
+      ...(task.boundNotePath ? [{ label: `${priorityPrefix}${tRaw("schedule.openNote")}`, action: () => contextOpenNote() }] : []),
       { divider: true },
       { label: tRaw("schedule.changeStatus"), disabled: true },
       ...(task.status !== "todo" ? [{ label: tRaw("schedule.statusTodo"), action: () => contextChangeStatus("todo") }] : []),
@@ -311,8 +311,8 @@
   }
 
   function contextOpenNote() {
-    if (contextMenuTask?.notePath) {
-      plugin.app.workspace.openLinkText(contextMenuTask.notePath, "", false);
+    if (contextMenuTask?.boundNotePath) {
+      plugin.app.workspace.openLinkText(contextMenuTask.boundNotePath, "", false);
     }
     closeContextMenu();
   }

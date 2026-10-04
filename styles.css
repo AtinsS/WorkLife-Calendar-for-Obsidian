@@ -1118,6 +1118,39 @@
   letter-spacing: 0.02em;
 }
 
+/* Desktop progress: done/total + bar */
+.task-tracker-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.task-tracker-progress .task-tracker-count {
+  padding: 3px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.task-tracker-progress-bar {
+  width: 56px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.task-tracker-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3dd68c, #2bb673);
+  transition: width 0.35s ease;
+  min-width: 0;
+}
+
+.task-tracker-progress-fill[style*="width: 0%"] {
+  min-width: 0;
+}
+
 .habit-tracker-streak {
   font-size: 13px;
   font-weight: 600;
@@ -1136,11 +1169,27 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--mcp-text-muted);
   cursor: pointer;
-  padding: 6px 11px;
+  padding: 8px 14px;
   font-size: 15px;
   line-height: 1;
   border-radius: 10px;
   transition: all 0.18s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+}
+
+.task-tracker-btn .btn-glyph {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.task-tracker-btn .btn-label {
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .task-tracker-btn:hover,
@@ -1164,9 +1213,9 @@
 
 /* Unified add button for task and habit panels */
 .add-btn {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
-  padding: 5px 14px;
+  padding: 8px 16px;
   white-space: nowrap;
   background: linear-gradient(
     145deg,
@@ -1175,6 +1224,12 @@
   );
   color: #fff;
   border-color: transparent;
+  min-height: 36px;
+}
+
+.add-btn .btn-label {
+  color: #fff;
+  font-weight: 700;
 }
 
 .add-btn:hover {
@@ -1188,6 +1243,22 @@
   background: var(--mcp-accent-dim);
   border-color: rgba(124, 92, 252, 0.3);
   color: var(--mcp-accent);
+}
+
+/* Desktop: labels visible; mobile: glyphs only */
+@media (max-width: 768px) {
+  .task-tracker-btn .btn-label {
+    display: none;
+  }
+
+  .task-tracker-btn {
+    padding: 8px 10px;
+    min-height: 32px;
+  }
+
+  .add-btn {
+    padding: 8px 12px;
+  }
 }
 
 /* Dropdown labels — desktop shows full, mobile shows short */
@@ -1591,8 +1662,11 @@
 }
 
 .task-tracker-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   text-align: center;
-  padding: 48px 20px;
+  padding: 40px 20px 32px;
   color: var(--mcp-text-muted);
   font-size: 13px;
   border-radius: 16px;
@@ -1603,9 +1677,9 @@
 
 .task-tracker-empty .empty-illustration {
   opacity: 0.75;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   filter: drop-shadow(0 4px 16px rgba(124, 92, 252, 0.18));
-  font-size: 28px;
+  font-size: 30px;
 }
 
 .task-tracker-empty .empty-title {
@@ -1620,6 +1694,26 @@
   font-size: 12px;
   color: var(--mcp-text-muted);
   opacity: 0.85;
+  max-width: 280px;
+  line-height: 1.45;
+}
+
+.task-tracker-empty .empty-cta {
+  margin-top: 14px;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--mcp-accent, #7c5cfc) 35%, transparent);
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 16%, transparent);
+  color: var(--text-normal, var(--mcp-text));
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.task-tracker-empty .empty-cta:hover {
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 28%, transparent);
+  transform: translateY(-1px);
 }
 
 .task-group-header {
@@ -1701,6 +1795,33 @@
   min-width: 0;
   flex-wrap: wrap;
   padding-left: 32px;
+}
+
+/* Project chip on task cards */
+.task-project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--mcp-text-muted);
+  background: color-mix(in srgb, var(--pc, var(--mcp-accent)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pc, var(--mcp-accent)) 28%, transparent);
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.task-project-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--pc, var(--mcp-accent));
+  flex-shrink: 0;
 }
 
 .task-item[data-status="done"] {
@@ -2156,13 +2277,18 @@
 .task-date-group-header {
   display: flex;
   align-items: center;
-  padding: 10px 0 4px;
-  font-size: 12px;
+  padding: 12px 2px 6px;
+  font-size: 11px;
   font-weight: 700;
-  color: var(--mcp-accent);
-  gap: 6px;
-  border-bottom: 1px solid var(--mcp-glass-border);
-  margin-bottom: 4px;
+  color: var(--mcp-text-muted);
+  gap: 8px;
+  margin-bottom: 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--background-primary, #1a1a2e) 92%, transparent), transparent);
+  z-index: 2;
 }
 
 .date-group-label {
@@ -3186,7 +3312,7 @@ h2.tm-title.tm-title {
    PROJECT MODAL — POLISHED
    ============================================ */
 .wf-project-modal {
-  width: 540px;
+  width: 560px;
 }
 
 .wf-project-modal .wf-dialog-content {
@@ -3202,8 +3328,36 @@ h2.tm-title.tm-title {
   font-size: 18px;
   font-weight: 700;
   color: var(--text-normal);
-  padding: 0 24px;
   letter-spacing: -0.02em;
+}
+
+.pm-modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 24px 0;
+  margin-bottom: 16px;
+}
+
+.pm-modal-header-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--mcp-accent-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.pm-modal-header-text {
+  min-width: 0;
+}
+
+.pm-modal-header-text .wf-dialog-subtitle {
+  padding: 0;
+  margin: 0;
 }
 
 .wf-dialog-subtitle {
@@ -3211,6 +3365,11 @@ h2.tm-title.tm-title {
   color: var(--text-muted);
   margin: 0 0 16px;
   padding: 0 24px;
+  line-height: 1.45;
+}
+
+.wf-edit-modal .wf-dialog-subtitle {
+  padding: 0;
 }
 
 /* Section header */
@@ -3378,6 +3537,7 @@ h2.tm-title.tm-title {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
 }
 
 .pm-color-swatch {
@@ -3389,6 +3549,7 @@ h2.tm-title.tm-title {
   transition: all 0.15s;
   position: relative;
   background-color: var(--swatch-color);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
 }
 
 .pm-color-swatch:hover {
@@ -3398,6 +3559,9 @@ h2.tm-title.tm-title {
 .pm-color-swatch.active {
   border-color: var(--text-normal);
   transform: scale(1.1);
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.15),
+    0 0 0 3px color-mix(in srgb, var(--swatch-color) 35%, transparent);
 }
 
 .pm-color-swatch.active::after {
@@ -3411,6 +3575,59 @@ h2.tm-title.tm-title {
   font-size: 11px;
   font-weight: 700;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Custom color (native picker) */
+.pm-color-custom {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.pm-color-custom-btn {
+  background:
+    conic-gradient(
+      from 180deg,
+      #e74c3c,
+      #f39c12,
+      #f1c40f,
+      #2ecc71,
+      #3498db,
+      #9b59b6,
+      #e74c3c
+    ) !important;
+  border-style: dashed !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+.pm-color-custom-btn .pm-color-custom-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #fff;
+  font-size: 12px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+
+.pm-color-custom-btn.active {
+  border-color: var(--text-normal) !important;
+  border-style: solid !important;
+  background: var(--swatch-color) !important;
+}
+
+.pm-color-custom-btn.active .pm-color-custom-glyph {
+  opacity: 0;
+}
+
+.pm-color-custom-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* Icon grid */
@@ -3522,10 +3739,10 @@ h2.tm-title.tm-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 14px;
-  background: var(--mcp-surface);
-  border: 1px solid var(--mcp-glass-border);
-  border-radius: var(--mcp-radius-sm);
+  padding: 12px 14px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--dot-color, var(--mcp-accent)) 10%, transparent), transparent 60%), var(--mcp-surface);
+  border: 1px solid color-mix(in srgb, var(--dot-color, var(--mcp-accent)) 22%, var(--mcp-glass-border));
+  border-radius: 12px;
 }
 
 .pm-preview-dot {
@@ -3534,6 +3751,7 @@ h2.tm-title.tm-title {
   border-radius: 50%;
   flex-shrink: 0;
   background-color: var(--dot-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot-color) 25%, transparent);
 }
 
 .pm-preview-icon {
@@ -3543,7 +3761,7 @@ h2.tm-title.tm-title {
 
 .pm-preview-name {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-normal);
 }
 
@@ -3615,16 +3833,20 @@ h2.tm-title.tm-title {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 12px;
-  border-radius: var(--mcp-radius-sm);
+  padding: 11px 14px;
+  border-radius: 12px;
   background: var(--mcp-glass-highlight);
   border: 1px solid var(--mcp-glass-border);
   border-left: 3px solid var(--project-color, var(--mcp-glass-border));
   transition: all 0.15s;
+  gap: 10px;
 }
 
 .pm-project-item:hover {
   background: var(--mcp-surface-hover);
+  border-color: color-mix(in srgb, var(--project-color, var(--mcp-accent)) 30%, var(--mcp-glass-border));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--project-color, var(--mcp-accent)) 12%, transparent);
 }
 
 .pm-project-left {
@@ -6136,26 +6358,26 @@ h2.tm-title.tm-title {
 }
 
 .date-nav-btn {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
   color: var(--mcp-text-muted);
   cursor: pointer;
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 600;
   transition: all var(--mcp-transition-fast);
   padding: 0;
 }
 
 .date-nav-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--mcp-text);
-  border-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
 }
 
 .task-tracker-date {
@@ -8265,6 +8487,10 @@ h2.tm-title.tm-title {
   margin-bottom: 8px;
 }
 
+.mcp-cleanup-note {
+  margin: 0.5em 0;
+}
+
 .mcp-format-label {
   margin: 4px 0;
   font-size: 12px;
@@ -8385,7 +8611,35 @@ h2.tm-title.tm-title {
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(8px);
-  max-width: 48%;
+}
+
+/* Date chip under the title (TaskModal) — clears the close (×) button */
+.qa2-date-chip--inline {
+  margin-top: 6px;
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.qa2-date-chip--inline .date-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Reserve space for CustomModal close so it never overlaps header content */
+.wf-task-modal.quick-add-shell .qa2-top {
+  padding-right: 48px;
+}
+
+.wf-task-modal .wf-dialog-close {
+  z-index: 5;
+}
+
+/* Multi-line AI how-to text in settings */
+.ai-howto-text {
+  white-space: pre-line;
+  line-height: 1.55;
+  max-width: 52em;
 }
 
 .qa2-date-chip-icon {
@@ -8601,6 +8855,196 @@ h2.tm-title.tm-title {
   100% { transform: translateX(180%); opacity: 0.55; }
 }
 
+/* Subtasks editor — compact, collapsible */
+/* Section toggles on one row: Subtasks · Syntax · Extra */
+.qa2-panels-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 20px 0;
+  flex-wrap: wrap;
+}
+
+.qa2-panels-row .qa2-subtasks-toggle,
+.qa2-panels-row .qa2-syntax-toggle,
+.qa2-panels-row .qa2-extra-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 6px 12px;
+  border-radius: 999px;
+  opacity: 0.9;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.qa2-panels-row .qa2-subtasks-toggle:hover,
+.qa2-panels-row .qa2-syntax-toggle:hover,
+.qa2-panels-row .qa2-extra-toggle:hover,
+.qa2-panels-row .qa2-subtasks-toggle.open,
+.qa2-panels-row .qa2-syntax-toggle.open,
+.qa2-panels-row .qa2-extra-toggle.open {
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 14%, transparent);
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 32%, transparent);
+  opacity: 1;
+}
+
+.qa2-panels-row .qa2-subtasks-toggle::before,
+.qa2-panels-row .qa2-syntax-toggle::before,
+.qa2-panels-row .qa2-extra-toggle::before {
+  content: none;
+}
+
+.qa2-subtasks {
+  margin: 8px 20px 0;
+}
+
+.qa2-subtasks-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 4px 0;
+  opacity: 0.85;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.qa2-subtasks-toggle:hover,
+.qa2-subtasks-toggle.open {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.qa2-subtasks-toggle::before {
+  content: "▸";
+  font-size: 9px;
+  transition: transform 0.15s ease;
+}
+
+.qa2-subtasks-toggle.open::before {
+  transform: rotate(90deg);
+}
+
+.qa2-subtasks-count {
+  font-size: 10px;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 22%, transparent);
+  color: var(--text-normal);
+  border-radius: 999px;
+  padding: 1px 7px;
+  min-width: 16px;
+  text-align: center;
+}
+
+.qa2-subtask-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.qa2-subtasks-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+.qa2-subtask-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.qa2-subtask-input {
+  flex: 1;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  min-height: 28px;
+}
+
+.qa2-subtask-remove {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+  font-size: 11px;
+  opacity: 0.55;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+
+.qa2-subtask-remove:hover {
+  opacity: 1;
+  color: #f06565;
+}
+
+.qa2-subtask-add,
+.qa2-subtask-ai {
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.qa2-subtask-add:hover,
+.qa2-subtask-ai:hover {
+  color: var(--text-normal);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.qa2-subtask-ai.is-busy {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+/* Review panel subtasks */
+.qa2-review-subtasks {
+  margin-top: 6px;
+  padding-left: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qa2-review-subtask {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.45;
+}
+
+.qa2-mode.is-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .qa2-desc-input:focus {
   outline: none;
   border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 55%, transparent);
@@ -8609,7 +9053,7 @@ h2.tm-title.tm-title {
 }
 
 .qa2-extra {
-  margin: 14px 20px 0;
+  margin: 8px 20px 0;
 }
 
 .qa2-extra-toggle {
@@ -8892,7 +9336,7 @@ select.qa2-extra-input {
   background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 12%, transparent);
 }
 
-/* Mode switch */
+/* Mode switcher (Normal / AI) */
 .qa2-modes {
   display: flex;
   flex-direction: column;
@@ -8915,6 +9359,7 @@ select.qa2-extra-input {
   color: var(--text-faint);
   padding-left: 2px;
   letter-spacing: 0.01em;
+  line-height: 1.45;
 }
 
 .qa2-mode {
@@ -9187,7 +9632,8 @@ textarea.qa2-textarea.qa2-textarea {
 
 /* Syntax help / hints */
 .qa2-syntax {
-  padding: 12px 20px 0;
+  margin: 8px 20px 0;
+  padding: 0;
 }
 
 .qa2-syntax-toggle {

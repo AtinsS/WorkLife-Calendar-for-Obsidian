@@ -32,6 +32,64 @@ function addRecentIcon(app: App, emoji: string): void {
   app.saveLocalStorage(RECENT_ICONS_KEY, JSON.stringify(recent));
 }
 
+function renderColorPicker(
+  container: HTMLElement,
+  currentColor: string,
+  onSelect: (hex: string) => void,
+): void {
+  container.empty();
+  const grid = container.createDiv("pm-color-grid");
+  const presets = DEFAULT_PROJECT_COLORS.includes(currentColor)
+    ? DEFAULT_PROJECT_COLORS
+    : [currentColor, ...DEFAULT_PROJECT_COLORS];
+
+  const swatches: HTMLElement[] = [];
+  const selectSwatch = (hex: string, el: HTMLElement) => {
+    swatches.forEach((s) => s.removeClass("active"));
+    el.addClass("active");
+    onSelect(hex);
+  };
+
+  presets.forEach((color) => {
+    const swatch = grid.createDiv("pm-color-swatch");
+    swatch.style.setProperty("--swatch-color", color);
+    swatch.title = color;
+    if (color === currentColor) swatch.addClass("active");
+    swatch.addEventListener("click", () => {
+      customInput.value = color;
+      selectSwatch(color, swatch);
+    });
+    swatches.push(swatch);
+  });
+
+  // Custom color: native picker + hex field
+  const custom = grid.createDiv("pm-color-custom");
+  const customBtn = custom.createEl("button", {
+    cls: "pm-color-swatch pm-color-custom-btn",
+    attr: { type: "button", title: "Custom color" },
+  });
+  customBtn.createSpan({ text: "✦", cls: "pm-color-custom-glyph" });
+  swatches.push(customBtn);
+
+  const customInput = custom.createEl("input", {
+    cls: "pm-color-custom-input",
+    attr: { type: "color", value: currentColor, title: "Pick color" },
+  });
+  customBtn.addEventListener("click", () => customInput.click());
+  customInput.addEventListener("input", () => {
+    const hex = customInput.value;
+    customBtn.style.setProperty("--swatch-color", hex);
+    selectSwatch(hex, customBtn);
+  });
+
+  // Sync custom button preview with current color
+  customBtn.style.setProperty("--swatch-color", currentColor);
+  if (!DEFAULT_PROJECT_COLORS.includes(currentColor)) {
+    swatches.forEach((s) => s.removeClass("active"));
+    customBtn.addClass("active");
+  }
+}
+
 function renderIconPicker(
   app: App,
   container: HTMLElement,
@@ -102,8 +160,11 @@ export class ProjectModal extends CustomModal {
   onOpen(): void {
     this.containerEl.addClass("wf-project-modal");
 
-    this.contentEl.createEl("h2", { text: tRaw("tasks.project.title") });
-    this.contentEl.createEl("p", {
+    const header = this.contentEl.createDiv("pm-modal-header");
+    header.createDiv({ text: "🗂", cls: "pm-modal-header-icon" });
+    const headerText = header.createDiv("pm-modal-header-text");
+    headerText.createEl("h2", { text: tRaw("tasks.project.title") });
+    headerText.createEl("p", {
       text: tRaw("tasks.project.subtitle"),
       cls: "wf-dialog-subtitle",
     });
@@ -153,18 +214,9 @@ export class ProjectModal extends CustomModal {
     // Color picker
     const colorSection = row.createDiv("pm-color-section");
     colorSection.createEl("label", { text: tRaw("tasks.project.color"), cls: "pm-label" });
-    const colorGrid = colorSection.createDiv("pm-color-grid");
-
-    DEFAULT_PROJECT_COLORS.forEach((color) => {
-      const swatch = colorGrid.createDiv("pm-color-swatch");
-      swatch.style.setProperty("--swatch-color", color);
-      if (color === newColor) swatch.addClass("active");
-      swatch.addEventListener("click", () => {
-        colorGrid.querySelectorAll(".pm-color-swatch").forEach((s) => s.removeClass("active"));
-        swatch.addClass("active");
-        newColor = color;
-        updatePreview();
-      });
+    renderColorPicker(colorSection, newColor, (hex) => {
+      newColor = hex;
+      updatePreview();
     });
 
     // Icon picker
@@ -328,17 +380,8 @@ class EditProjectModal extends CustomModal {
     // Color
     const colorSection = this.contentEl.createDiv("pm-color-section");
     colorSection.createEl("label", { text: tRaw("tasks.project.color"), cls: "pm-label" });
-    const colorGrid = colorSection.createDiv("pm-color-grid");
-
-    DEFAULT_PROJECT_COLORS.forEach((c) => {
-      const swatch = colorGrid.createDiv("pm-color-swatch");
-      swatch.style.setProperty("--swatch-color", c);
-      if (c === color) swatch.addClass("active");
-      swatch.addEventListener("click", () => {
-        colorGrid.querySelectorAll(".pm-color-swatch").forEach((s) => s.removeClass("active"));
-        swatch.addClass("active");
-        color = c;
-      });
+    renderColorPicker(colorSection, color, (hex) => {
+      color = hex;
     });
 
     // Icon

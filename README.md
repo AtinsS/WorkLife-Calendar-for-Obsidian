@@ -120,23 +120,6 @@ The plugin stores data in JSON format in the `calendar-data/` folder at the root
 3. The plugin will create a Gist with an `.ics` file and provide a link.
 4. Add this link to your calendar via the "Subscribe by URL" function.
 
-### Tasks Format Integration (optional)
-When the "Tasks plugin sync" setting is enabled, the plugin creates `.md` files for tasks so they are visible in the Tasks and Dataview plugins. This is an **additional** feature — the primary storage remains in JSON. Example of a generated file:
-```markdown
----
-task_id: abc123
-title: Buy milk
-status: todo
-date: day-2024-10-25
-priority: medium
----
-- [ ] Buy milk 📅 2024-10-25 🛫 14:30 🔼
-```
-*(Supported statuses: `- [ ]` todo, `- [/]` progress, `- [-]` paused, `- [x]` done)*
-
-> [!NOTE]
-> Optional synchronization with `.md` files (via the "Tasks plugin sync" setting) is intended for compatibility with the [Tasks](https://github.com/obsidian-tasks-group/obsidian-tasks) and [Dataview](https://github.com/blacksmithgu/obsidian-dataview) plugins.
-
 </details>
 
 <details>
