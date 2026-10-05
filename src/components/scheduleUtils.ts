@@ -102,17 +102,29 @@ function localISO(dateStr: string, time: string): string {
 
 /** Advance an ISO datetime string by durationMin minutes */
 function addMinutesISO(dateStr: string, time: string, durationMin: number): string {
-  const totalMin = parseInt(time.split(":")[0], 10) * 60 + parseInt(time.split(":")[1], 10) + durationMin;
-  let endH = Math.floor(totalMin / 60);
-  const endM = totalMin % 60;
+  const [th, tm] = time.split(":").map(Number);
+  const totalMin = th * 60 + tm + durationMin;
+  const dayShift = Math.floor(totalMin / 1440);
+  const minOfDay = ((totalMin % 1440) + 1440) % 1440;
+  const endH = Math.floor(minOfDay / 60);
+  const endM = minOfDay % 60;
   let endStr = dateStr;
-  if (endH >= 24) {
+  if (dayShift !== 0) {
     const d = new Date(`${dateStr}T00:00:00`);
-    d.setDate(d.getDate() + 1);
+    d.setDate(d.getDate() + dayShift);
     endStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    endH -= 24;
   }
   return `${endStr}T${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}:00${getLocalTzOffset()}`;
+}
+
+/** Minutes from start "HH:MM" to end "HH:MM"; overnight (end <= start) wraps +24h. */
+function minutesBetweenTimes(start: string, end: string): number | null {
+  const [sh, sm] = start.split(":").map(Number);
+  const [eh, em] = end.split(":").map(Number);
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return null;
+  let diff = eh * 60 + em - (sh * 60 + sm);
+  if (diff <= 0) diff += 24 * 60;
+  return diff > 0 ? diff : null;
 }
 
 export function taskToEvent(
@@ -127,13 +139,12 @@ export function taskToEvent(
     ? localISO(dateStr, task.scheduledTime)
     : localISO(dateStr, "00:00");
 
-  // Compute duration: prefer estimatedTime, fallback to endTime - scheduledTime, default 60min
+  // End point must match the displayed endTime. estimatedTime is only a fallback
+  // when the task has no explicit end (or overnight-safe range).
   let durationMin = task.estimatedTime || 60;
-  if (!task.estimatedTime && task.endTime && task.scheduledTime) {
-    const [sh, sm] = task.scheduledTime.split(":").map(Number);
-    const [eh, em] = task.endTime.split(":").map(Number);
-    const diff = (eh * 60 + em) - (sh * 60 + sm);
-    if (diff > 0) durationMin = diff;
+  if (task.endTime && task.scheduledTime) {
+    const diff = minutesBetweenTimes(task.scheduledTime, task.endTime);
+    if (diff) durationMin = diff;
   }
 
   const end = hasTime
@@ -181,8 +192,9 @@ function deadlineToEvent(
   const start = hasTime
     ? localISO(deadlineDateStr, task.deadlineTime)
     : localISO(deadlineDateStr, "00:00");
+  // Timed deadline needs a non-zero span — start===end renders as a broken end point
   const end = hasTime
-    ? localISO(deadlineDateStr, task.deadlineTime)
+    ? addMinutesISO(deadlineDateStr, task.deadlineTime, 30)
     : localISO(deadlineDateStr, "23:59");
 
   const project = projects.find((p) => p.id === task.projectId);
@@ -212,12 +224,42 @@ export function tasksToEvents(
   projects: IProject[]
 ): ScheduleEvent[] {
   const events: ScheduleEvent[] = [];
+  // Recurring series share one deadline — emit a single marker, not one per instance
+  const emittedDeadlineSeries = new Set<string>();
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+
+  const resolveSeriesKey = (task: ITask): string => {
+    if (!task.isRecurringInstance && !task.recurrence) return `task:${task.id}`;
+    // Walk up parentTaskId chain to the series root; if the root is missing
+    // from the task list, group orphans by their claimed parent id.
+    let root: ITask | undefined = task;
+    let seriesId =
+      task.isRecurringInstance && task.parentTaskId ? task.parentTaskId : task.id;
+    const seen = new Set<string>();
+    while (root && root.isRecurringInstance && root.parentTaskId && !seen.has(root.id)) {
+      seen.add(root.id);
+      seriesId = root.parentTaskId;
+      root = byId.get(root.parentTaskId);
+    }
+    if (root && !root.isRecurringInstance) seriesId = root.id;
+    return `series:${seriesId}`;
+  };
+
   for (const task of tasks) {
     if (!task.dateUID) continue;
     const mainEvent = taskToEvent(task, projects);
     if (mainEvent) events.push(mainEvent);
+
+    if (!task.deadline || task.status === "done") continue;
+
+    const seriesKey = resolveSeriesKey(task);
+    if (emittedDeadlineSeries.has(seriesKey)) continue;
+
     const dlEvent = deadlineToEvent(task, projects);
-    if (dlEvent) events.push(dlEvent);
+    if (dlEvent) {
+      emittedDeadlineSeries.add(seriesKey);
+      events.push(dlEvent);
+    }
   }
   return events;
 }

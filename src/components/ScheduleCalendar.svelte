@@ -380,6 +380,95 @@
     });
   }
 
+  /** Повесить подсветку на слот, в который попадает y (координата экрана). */
+  function setHotSlotAtY(y: number): void {
+    const body = calendarEl?.querySelector(".fc-timegrid-body");
+    if (!body) return;
+    const slots = body.querySelectorAll<HTMLElement>(".fc-timegrid-slot");
+    let hot: HTMLElement | null = null;
+    for (const slot of slots) {
+      const r = slot.getBoundingClientRect();
+      if (y >= r.top && y < r.bottom) {
+        hot = slot;
+        break;
+      }
+    }
+    calendarEl
+      ?.querySelectorAll(".fc-timegrid-slot.sch-slot-hot")
+      .forEach((el) => {
+        if (el !== hot) el.classList.remove("sch-slot-hot");
+      });
+    hot?.classList.add("sch-slot-hot");
+  }
+
+  /**
+   * Во время растягивания выделения конечное время — это selectInfo.end
+   * (нижняя граница .fc-highlight), а не слот под курсором.
+   * Курсор в 17:30–18:00 даёт end=18:00 — и должна загораться метка 18:00.
+   */
+  function highlightSelectionEnd(): void {
+    const highlight = calendarEl?.querySelector(".fc-highlight, .fc-select-mirror");
+    if (!highlight) return;
+    const hr = highlight.getBoundingClientRect();
+    // Нижняя граница = время окончания (18:00). Метка этого времени —
+    // слот, который на ней начинается (18:00–18:30 → «18:00»).
+    const endY = hr.bottom + 1;
+    setHotSlotAtY(endY);
+
+    // Дополнительно помечаем слот, с которого начинается время конца
+    calendarEl
+      ?.querySelectorAll(".fc-timegrid-slot.sch-slot-end")
+      .forEach((el) => el.classList.remove("sch-slot-end"));
+    const body = calendarEl?.querySelector(".fc-timegrid-body");
+    if (!body) return;
+    for (const slot of body.querySelectorAll<HTMLElement>(".fc-timegrid-slot")) {
+      const r = slot.getBoundingClientRect();
+      if (endY >= r.top && endY < r.bottom) {
+        slot.classList.add("sch-slot-end");
+        break;
+      }
+    }
+  }
+
+  /** Подсветка тайм-слота + его метки времени при наведении (точное создание задач). */
+  function handleTimegridHover(e: MouseEvent): void {
+    const isTimeGrid =
+      currentViewType === "timeGridWeek" || currentViewType === "timeGridDay";
+    if (!calendarEl || !isTimeGrid) {
+      clearTimegridHover();
+      return;
+    }
+
+    // Растягивание выделения — подсвечиваем КОНЕЦ, не позицию курсора
+    if (calendarEl.querySelector(".fc-highlight, .fc-select-mirror")) {
+      highlightSelectionEnd();
+      return;
+    }
+
+    // Без выделения — убираем маркер конца
+    calendarEl
+      .querySelectorAll(".fc-timegrid-slot.sch-slot-end")
+      .forEach((el) => el.classList.remove("sch-slot-end"));
+
+    const body = calendarEl.querySelector(".fc-timegrid-body");
+    if (!body) return;
+
+    const y = e.clientY;
+    const bodyRect = body.getBoundingClientRect();
+    if (y < bodyRect.top || y >= bodyRect.bottom) {
+      clearTimegridHover();
+      return;
+    }
+
+    setHotSlotAtY(y);
+  }
+
+  function clearTimegridHover(): void {
+    calendarEl
+      ?.querySelectorAll(".fc-timegrid-slot.sch-slot-hot, .fc-timegrid-slot.sch-slot-end")
+      .forEach((el) => el.classList.remove("sch-slot-hot", "sch-slot-end"));
+  }
+
   onMount(() => {
     carryOverOverdueTasks();
     initCalendar();
@@ -401,6 +490,9 @@
     calendarEl?.addEventListener("click", handleDeadlineClick);
     // Right-click context menu on events
     calendarEl?.addEventListener("contextmenu", handleEventContextMenu);
+    // Hover on time slots — highlight slot + time label for precise task creation
+    calendarEl?.addEventListener("mousemove", handleTimegridHover);
+    calendarEl?.addEventListener("mouseleave", clearTimegridHover);
     // ResizeObserver
     if (calendarEl) {
       resizeObserver = new ResizeObserver(() => {
@@ -425,6 +517,8 @@
     calendarEl?.removeEventListener("keydown", handleKeyNav);
     calendarEl?.removeEventListener("click", handleDeadlineClick);
     calendarEl?.removeEventListener("contextmenu", handleEventContextMenu);
+    calendarEl?.removeEventListener("mousemove", handleTimegridHover);
+    calendarEl?.removeEventListener("mouseleave", clearTimegridHover);
     resizeObserver?.disconnect();
     if (highlightInterval) clearInterval(highlightInterval);
     document.removeEventListener("visibilitychange", updateEventHighlight);
@@ -492,10 +586,14 @@
 
   function initCalendar(): void {
     const initialView = isSmallPhone ? "timeGridDay" : "timeGridWeek";
+    const aiEnabled =
+      ($settings as { aiScheduleActionsEnabled?: boolean }).aiScheduleActionsEnabled !== false;
     const headerToolbar = {
       left: "prev,next",
       center: "title",
-      right: "dayGridMonth,timeGridWeek,timeGridDay",
+      right: aiEnabled
+        ? "aiActions,dayGridMonth,timeGridWeek,timeGridDay"
+        : "dayGridMonth,timeGridWeek,timeGridDay",
     };
     const mirrorParent = document.body;
 
@@ -505,20 +603,38 @@
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       locale: tRaw("locale.momentLocale"),
       headerToolbar,
-      buttonText: { month: tRaw("schedule.month"), week: tRaw("schedule.week"), day: tRaw("schedule.day") },
+      customButtons: {
+        aiActions: {
+          text: `✨ ${tRaw("schedule.aiActions")}`,
+          click: () => openAiScheduleActions(),
+        },
+      },
+      buttonText: {
+        month: tRaw("schedule.month"),
+        week: tRaw("schedule.week"),
+        day: tRaw("schedule.day"),
+        aiActions: tRaw("schedule.aiActions"),
+      },
       slotMinTime: "06:00:00",
       slotMaxTime: "30:00:00",
       allDaySlot: true,
       allDayText: tRaw("schedule.untimed"),
       slotDuration: isSmallPhone ? "00:15:00" : "00:30:00",
-      snapDuration: isSmallPhone ? "00:15:00" : "00:30:00",
+      // 15-min snap: create tasks at :00/:15/:30/:45 while keeping a readable grid
+      snapDuration: "00:15:00",
+      slotLabelInterval: "00:30:00",
       editable: !isMobile,
       fixedMirrorParent: mirrorParent,
       longPressDelay: 250,
       selectable: true,
-      selectAllow: (selectInfo) =>
-        !selectInfo.end.getTime ||
-        selectInfo.end.getTime() - selectInfo.start.getTime() < 86400000 * 7,
+      selectAllow: (selectInfo) => {
+        const ok =
+          !selectInfo.end?.getTime ||
+          selectInfo.end.getTime() - selectInfo.start.getTime() < 86400000 * 7;
+        // Подсветка конца выделения (18:00, а не слот 17:30 под курсором)
+        if (ok) requestAnimationFrame(highlightSelectionEnd);
+        return ok;
+      },
       selectMirror: true,
       select: handleCalendarSelect,
       dayMaxEvents: true,
@@ -541,6 +657,17 @@
       scrollTimeReset: false,
       eventTimeFormat: { hour: "numeric", minute: "2-digit", hour12: false },
       slotLabelFormat: { hour: "numeric", minute: "2-digit", hour12: false },
+      // Hour labels bold (18:00), half-hour quieter (18:30) — easier to place tasks
+      slotLabelContent: (arg: { date: Date; text: string }) => {
+        const d = arg.date;
+        const isHalf = d.getMinutes() !== 0;
+        const text =
+          arg.text ||
+          `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        return {
+          html: `<span class="sch-slot-label ${isHalf ? "sch-slot-label-half" : "sch-slot-label-hour"}">${text}</span>`,
+        };
+      },
       dayHeaderFormat: { weekday: "short", day: "numeric", month: "numeric" },
       dayHeaderContent: (arg: any) => {
         const dateStr = arg.date
@@ -1232,10 +1359,11 @@
           taskChanges.estimatedTime = null;
           taskChanges.endTime = null;
         } else if (newTime && task.endTime && task.scheduledTime) {
-          // Recalculate endTime to preserve the original duration
+          // Recalculate endTime to preserve the original duration (incl. overnight)
           const [oh, om] = task.scheduledTime.split(":").map(Number);
           const [eh, em] = task.endTime.split(":").map(Number);
-          const durationMin = (eh * 60 + em) - (oh * 60 + om);
+          let durationMin = eh * 60 + em - (oh * 60 + om);
+          if (durationMin <= 0) durationMin += 24 * 60;
           if (durationMin > 0) {
             const [nh, nm] = newTime.split(":").map(Number);
             const totalMin = nh * 60 + nm + durationMin;
@@ -1545,6 +1673,16 @@
   export function refresh(): void {
     scheduleRefetch();
   }
+
+  async function openAiScheduleActions(): Promise<void> {
+    const appInst = get(app) ?? plugin?.app;
+    if (!appInst) return;
+    const view = calendar?.view;
+    const start = view?.activeStart ?? null;
+    const end = view?.activeEnd ?? null;
+    const { AIScheduleModal } = await import("../services/AIScheduleModal");
+    new AIScheduleModal(appInst, start, end).open();
+  }
 </script>
 
 <div class="schedule-calendar-wrapper">
@@ -1763,6 +1901,19 @@
     font-weight: 600;
   }
 
+  /* AI actions button in toolbar */
+  :global(.fc .fc-button.fc-aiActions-button) {
+    background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 22%, transparent);
+    border-color: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 45%, transparent);
+    color: var(--mcp-text, var(--text-normal));
+  }
+
+  :global(.fc .fc-button.fc-aiActions-button:hover) {
+    background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 38%, transparent);
+    border-color: var(--mcp-accent, #7c5cfc);
+    box-shadow: 0 0 12px var(--mcp-accent-faint);
+  }
+
   :global(.fc .fc-button) {
     background: rgba(255, 255, 255, 0.05);
     color: var(--mcp-text, var(--text-normal));
@@ -1877,6 +2028,30 @@
     color: var(--mcp-text-faint, var(--text-faint));
     font-size: 11px;
     font-weight: 500;
+    transition: color 0.2s ease;
+  }
+
+  /* 18:00 — accent hour; 18:30 — quieter half-hour */
+  :global(.sch-slot-label-hour) {
+    color: var(--mcp-text, var(--text-normal));
+    font-weight: 650;
+    font-size: 11.5px;
+  }
+
+  :global(.sch-slot-label-half) {
+    color: var(--mcp-text-faint, var(--text-faint));
+    font-weight: 500;
+    font-size: 10.5px;
+    opacity: 0.85;
+  }
+
+  :global(.fc .fc-timegrid-slot) {
+    transition: background-color 0.18s ease;
+  }
+
+  /* Half-hour separator slightly softer than the hour line */
+  :global(.fc .fc-timegrid-slot.fc-timegrid-slot-minor) {
+    border-top-color: rgba(255, 255, 255, 0.03);
   }
 
   /* Не переопределяем height слотов — FullCalendar рассчитывает
@@ -1982,8 +2157,45 @@
 
   /* Выделение */
   :global(.fc .fc-highlight) {
-    background: var(--mcp-accent-ultra-dim);
+    background: var(--mcp-accent-dim);
     border-radius: 4px;
+    transition: background-color 0.15s ease;
+    animation: sch-select-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  @keyframes sch-select-in {
+    from {
+      opacity: 0.4;
+      transform: scaleY(0.92);
+    }
+    to {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+  }
+
+  /* Плавное появление тела календарной сетки */
+  :global(.fc .fc-timegrid-body),
+  :global(.fc .fc-daygrid-body) {
+    animation: sch-view-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  @keyframes sch-view-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.fc .fc-event),
+    :global(.fc .fc-timegrid-body),
+    :global(.fc .fc-daygrid-body),
+    :global(.fc .fc-highlight) {
+      animation: none !important;
+    }
   }
 
   /* Hover на слотах времени */
@@ -1991,12 +2203,34 @@
     transition: background-color 0.15s ease;
   }
 
-  :global(.fc .fc-timegrid-slot:hover) {
-    background: var(--mcp-accent-ultra-dim);
+  :global(.fc .fc-timegrid-slot:hover),
+  :global(.fc .fc-timegrid-slot-lane:hover) {
+    background: var(--mcp-amber-dim, rgba(245, 166, 35, 0.12));
   }
 
-  :global(.fc .fc-timegrid-slot-lane:hover) {
-    background: var(--mcp-accent-ultra-dim);
+  /* Активный слот под курсором — подсветка строки + метки времени */
+  :global(.fc .fc-timegrid-slot.sch-slot-hot),
+  :global(.fc .fc-timegrid-slot.sch-slot-hot .fc-timegrid-slot-lane) {
+    background: var(--mcp-amber-dim, rgba(245, 166, 35, 0.14));
+  }
+
+  :global(.fc .fc-timegrid-slot.sch-slot-hot .fc-timegrid-slot-label-cushion),
+  :global(.fc .fc-timegrid-slot.sch-slot-hot .fc-timegrid-axis-cushion) {
+    color: var(--mcp-amber, #f5a623) !important;
+    font-weight: 700;
+    text-shadow: 0 0 10px var(--mcp-amber-dim, rgba(245, 166, 35, 0.45));
+  }
+
+  /* Конец выделения при создании задачи — резкая линия на времени конца (18:00) */
+  :global(.fc .fc-timegrid-slot.sch-slot-end) {
+    border-top: 2px solid var(--mcp-amber, #f5a623) !important;
+  }
+
+  :global(.fc .fc-timegrid-slot.sch-slot-end .fc-timegrid-slot-label-cushion),
+  :global(.fc .fc-timegrid-slot.sch-slot-end .fc-timegrid-axis-cushion) {
+    color: var(--mcp-amber, #f5a623) !important;
+    font-weight: 800;
+    text-shadow: 0 0 12px rgba(245, 166, 35, 0.55);
   }
 
   :global(.fc .fc-daygrid-day:hover) {
@@ -2183,12 +2417,35 @@
     border: none !important;
     border-radius: 8px !important;
     transition:
-      background-color 0.2s ease,
-      box-shadow 0.2s ease,
-      filter 0.2s ease;
+      background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+      box-shadow 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+      filter 0.22s ease,
+      transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+      opacity 0.22s ease;
     box-shadow:
       inset 3px 0 0 var(--event-project-color, rgba(120, 145, 175, 1)),
       0 2px 8px rgba(0, 0, 0, 0.12);
+    animation: sch-event-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  @keyframes sch-event-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  :global(.fc .fc-event:hover) {
+    filter: brightness(1.08);
+    transform: translateY(-1px) scale(1.01);
+    box-shadow:
+      inset 3px 0 0 var(--event-project-color, rgba(120, 145, 175, 1)),
+      0 6px 16px rgba(0, 0, 0, 0.22);
+    z-index: 3;
   }
 
   :global(.fc .fc-event:has(.sch-event)) {
@@ -2242,13 +2499,6 @@
 
   :global(.fc .fc-timegrid-event-harness-inset) {
     pointer-events: none;
-  }
-
-  :global(.fc .fc-event:hover) {
-    transform: scale(1.01);
-    box-shadow:
-      inset 3px 0 0 var(--event-project-color, rgba(120, 145, 175, 1)),
-      0 4px 16px rgba(0, 0, 0, 0.25);
   }
 
   /* Active/current event highlight — multi-layered glow (reference pattern) */

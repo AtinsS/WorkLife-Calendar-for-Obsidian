@@ -47,6 +47,8 @@ export interface ISettings {
   helloShowScheduleBtn?: boolean;
   helloShowSearch?: boolean;
   helloShowWeight?: boolean;
+  /** Порядок nav-кнопок в hello: "tasks" | "analytics" | "finance" | "schedule" */
+  helloNavOrder?: string[];
 
   // Data cleanup
   autoCleanupThreshold: number;
@@ -159,6 +161,8 @@ export interface ISettings {
   aiSummaryEnabled: boolean;
   /** Разбить задачу на подзадачи (ПКМ → задача) */
   aiSubtasksEnabled: boolean;
+  /** Кнопка «Действия с ИИ» в расписании */
+  aiScheduleActionsEnabled?: boolean;
   /** Умное быстрое добавление задач (ИИ: работа / заметка / повтор / мульти) */
   aiQuickAddEnabled: boolean;
   /** Предварительное согласование AI-задач перед добавлением */
@@ -195,6 +199,7 @@ export const defaultSettings = Object.freeze({
   helloShowScheduleBtn: true,
   helloShowSearch: true,
   helloShowWeight: true,
+  helloNavOrder: ["tasks", "analytics", "finance", "schedule"],
 
   taskTrackerCollapsed: false,
 
@@ -279,6 +284,7 @@ export const defaultSettings = Object.freeze({
   aiExtractEnabled: true,
   aiSummaryEnabled: true,
   aiSubtasksEnabled: true,
+  aiScheduleActionsEnabled: true,
   aiQuickAddEnabled: true,
   aiConfirmBeforeAdd: true,
   aiSummaryStyle: "detailed" as const,
@@ -2261,6 +2267,17 @@ export class CalendarSettingsTab extends PluginSettingTab {
         toggle.setValue(this.plugin.options.aiConfirmBeforeAdd !== false);
         toggle.onChange(async (value) => {
           await this.plugin.writeOptions({ aiConfirmBeforeAdd: value });
+        });
+      });
+
+    // Schedule AI actions button
+    new Setting(container)
+      .setName(tRaw("settings.ai.scheduleActionsEnabled"))
+      .setDesc(tRaw("settings.ai.scheduleActionsEnabledDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.aiScheduleActionsEnabled !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ aiScheduleActionsEnabled: value });
         });
       });
 

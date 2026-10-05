@@ -14,6 +14,8 @@
   export let onOpenAnalytics: (() => void) | undefined = undefined;
   export let onOpenFinance: (() => void) | undefined = undefined;
   export let onOpenSchedule: (() => void) | undefined = undefined;
+  /** Сохранить порядок nav-кнопок (drag & drop) в настройках плагина */
+  export let persistNavOrder: ((order: string[]) => void) | undefined = undefined;
 
   let now = moment();
   let clockTimer: ReturnType<typeof setInterval> | null = null;
@@ -138,6 +140,91 @@
   $: showFinanceBtn = $settings.helloShowFinanceBtn !== false;
   $: showScheduleBtn = $settings.helloShowScheduleBtn !== false;
   $: showSearch = $settings.helloShowSearch !== false;
+
+  // ── Nav buttons: order + drag & drop ──
+  const NAV_DEFAULT_ORDER = ["tasks", "analytics", "finance", "schedule"] as const;
+  type NavId = (typeof NAV_DEFAULT_ORDER)[number];
+
+  let draggedNavId: string | null = null;
+  let dragOverNavId: string | null = null;
+
+  $: navOrder = (() => {
+    const stored = $settings.helloNavOrder;
+    if (!Array.isArray(stored) || stored.length === 0) return [...NAV_DEFAULT_ORDER];
+    const known = new Set(NAV_DEFAULT_ORDER as readonly string[]);
+    const ordered = stored.filter((id) => known.has(id));
+    // append any missing defaults at the end
+    for (const id of NAV_DEFAULT_ORDER) {
+      if (!ordered.includes(id)) ordered.push(id);
+    }
+    return ordered;
+  })();
+
+  $: navItems = navOrder
+    .map((id) => {
+      switch (id as NavId) {
+        case "tasks":
+          return showTasksBtn
+            ? { id, icon: "✅", label: $t("hello.navTasks"), onClick: onOpenTasks }
+            : null;
+        case "analytics":
+          return showAnalyticsBtn
+            ? { id, icon: "📊", label: $t("hello.navAnalytics"), onClick: onOpenAnalytics }
+            : null;
+        case "finance":
+          return showFinanceBtn
+            ? { id, icon: "💰", label: $t("hello.navFinance"), onClick: onOpenFinance }
+            : null;
+        case "schedule":
+          return showScheduleBtn
+            ? { id, icon: "📅", label: $t("hello.navSchedule"), onClick: onOpenSchedule }
+            : null;
+        default:
+          return null;
+      }
+    })
+    .filter(Boolean) as Array<{ id: string; icon: string; label: string; onClick?: () => void }>;
+
+  function onNavDragStart(e: DragEvent, id: string) {
+    draggedNavId = id;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", id);
+    (e.currentTarget as HTMLElement).classList.add("dragging");
+  }
+
+  function onNavDragEnd(e: DragEvent) {
+    (e.currentTarget as HTMLElement).classList.remove("dragging");
+    draggedNavId = null;
+    dragOverNavId = null;
+  }
+
+  function onNavDragOver(e: DragEvent, id: string) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (id !== draggedNavId) dragOverNavId = id;
+  }
+
+  function onNavDragLeave() {
+    dragOverNavId = null;
+  }
+
+  function onNavDrop(e: DragEvent, targetId: string) {
+    e.preventDefault();
+    const fromId = draggedNavId;
+    dragOverNavId = null;
+    draggedNavId = null;
+    if (!fromId || fromId === targetId) return;
+
+    const next = [...navOrder];
+    const fromIdx = next.indexOf(fromId);
+    const toIdx = next.indexOf(targetId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    next.splice(fromIdx, 1);
+    next.splice(toIdx, 0, fromId);
+
+    settings.update((s) => ({ ...s, helloNavOrder: next }));
+    persistNavOrder?.(next);
+  }
   $: showWeightInput =
     $settings.weightControlEnabled !== false && $settings.helloShowWeight !== false;
   $: currentWeight = latestWeight($weightData?.entries || []);
@@ -264,32 +351,25 @@
     {/if}
   </div>
 
-  <!-- Nav -->
+  <!-- Nav (drag & drop to reorder) -->
   <div class="hello-nav">
-    {#if showTasksBtn}
-      <button class="hello-nav-btn" on:click={onOpenTasks}>
-        <span class="hello-nav-icon">✅</span>
-        <span>{$t("hello.navTasks")}</span>
+    {#each navItems as item (item.id)}
+      <button
+        class="hello-nav-btn"
+        class:dragging={draggedNavId === item.id}
+        class:drag-over={dragOverNavId === item.id}
+        draggable="true"
+        on:click={() => item.onClick?.()}
+        on:dragstart={(e) => onNavDragStart(e, item.id)}
+        on:dragend={onNavDragEnd}
+        on:dragover={(e) => onNavDragOver(e, item.id)}
+        on:dragleave={onNavDragLeave}
+        on:drop={(e) => onNavDrop(e, item.id)}
+      >
+        <span class="hello-nav-icon">{item.icon}</span>
+        <span>{item.label}</span>
       </button>
-    {/if}
-    {#if showAnalyticsBtn}
-      <button class="hello-nav-btn" on:click={onOpenAnalytics}>
-        <span class="hello-nav-icon">📊</span>
-        <span>{$t("hello.navAnalytics")}</span>
-      </button>
-    {/if}
-    {#if showFinanceBtn}
-      <button class="hello-nav-btn" on:click={onOpenFinance}>
-        <span class="hello-nav-icon">💰</span>
-        <span>{$t("hello.navFinance")}</span>
-      </button>
-    {/if}
-    {#if showScheduleBtn}
-      <button class="hello-nav-btn" on:click={onOpenSchedule}>
-        <span class="hello-nav-icon">📅</span>
-        <span>{$t("hello.navSchedule")}</span>
-      </button>
-    {/if}
+    {/each}
   </div>
 </div>
 
@@ -583,6 +663,19 @@
   }
 
   .hello-nav-btn:active { transform: translateY(0); box-shadow: none; }
+
+  /* Drag & drop reorder */
+  .hello-nav-btn { user-select: none; cursor: grab; }
+  .hello-nav-btn.dragging {
+    opacity: 0.45;
+    cursor: grabbing;
+    transform: scale(0.97);
+  }
+  .hello-nav-btn.drag-over {
+    border-color: var(--interactive-accent, #7C5CFC);
+    box-shadow: 0 0 0 2px var(--interactive-accent, #7C5CFC);
+    transform: translateY(-2px) scale(1.02);
+  }
 
   .hello-nav-icon { font-size: 16px; line-height: 1; }
 

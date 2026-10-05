@@ -459,6 +459,9 @@ export default class CalendarPlugin extends Plugin {
           onOpenAnalytics: () => this.activateHabitAnalyticsView(),
           onOpenFinance: () => this.activateFinanceView(),
           onOpenSchedule: () => window.innerWidth <= 768 ? this.activateMobileScheduleView() : this.activateScheduleView(),
+          persistNavOrder: (order: string[]) => {
+            void this.writeOptions({ helloNavOrder: order });
+          },
         },
       });
     });

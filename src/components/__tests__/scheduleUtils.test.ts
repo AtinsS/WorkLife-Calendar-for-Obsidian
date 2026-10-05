@@ -150,6 +150,44 @@ describe("taskToEvent", () => {
     expect(event.end).toContain("T11:00:00");
   });
 
+  it("should prefer endTime over estimatedTime for the end point", () => {
+    const task = makeTask({
+      scheduledTime: "18:00",
+      endTime: "19:30",
+      estimatedTime: 60, // stale / conflicting — endTime must win
+    });
+    const event = taskToEvent(task, []);
+
+    expect(event.start).toContain("T18:00:00");
+    expect(event.end).toContain("T19:30:00");
+  });
+
+  it("should handle overnight endTime (end before start)", () => {
+    const task = makeTask({
+      scheduledTime: "23:00",
+      endTime: "01:00",
+    });
+    const event = taskToEvent(task, []);
+
+    expect(event.start).toContain("T23:00:00");
+    expect(event.end).toContain("T01:00:00");
+  });
+
+  it("should give timed deadline events a non-zero end", () => {
+    const task = makeTask({
+      id: "t1",
+      dateUID: "day-2026-07-01T00:00:00",
+      deadline: "day-2026-07-20T00:00:00",
+      deadlineTime: "18:00",
+    });
+    const events = tasksToEvents([task], []);
+    const dl = events.find((e) => e.extendedProps.isDeadlineEvent);
+
+    expect(dl).toBeTruthy();
+    expect(dl.start).toContain("T18:00:00");
+    expect(dl.end).toContain("T18:30:00");
+  });
+
   it("should use project color when available (muted)", () => {
     const project = makeProject({ color: "#ff0000" });
     const task = makeTask({ projectId: "proj-1" });
@@ -292,6 +330,120 @@ describe("tasksToEvents", () => {
 
     expect(events.length).toBe(1);
     expect(events[0].extendedProps.task.recurrence.type).toBe("daily");
+  });
+
+  it("should emit only one deadline event for a recurring series", () => {
+    const deadline = "day-2026-07-20T00:00:00";
+    const parent = makeTask({
+      id: "parent",
+      title: "Recurring",
+      dateUID: "day-2026-07-01T00:00:00",
+      recurrence: { type: "daily", interval: 1 },
+      deadline,
+    });
+    const instances = [2, 3, 4, 5].map((d) =>
+      makeTask({
+        id: `inst-${d}`,
+        title: "Recurring",
+        dateUID: `day-2026-07-0${d}T00:00:00`,
+        recurrence: { type: "daily", interval: 1 },
+        isRecurringInstance: true,
+        parentTaskId: "parent",
+        deadline,
+      })
+    );
+
+    const events = tasksToEvents([parent, ...instances], []);
+    const deadlineEvents = events.filter((e) => e.extendedProps.isDeadlineEvent);
+
+    expect(deadlineEvents.length).toBe(1);
+    expect(deadlineEvents[0].id).toBe("deadline-parent");
+    // 5 task events + 1 deadline
+    expect(events.length).toBe(6);
+  });
+
+  it("should emit one deadline even when only instances carry it", () => {
+    const deadline = "day-2026-07-20T00:00:00";
+    const instances = [1, 2, 3].map((d) =>
+      makeTask({
+        id: `inst-${d}`,
+        title: "Recurring",
+        dateUID: `day-2026-07-0${d}T00:00:00`,
+        isRecurringInstance: true,
+        parentTaskId: "parent",
+        deadline,
+      })
+    );
+
+    const events = tasksToEvents(instances, []);
+    const deadlineEvents = events.filter((e) => e.extendedProps.isDeadlineEvent);
+
+    expect(deadlineEvents.length).toBe(1);
+  });
+
+  it("should emit one deadline for chained instance parentTaskId", () => {
+    const deadline = "day-2026-07-20T00:00:00";
+    const parent = makeTask({
+      id: "root",
+      title: "Recurring",
+      dateUID: "day-2026-07-01T00:00:00",
+      recurrence: { type: "daily", interval: 1 },
+      deadline,
+    });
+    const inst1 = makeTask({
+      id: "a",
+      title: "Recurring",
+      dateUID: "day-2026-07-02T00:00:00",
+      isRecurringInstance: true,
+      parentTaskId: "root",
+      deadline,
+    });
+    // createNextRecurringInstance may point at the previous instance, not the root
+    const inst2 = makeTask({
+      id: "b",
+      title: "Recurring",
+      dateUID: "day-2026-07-03T00:00:00",
+      isRecurringInstance: true,
+      parentTaskId: "a",
+      deadline,
+    });
+
+    const events = tasksToEvents([parent, inst1, inst2], []);
+    const deadlineEvents = events.filter((e) => e.extendedProps.isDeadlineEvent);
+
+    expect(deadlineEvents.length).toBe(1);
+  });
+
+  it("should skip deadline event when task date equals deadline date", () => {
+    const deadline = "day-2026-07-05T00:00:00";
+    const tasks = [
+      makeTask({ id: "t1", dateUID: "day-2026-07-05T00:00:00", deadline }),
+    ];
+
+    const events = tasksToEvents(tasks, []);
+    const deadlineEvents = events.filter((e) => e.extendedProps.isDeadlineEvent);
+
+    expect(deadlineEvents.length).toBe(0);
+  });
+
+  it("should emit separate deadlines for unrelated tasks", () => {
+    const tasks = [
+      makeTask({
+        id: "t1",
+        dateUID: "day-2026-07-01T00:00:00",
+        deadline: "day-2026-07-10T00:00:00",
+      }),
+      makeTask({
+        id: "t2",
+        dateUID: "day-2026-07-02T00:00:00",
+        deadline: "day-2026-07-11T00:00:00",
+      }),
+    ];
+
+    const events = tasksToEvents(tasks, []);
+    const deadlineEvents = events.filter((e) => e.extendedProps.isDeadlineEvent);
+
+    expect(deadlineEvents.length).toBe(2);
   });
 });
 
