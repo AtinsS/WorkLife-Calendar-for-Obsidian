@@ -34,7 +34,25 @@
     const date = taskDate(task.dateUID);
     if (!date || isDone(task)) return false;
     if (date < today) return true;
-    return date === today && task.status === "todo" && !!task.scheduledTime && task.scheduledTime <= time;
+    // Same day: overdue only after the planned slot ends (endTime / estimate / +60),
+    // not at the moment the task is supposed to start.
+    return date === today && checkSlotOverdue(task, time);
+  }
+
+  /** True when today's planned slot has already ended. */
+  function checkSlotOverdue(task: ITask, time: string): boolean {
+    if (task.status !== "todo" || !task.scheduledTime) return false;
+    const end =
+      task.endTime ||
+      (() => {
+        const [sh, sm] = task.scheduledTime!.split(":").map(Number);
+        const extra = task.estimatedTime && task.estimatedTime > 0 ? task.estimatedTime : 60;
+        const total = sh * 60 + sm + extra;
+        const eh = Math.floor(total / 60) % 24;
+        const em = total % 60;
+        return `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
+      })();
+    return end <= time;
   }
 
   function isDeadlineToday(task: ITask, today: string): boolean {

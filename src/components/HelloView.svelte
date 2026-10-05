@@ -665,10 +665,10 @@
   .hello-nav-btn:active { transform: translateY(0); box-shadow: none; }
 
   /* Drag & drop reorder */
-  .hello-nav-btn { user-select: none; cursor: grab; }
+  .hello-nav-btn { user-select: none; cursor: pointer; }
   .hello-nav-btn.dragging {
     opacity: 0.45;
-    cursor: grabbing;
+    cursor: pointer;
     transform: scale(0.97);
   }
   .hello-nav-btn.drag-over {

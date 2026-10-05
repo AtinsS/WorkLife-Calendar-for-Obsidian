@@ -1,6 +1,7 @@
 import type { App } from "obsidian";
-import { Notice } from "obsidian";
+import { Notice, normalizePath, TFile } from "obsidian";
 import { CustomModal } from "../ui/CustomModal";
+import { renderMarkdown, appendMarkdownToNote, datedNotePath } from "../ui/markdown";
 import { tRaw } from "../i18n";
 import {
   forecastBalance,
@@ -27,6 +28,8 @@ export class AIFinanceModal extends CustomModal {
   private statusEl: HTMLElement | null = null;
   private resultEl: HTMLElement | null = null;
   private suggestion: DistributionSuggestion | null = null;
+  private forecastText = "";
+  private lastPaint = 0;
 
   constructor(app: App, mode: AIFinanceMode, cb: AIFinanceCallbacks) {
     super(app);
@@ -47,6 +50,7 @@ export class AIFinanceModal extends CustomModal {
   private setMode(mode: AIFinanceMode): void {
     this.mode = mode;
     this.suggestion = null;
+    this.forecastText = "";
     this.render();
   }
 
@@ -119,19 +123,32 @@ export class AIFinanceModal extends CustomModal {
     return true;
   }
 
+  private paintMarkdown(host: HTMLElement, md: string): void {
+    host.empty();
+    host.addClass("ai-finance-stream", "ai-md");
+    renderMarkdown(host, md);
+  }
+
   private async runForecast(): Promise<void> {
     if (this.busy || !this.ensureAi()) return;
     const box = this.resultEl;
     if (!box) return;
     this.busy = true;
     this.abort = new AbortController();
+    this.forecastText = "";
     this.setStatus(tRaw("ai.finance.working"));
-    const out = box.createDiv({ cls: "ai-finance-stream" });
+    const out = box.createDiv({ cls: "ai-finance-stream ai-md" });
     try {
       await forecastBalance(this.cb.getSummary(), this.abort.signal, (full) => {
-        out.textContent = full;
+        this.forecastText = full;
+        const now = Date.now();
+        if (now - this.lastPaint < 40) return;
+        this.lastPaint = now;
+        this.paintMarkdown(out, full);
       });
+      this.paintMarkdown(out, this.forecastText.trim());
       this.setStatus("");
+      this.mountNoteButton(box, () => this.forecastText.trim(), tRaw("ai.finance.noteForecastTitle"));
     } catch {
       out.remove();
       this.setStatus(tRaw("ai.finance.error"), true);
@@ -156,27 +173,31 @@ export class AIFinanceModal extends CustomModal {
     }
   }
 
+  private rulesAsMarkdown(sug: DistributionSuggestion): string {
+    const parts: string[] = [];
+    if (sug.explanation) parts.push(sug.explanation.trim(), "");
+    if (sug.rules.length) {
+      parts.push(`## ${tRaw("ai.finance.tab.rules")}`, ...sug.rules.map((r) => `- ${r}`), "");
+    }
+    if (sug.categoryPercents.length) {
+      parts.push(`## ${tRaw("ai.finance.rulesPercents")}`);
+      for (const c of sug.categoryPercents) {
+        parts.push(`- **${c.name}** — ${c.percent}%`);
+      }
+    }
+    return parts.join("\n").trim();
+  }
+
   private paintRules(): void {
     const box = this.resultEl;
     if (!box) return;
-    box.querySelectorAll(".ai-finance-list, .ai-finance-apply, .ai-finance-stream").forEach((el) => el.remove());
+    box.querySelectorAll(".ai-finance-list, .ai-finance-apply, .ai-finance-stream, .ai-finance-note-btn").forEach((el) => el.remove());
     const sug = this.suggestion;
     if (!sug) return;
 
-    if (sug.explanation) {
-      box.createDiv({ cls: "ai-finance-stream", text: sug.explanation });
-    }
-
-    const list = box.createDiv({ cls: "ai-finance-list" });
-    for (const r of sug.rules) {
-      list.createDiv({ cls: "ai-finance-rule", text: `• ${r}` });
-    }
-    if (sug.categoryPercents.length > 0) {
-      list.createDiv({ cls: "ai-finance-rule", text: tRaw("ai.finance.rulesPercents") });
-      for (const c of sug.categoryPercents) {
-        list.createDiv({ cls: "ai-finance-rule", text: `  ${c.name}: ${c.percent}%` });
-      }
-    }
+    const mdText = this.rulesAsMarkdown(sug);
+    const stream = box.createDiv({ cls: "ai-finance-stream ai-md" });
+    this.paintMarkdown(stream, mdText);
 
     const applyBtn = box.createEl("button", {
       text: tRaw("ai.finance.rulesApply"),
@@ -188,5 +209,39 @@ export class AIFinanceModal extends CustomModal {
       new Notice(tRaw("ai.finance.rulesApplied"));
       this.close();
     });
+
+    this.mountNoteButton(box, () => mdText, tRaw("ai.finance.noteRulesTitle"));
+  }
+
+  private mountNoteButton(
+    box: HTMLElement,
+    getText: () => string,
+    title: string,
+  ): void {
+    box.querySelector(".ai-finance-note-btn")?.remove();
+    const btn = box.createEl("button", {
+      text: tRaw("ai.finance.saveToNote"),
+      cls: "ai-btn ai-finance-note-btn",
+    });
+    btn.addEventListener("click", () => void this.saveToNote(getText(), title));
+  }
+
+  private async saveToNote(body: string, title: string): Promise<void> {
+    const text = body.trim();
+    if (!text) return;
+    try {
+      const path = await appendMarkdownToNote(
+        this.app,
+        datedNotePath(title),
+        `# ${title}\n\n${text}\n`,
+      );
+      new Notice(tRaw("ai.finance.noteSaved", { path }));
+      const file = this.app.vault.getAbstractFileByPath(normalizePath(path));
+      if (file instanceof TFile) {
+        await this.app.workspace.getLeaf("tab").openFile(file);
+      }
+    } catch (e) {
+      new Notice(tRaw("ai.finance.noteError", { error: e instanceof Error ? e.message : String(e) }));
+    }
   }
 }

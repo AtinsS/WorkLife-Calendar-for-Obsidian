@@ -1036,12 +1036,13 @@
 }
 
 .task-tracker-list::-webkit-scrollbar {
-  width: 6px;
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .task-tracker-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  background: transparent;
 }
 
 /* ============================================
@@ -4264,11 +4265,13 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   SCROLLBAR
+   SCROLLBAR — hidden plugin-wide (see bottom of file)
    ============================================ */
 .task-tracker-panel::-webkit-scrollbar,
 .habit-tracker-panel::-webkit-scrollbar {
-  width: 5px;
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .task-tracker-panel::-webkit-scrollbar-track,
@@ -4278,13 +4281,12 @@ h2.tm-title.tm-title {
 
 .task-tracker-panel::-webkit-scrollbar-thumb,
 .habit-tracker-panel::-webkit-scrollbar-thumb {
-  background: var(--mcp-glass-border);
-  border-radius: 3px;
+  background: transparent;
 }
 
 .task-tracker-panel::-webkit-scrollbar-thumb:hover,
 .habit-tracker-panel::-webkit-scrollbar-thumb:hover {
-  background: var(--mcp-text-faint);
+  background: transparent;
 }
 
 /* ============================================
@@ -12829,6 +12831,12 @@ input.ai-task-time-input.ai-task-time-input {
   background: var(--background-secondary);
   margin-top: 8px;
 }
+.ai-finance-stream.ai-md {
+  white-space: normal;
+}
+.ai-finance-note-btn {
+  margin-left: auto;
+}
 .ai-finance-list {
   display: flex;
   flex-direction: column;
@@ -12862,6 +12870,302 @@ input.ai-task-time-input.ai-task-time-input {
   display: flex;
   justify-content: flex-end;
   margin-top: 14px;
+}
+
+/* -- AI expense parse modal (redesign) --------------------- */
+.ai-expense-modal .wf-dialog-content {
+  max-width: 520px;
+  padding: 20px 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.aex-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.aex-head-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  background: rgba(95, 153, 225, 0.12);
+  border: 1px solid rgba(95, 153, 225, 0.22);
+  flex-shrink: 0;
+}
+.aex-head-text { min-width: 0; flex: 1; }
+.aex-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-normal);
+}
+.aex-subtitle {
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.aex-input-wrap {
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.aex-input-wrap:focus-within {
+  border-color: rgba(95, 153, 225, 0.5);
+  box-shadow: 0 0 0 2px rgba(95, 153, 225, 0.15);
+}
+.aex-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: none !important;
+  outline: none;
+  padding: 12px 14px;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: inherit;
+  resize: vertical;
+  min-height: 72px;
+}
+.aex-textarea::placeholder {
+  color: var(--text-faint);
+}
+
+.aex-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+.aex-footer-spacer {
+  flex: 1;
+}
+.aex-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-muted);
+}
+.aex-btn-ghost:hover {
+  background: var(--background-modifier-hover);
+  color: var(--text-normal);
+}
+.aex-cancel-btn,
+.aex-run-btn,
+.aex-apply-btn,
+.aex-note-btn {
+  height: 36px;
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.aex-run-btn,
+.aex-apply-btn {
+  min-width: 110px;
+  font-weight: 600;
+}
+.aex-apply-btn:disabled {
+  opacity: 0.45;
+}
+
+.aex-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 18px;
+}
+.aex-status.is-error { color: var(--text-error); }
+.aex-status.is-busy::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(95, 153, 225, 0.25);
+  border-top-color: #5f99e1;
+  animation: aex-spin 0.7s linear infinite;
+}
+@keyframes aex-spin {
+  to { transform: rotate(360deg); }
+}
+
+.aex-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(95, 153, 225, 0.1);
+  border: 1px solid rgba(95, 153, 225, 0.22);
+}
+.aex-summary-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+.aex-summary-total {
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+}
+
+.aex-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.aex-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.aex-toggle-all {
+  border: none;
+  background: transparent;
+  color: var(--interactive-accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 0;
+  font-family: inherit;
+}
+.aex-toggle-all:hover { text-decoration: underline; }
+.aex-bar-count {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.aex-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.aex-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--background-secondary);
+  transition: background 0.12s ease, border-color 0.12s ease, opacity 0.12s ease;
+}
+.aex-row:hover {
+  background: var(--background-modifier-hover);
+}
+.aex-row.is-selected {
+  border-color: rgba(95, 153, 225, 0.35);
+  background: rgba(95, 153, 225, 0.08);
+}
+.aex-row:not(.is-selected) {
+  opacity: 0.55;
+}
+
+.aex-row-check {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--interactive-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0;
+}
+.aex-row-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+.aex-row-body {
+  flex: 1;
+  min-width: 0;
+}
+.aex-row-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.aex-row-cat {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.aex-row-amt {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-normal);
+  flex-shrink: 0;
+}
+
+.aex-md-wrap {
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  overflow: hidden;
+}
+.aex-md-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.aex-md-badge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(95, 153, 225, 0.18);
+  color: #8eb8e8;
+}
+.aex-md-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.aex-md-body {
+  margin: 0 !important;
+  background: transparent !important;
+  border-radius: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 12px;
+}
+
+@media (max-width: 480px) {
+  .ai-expense-modal .wf-dialog-content {
+    padding: 16px 12px 12px;
+  }
+  .aex-row-amt { font-size: 12px; }
+  .aex-rows { max-height: 220px; }
 }
 
 /* -- Weight entry modal ----------------------------------- */
@@ -12911,51 +13215,90 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 /* -- Hide scrollbars across the plugin (keep scrolling) -- */
+/* Covers every WorkLife view, panel, modal and their children. */
 .worklife-scroll-hidden,
-.finance-tracker,
+.calendar-main-view,
+.calendar-view-container,
+.schedule-view-container,
 .finance-view-container,
+.finance-tracker,
 .habit-analytics-view-container,
-.finance-view-container *,
-.habit-analytics-view-container *,
-.task-tracker-panel,
 .habit-tracker-panel,
+.task-tracker-panel,
+.task-tracker-list,
 .hello,
+.dtw-panel,
+.dashboard-card,
+.kanban-board,
+.kanban-column,
+.weight-view-container,
+.wf-dialog-overlay,
 .wf-dialog-container,
 .wf-dialog-content,
 .ai-finance-modal,
-.ai-extract-modal {
+.ai-extract-modal,
+.ai-summary-modal,
+.ai-summary-shell,
+.ai-schedule-modal,
+.mobile-schedule,
+.mobile-tasks,
+.workspace-leaf-content[data-type^="calendar-"],
+.workspace-leaf-content[data-type^="calendar-"] *,
+.wf-dialog-overlay *,
+.wf-dialog-container *,
+.finance-tracker *,
+.finance-view-container *,
+.habit-analytics-view-container *,
+.habit-tracker-panel *,
+.task-tracker-panel *,
+.hello *,
+.schedule-calendar-wrapper *,
+.schedule-calendar * {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
-.finance-tracker::-webkit-scrollbar,
+.worklife-scroll-hidden::-webkit-scrollbar,
+.calendar-main-view::-webkit-scrollbar,
+.calendar-view-container::-webkit-scrollbar,
+.schedule-view-container::-webkit-scrollbar,
 .finance-view-container::-webkit-scrollbar,
+.finance-tracker::-webkit-scrollbar,
 .habit-analytics-view-container::-webkit-scrollbar,
-.finance-view-container *::-webkit-scrollbar,
-.habit-analytics-view-container *::-webkit-scrollbar,
-.task-tracker-panel::-webkit-scrollbar,
 .habit-tracker-panel::-webkit-scrollbar,
+.task-tracker-panel::-webkit-scrollbar,
+.task-tracker-list::-webkit-scrollbar,
 .hello::-webkit-scrollbar,
+.dtw-panel::-webkit-scrollbar,
+.dashboard-card::-webkit-scrollbar,
+.kanban-board::-webkit-scrollbar,
+.kanban-column::-webkit-scrollbar,
+.weight-view-container::-webkit-scrollbar,
+.wf-dialog-overlay::-webkit-scrollbar,
 .wf-dialog-container::-webkit-scrollbar,
 .wf-dialog-content::-webkit-scrollbar,
 .ai-finance-modal::-webkit-scrollbar,
 .ai-extract-modal::-webkit-scrollbar,
-.worklife-scroll-hidden::-webkit-scrollbar {
+.ai-summary-modal::-webkit-scrollbar,
+.ai-summary-shell::-webkit-scrollbar,
+.ai-schedule-modal::-webkit-scrollbar,
+.mobile-schedule::-webkit-scrollbar,
+.mobile-tasks::-webkit-scrollbar,
+.workspace-leaf-content[data-type^="calendar-"]::-webkit-scrollbar,
+.workspace-leaf-content[data-type^="calendar-"] *::-webkit-scrollbar,
+.wf-dialog-overlay *::-webkit-scrollbar,
+.wf-dialog-container *::-webkit-scrollbar,
+.finance-tracker *::-webkit-scrollbar,
+.finance-view-container *::-webkit-scrollbar,
+.habit-analytics-view-container *::-webkit-scrollbar,
+.habit-tracker-panel *::-webkit-scrollbar,
+.task-tracker-panel *::-webkit-scrollbar,
+.hello *::-webkit-scrollbar,
+.schedule-calendar-wrapper *::-webkit-scrollbar,
+.schedule-calendar *::-webkit-scrollbar {
   width: 0;
   height: 0;
   background: transparent;
-  display: none;
-}
-
-/* Broader: any scrollable area inside WorkLife plugin views */
-.workspace-leaf-content[data-type^="calendar-"] *,
-.workspace-leaf-content[data-type^="calendar-"] {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.workspace-leaf-content[data-type^="calendar-"] ::-webkit-scrollbar {
-  width: 0;
-  height: 0;
   display: none;
 }
 

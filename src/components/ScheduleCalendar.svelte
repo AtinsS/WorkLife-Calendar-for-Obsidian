@@ -24,6 +24,7 @@
   import { TaskModal } from "../task-tracker/TaskModal";
   import { getDateUID } from "obsidian-daily-notes-interface";
   import { tasksToEvents, getStatusColor } from "./scheduleUtils";
+  import { getTaskSlotEndMs } from "../task-tracker/overdue";
   import {
     fetchWeekWeather,
     type DayWeather,
@@ -191,6 +192,36 @@
       });
     } catch (e) {
       console.error("[ScheduleCalendar] applyEventsUpdate error:", e);
+    }
+  }
+
+  /** Пересчитать ключ без refetch — после точечных мутаций (drag / delete). */
+  function syncEventsKey(): void {
+    if (destroyed || !calendar) return;
+    try {
+      const allTasks = get(tasks);
+      const allProjects = get(projects);
+      let events = tasksToEvents(allTasks, allProjects);
+      if (scheduleDisplay.scheduleShowDeadlineEvents === false) {
+        events = events.filter((e) => !e.extendedProps?.isDeadlineEvent);
+      }
+      lastEventsKey = computeEventsKey(events);
+    } catch (e) {
+      console.error("[ScheduleCalendar] syncEventsKey error:", e);
+    }
+  }
+
+  /**
+   * Точечная мутация из drag/resize/delete: не даём store-подписке
+   * устроить полный refetchEvents (мигание всего расписания).
+   */
+  function commitLocalMutation(fn: () => void): void {
+    suppressRefetch = true;
+    try {
+      fn();
+    } finally {
+      syncEventsKey();
+      suppressRefetch = false;
     }
   }
 
@@ -405,6 +436,7 @@
    * Во время растягивания выделения конечное время — это selectInfo.end
    * (нижняя граница .fc-highlight), а не слот под курсором.
    * Курсор в 17:30–18:00 даёт end=18:00 — и должна загораться метка 18:00.
+   * Внутри зеркала выделения показываем диапазон времени вместо «?».
    */
   function highlightSelectionEnd(): void {
     const highlight = calendarEl?.querySelector(".fc-highlight, .fc-select-mirror");
@@ -415,11 +447,35 @@
     const endY = hr.bottom + 1;
     setHotSlotAtY(endY);
 
+    // Время диапазона внутри зеркала выделения
+    const body = calendarEl?.querySelector(".fc-timegrid-body");
+    if (body) {
+      const slots = body.querySelectorAll<HTMLElement>(".fc-timegrid-slot");
+      const timeAtY = (y: number): string | null => {
+        for (const slot of slots) {
+          const r = slot.getBoundingClientRect();
+          if (y >= r.top - 1 && y < r.bottom + 1) {
+            const label = slot
+              .querySelector(".fc-timegrid-slot-label-cushion")
+              ?.textContent?.trim();
+            return label || null;
+          }
+        }
+        return null;
+      };
+      const tStart = timeAtY(hr.top + 1);
+      const tEnd = timeAtY(hr.bottom + 1);
+      const label = tStart && tEnd && tStart !== tEnd ? `${tStart} — ${tEnd}` : tStart || "";
+      if (label) {
+        highlight.setAttribute("data-sch-select-time", label);
+        highlight.classList.add("sch-select-with-time");
+      }
+    }
+
     // Дополнительно помечаем слот, с которого начинается время конца
     calendarEl
       ?.querySelectorAll(".fc-timegrid-slot.sch-slot-end")
       .forEach((el) => el.classList.remove("sch-slot-end"));
-    const body = calendarEl?.querySelector(".fc-timegrid-body");
     if (!body) return;
     for (const slot of body.querySelectorAll<HTMLElement>(".fc-timegrid-slot")) {
       const r = slot.getBoundingClientRect();
@@ -467,6 +523,12 @@
     calendarEl
       ?.querySelectorAll(".fc-timegrid-slot.sch-slot-hot, .fc-timegrid-slot.sch-slot-end")
       .forEach((el) => el.classList.remove("sch-slot-hot", "sch-slot-end"));
+    calendarEl
+      ?.querySelectorAll(".fc-highlight.sch-select-with-time, .fc-select-mirror.sch-select-with-time")
+      .forEach((el) => {
+        el.classList.remove("sch-select-with-time");
+        el.removeAttribute("data-sch-select-time");
+      });
   }
 
   onMount(() => {
@@ -847,13 +909,32 @@
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }
 
+  /** "HH:MM" from a Date (local). */
+  function fmtClock(d: Date | null | undefined): string {
+    if (!d) return "";
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
+  /** Time range for a mirror/unknown event: "10:00 — 12:30" or just start. */
+  function eventTimeLabel(event: any): string {
+    const start = event?.start as Date | null | undefined;
+    const end = event?.end as Date | null | undefined;
+    const s = fmtClock(start);
+    if (!s) return "";
+    const e = fmtClock(end);
+    return e && e !== s ? `${s} — ${e}` : s;
+  }
+
   function renderEventContent(eventInfo: any) {
     const { time, event } = eventInfo;
 
     const task = resolveTask(event);
     if (!task) {
+      // Select-mirror / provisional event while stretching a new task:
+      // show the time range instead of a bare "?".
+      const label = eventTimeLabel(event) || event.title || "";
       return {
-        html: `<div class="sch-event sch-event-compact"><span class="sch-event-title">${event.title || "?"}</span></div>`,
+        html: `<div class="sch-event sch-event-compact"><span class="sch-event-title">${label}</span></div>`,
       };
     }
     const isDeadlineEvent = event.extendedProps?.isDeadlineEvent as boolean;
@@ -962,25 +1043,19 @@
       task.scheduledTime &&
       task.dateUID
     ) {
-      const dateMatch = task.dateUID.match(/^day-(\d{4})-(\d{2})-(\d{2})/);
-      if (dateMatch) {
-        const [, dy, dm, dd] = dateMatch;
-        const [sh, sm] = task.scheduledTime.split(":").map(Number);
-        const scheduledStart = new Date(
-          `${dy}-${dm}-${dd}T${String(sh).padStart(2, "0")}:${String(sm).padStart(2, "0")}:00`,
-        );
-        const now = new Date();
-        if (now.getTime() > scheduledStart.getTime()) {
-          const diffMs = now.getTime() - scheduledStart.getTime();
-          const diffMin = Math.floor(diffMs / 60000);
-          const diffH = Math.floor(diffMin / 60);
-          const diffD = Math.floor(diffH / 24);
-          let overdueLabel = "";
-          if (diffD > 0) overdueLabel = `${diffD}${tRaw("schedule.days")} ${diffH % 24}${tRaw("schedule.hours")}`;
-          else if (diffH > 0) overdueLabel = `${diffH}${tRaw("schedule.hours")} ${diffMin % 60}${tRaw("schedule.minutes")}`;
-          else overdueLabel = `${diffMin}${tRaw("schedule.minutes")}`;
-          overdueHtml = `<span class="sch-overdue" title="${tRaw("schedule.overdue")}">⚠ ${overdueLabel}</span>`;
-        }
+      // Просрочка — после конца слота (endTime / estimate / +60 мин), не с начала.
+      const endMs = getTaskSlotEndMs(task);
+      const now = Date.now();
+      if (endMs !== null && now > endMs) {
+        const diffMs = now - endMs;
+        const diffMin = Math.floor(diffMs / 60000);
+        const diffH = Math.floor(diffMin / 60);
+        const diffD = Math.floor(diffH / 24);
+        let overdueLabel = "";
+        if (diffD > 0) overdueLabel = `${diffD}${tRaw("schedule.days")} ${diffH % 24}${tRaw("schedule.hours")}`;
+        else if (diffH > 0) overdueLabel = `${diffH}${tRaw("schedule.hours")} ${diffMin % 60}${tRaw("schedule.minutes")}`;
+        else overdueLabel = `${diffMin}${tRaw("schedule.minutes")}`;
+        overdueHtml = `<span class="sch-overdue" title="${tRaw("schedule.overdue")}">⚠ ${overdueLabel}</span>`;
       }
     }
 
@@ -1345,11 +1420,11 @@
 
     const newDateUID = getDateUID(m, "day");
 
-    // Debounce data update — let FullCalendar finish its animation first
+    // Debounce data update — let FullCalendar finish its animation first.
+    // FullCalendar уже отрисовал событие на новом месте — НЕ делаем полный refetch.
     if (dropDebounceTimer) clearTimeout(dropDebounceTimer);
     dropDebounceTimer = setTimeout(() => {
       dropDebounceTimer = null;
-      skipNextRefetch = true;
       try {
         const taskChanges: Record<string, any> = {
           dateUID: newDateUID,
@@ -1372,7 +1447,9 @@
             taskChanges.endTime = `${String(newEndH).padStart(2, "0")}:${String(newEndM).padStart(2, "0")}`;
           }
         }
-        updateTask(task.id, taskChanges);
+        commitLocalMutation(() => {
+          updateTask(task.id, taskChanges);
+        });
       } catch (e) {
         /* ignore */
       }
@@ -1415,12 +1492,15 @@
       dropDebounceTimer = null;
       try {
         // Stretch/resize always locks the visible slot: start + end + duration.
+        // FullCalendar уже перерисовал событие — без полного refetch.
         const updates: Record<string, any> = {
           scheduledTime,
           endTime,
           estimatedTime: durationMin > 0 ? durationMin : undefined,
         };
-        updateTask(task.id, updates);
+        commitLocalMutation(() => {
+          updateTask(task.id, updates);
+        });
       } catch (e) {
         console.error("[handleEventResize] error:", e);
       }
@@ -1664,10 +1744,22 @@
   }
 
   async function contextDeleteTask(): Promise<void> {
-    if (contextMenuTask) {
-      removeTask(contextMenuTask.id);
-    }
+    const task = contextMenuTask;
     closeContextMenu();
+    if (!task) return;
+    // Точечное удаление событий задачи (включая дедлайн) без полного refetch.
+    commitLocalMutation(() => {
+      if (calendar) {
+        for (const ev of calendar.getEvents()) {
+          const tid = ev.extendedProps?.taskId || ev.id;
+          const isDeadline = ev.id === `deadline-${task.id}` || ev.extendedProps?.isDeadlineEvent;
+          if (tid === task.id || (isDeadline && ev.extendedProps?.taskId === task.id)) {
+            ev.remove();
+          }
+        }
+      }
+      removeTask(task.id);
+    });
   }
 
   export function refresh(): void {
@@ -2161,6 +2253,24 @@
     border-radius: 4px;
     transition: background-color 0.15s ease;
     animation: sch-select-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+    position: relative;
+  }
+
+  /* Время диапазона внутри зеркала выделения (вместо «?») */
+  :global(.fc .fc-highlight.sch-select-with-time::after),
+  :global(.fc .fc-select-mirror.sch-select-with-time::after) {
+    content: attr(data-sch-select-time);
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-normal, #e8ecf0);
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
   }
 
   @keyframes sch-select-in {

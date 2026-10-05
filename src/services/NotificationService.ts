@@ -10,6 +10,7 @@ import { tasks } from "src/task-tracker/stores";
 import type { ITask } from "src/task-tracker/types";
 import type { ISettings } from "src/settings";
 import { getActiveTimer } from "src/task-tracker/TimerManager";
+import { isTaskOverdue } from "src/task-tracker/overdue";
 import { recordNotificationEvent } from "./notificationTelemetry";
 import { tRaw } from "../i18n";
 import { errorMessage } from "../utils/sanitize";
@@ -47,6 +48,7 @@ export class NotificationService {
   private digestScheduling = false;
   private lastDigestDate = "";
   private firedReminders = new Set<string>();
+  private firedDueNow = new Set<string>();
   private firedOverdue = new Set<string>();
   private firedDeadline = new Set<string>();
   private firedEstimateExceeded = new Set<string>();
@@ -109,6 +111,7 @@ export class NotificationService {
     }
     this.stopDailyDigestLoop();
     this.firedReminders.clear();
+    this.firedDueNow.clear();
     this.firedOverdue.clear();
     this.firedDeadline.clear();
     this.firedEstimateExceeded.clear();
@@ -157,6 +160,7 @@ export class NotificationService {
           const fireAt = scheduledMoment.valueOf();
           // Include dateUID + scheduledTime in key so carryOver / reschedule clears stale fired state
           const reminderKey = `${task.id}@${task.dateUID}@${task.scheduledTime}:reminder`;
+          const dueNowKey = `${task.id}@${task.dateUID}@${task.scheduledTime}:due-now`;
           const overdueKey = `${task.id}@${task.dateUID}@${task.scheduledTime}:overdue`;
 
           const reminderMs = this.getSettings().reminderMinutesBefore * 60_000;
@@ -169,8 +173,23 @@ export class NotificationService {
             );
           }
 
-          // Просрочка — сразу при наступлении запланированного времени
-          if (this.getSettings().notifyOverdue && task.status === "todo" && now >= fireAt && !this.firedOverdue.has(overdueKey)) {
+          // Наступило время выполнения — напоминание «приступить», НЕ «просрочено»
+          if (this.getSettings().notifyReminders && now >= fireAt && now < fireAt + 60_000 && !this.firedDueNow.has(dueNowKey)) {
+            this.firedDueNow.add(dueNowKey);
+            this.notify(
+              tRaw("taskStore.notificationTitle"),
+              tRaw("notifications.dueNow", { title: task.title, time: task.scheduledTime || "" }),
+              "due-now"
+            );
+          }
+
+          // Просрочка — только после окончания запланированного слота
+          // (endTime / estimate / +60 мин), а не в момент начала задачи.
+          if (
+            this.getSettings().notifyOverdue &&
+            isTaskOverdue(task, now) &&
+            !this.firedOverdue.has(overdueKey)
+          ) {
             this.firedOverdue.add(overdueKey);
             this.notify(
               tRaw("taskStore.notificationTitle"),
@@ -621,6 +640,12 @@ export class NotificationService {
         this.firedReminders.delete(key);
       }
     }
+    for (const key of this.firedDueNow) {
+      const taskId = key.split("@")[0];
+      if (!activeIds.has(taskId)) {
+        this.firedDueNow.delete(key);
+      }
+    }
     for (const key of this.firedOverdue) {
       const taskId = key.split("@")[0];
       if (!activeIds.has(taskId)) {
@@ -647,6 +672,7 @@ export class NotificationService {
       const data: Record<string, unknown> = await this.plugin.loadData() as Record<string, unknown>;
       const fired = (data?.firedNotifications ?? {}) as Record<string, string[]>;
       this.firedReminders = new Set(fired.reminders ?? []);
+      this.firedDueNow = new Set(fired.dueNow ?? []);
       this.firedOverdue = new Set(fired.overdue ?? []);
       this.firedDeadline = new Set(fired.deadline ?? []);
       this.firedEstimateExceeded = new Set(fired.estimateExceeded ?? []);
@@ -658,6 +684,7 @@ export class NotificationService {
   private saveFiredState(): void {
     const firedData = {
       reminders: [...this.firedReminders],
+      dueNow: [...this.firedDueNow],
       overdue: [...this.firedOverdue],
       deadline: [...this.firedDeadline],
       estimateExceeded: [...this.firedEstimateExceeded],
