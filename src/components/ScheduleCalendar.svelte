@@ -225,6 +225,29 @@
     }
   }
 
+  /** Перерисовать контент одного события из актуальных event + store. */
+  function refreshEventContent(taskId: string): void {
+    if (destroyed || !calendar || !calendarEl) return;
+    try {
+      const ev = calendar.getEventById(taskId);
+      if (!ev) return;
+      const el = calendarEl.querySelector(
+        `[data-event-id="${CSS.escape(taskId)}"]`,
+      );
+      if (!el) return;
+      const rendered = renderEventContent({
+        event: ev,
+        timeText: ev.allDay ? "" : fmtClock(ev.start),
+      } as any);
+      if (rendered?.html != null) {
+        const root = el.querySelector(".fc-event-main") ?? el;
+        root.innerHTML = rendered.html;
+      }
+    } catch (e) {
+      console.error("[ScheduleCalendar] refreshEventContent error:", e);
+    }
+  }
+
   /** Debounced refetch — предотвращает каскадное обновление */
   function scheduleRefetch(): void {
     if (destroyed) return;
@@ -893,13 +916,15 @@
   }
 
   /** FullCalendar v6 + luxon3 не сохраняет complex objects в extendedProps.
-   *  Ищем task по ID из store — это гарантированно работает. */
+   *  Всегда предпочитаем live-store: extendedProps.task — устаревший снапшот
+   *  из tasksToEvents и после drag/resize тянет старое время. */
   function resolveTask(event: any): ITask | null {
-    const fromProps = event.extendedProps?.task as ITask | undefined;
-    if (fromProps) return fromProps;
     const taskId = event.extendedProps?.taskId || event.id;
-    if (!taskId) return null;
-    return get(tasks).find((t) => t.id === taskId) || null;
+    if (taskId) {
+      const live = get(tasks).find((t) => t.id === taskId);
+      if (live) return live;
+    }
+    return (event.extendedProps?.task as ITask | undefined) || null;
   }
 
   /** Получить чек-лист для задачи */
@@ -926,7 +951,11 @@
   }
 
   function renderEventContent(eventInfo: any) {
-    const { time, event } = eventInfo;
+    // FullCalendar v6 передаёт timeText (не time). Раньше time был всегда
+    // undefined — метка времени бралась из task.scheduledTime и после drag
+    // «залипала» на старом значении, пока не было refetch.
+    const event = eventInfo.event;
+    const timeText: string = (eventInfo.timeText ?? eventInfo.time ?? "").trim();
 
     const task = resolveTask(event);
     if (!task) {
@@ -957,7 +986,11 @@
 
     // Month view: compact inline badge — only time + status
     if (currentViewType === "dayGridMonth") {
-      const displayTime = task.scheduledTime || "";
+      // Время берём из диапазона события — оно обновляется сразу при drag,
+      // в отличие от task.scheduledTime (store ещё не обновлён).
+      const displayTime = event.allDay
+        ? ""
+        : fmtClock(event.start) || task.scheduledTime || "";
       const statusIcon = task.status === "progress" ? "🔥"
         : task.status === "paused" ? "☕"
         : task.status === "done" ? "✓"
@@ -979,8 +1012,19 @@
     const showOverdue = scheduleDisplay.scheduleShowOverdue !== false;
     const showDescription = scheduleDisplay.scheduleShowDescription !== false;
 
-    const startTime = showTime ? time || task.scheduledTime || "" : "";
-    const endTimeStr = showTime && startTime && task.endTime ? task.endTime : "";
+    // Старт/финиш — из диапазона события (актуален сразу после drag/resize).
+    // task.scheduledTime / endTime — fallback и флаг «явный конец».
+    // allDay: время не показываем, даже если store ещё не обновился.
+    const startClock = !event.allDay && event.start ? fmtClock(event.start) : "";
+    const endClock = !event.allDay && event.end ? fmtClock(event.end) : "";
+    const startTime = showTime && !event.allDay
+      ? startClock || timeText || task.scheduledTime || ""
+      : "";
+    const hasExplicitEnd = !!task.endTime;
+    const endTimeStr =
+      showTime && startTime && hasExplicitEnd && endClock && endClock !== startTime
+        ? endClock
+        : "";
     const displayTime = endTimeStr ? `${startTime} — ${endTimeStr}` : startTime;
     const statusLabel = showStatus
       ? task.status === "progress"
@@ -1450,6 +1494,7 @@
         commitLocalMutation(() => {
           updateTask(task.id, taskChanges);
         });
+        refreshEventContent(task.id);
       } catch (e) {
         /* ignore */
       }
@@ -1501,6 +1546,7 @@
         commitLocalMutation(() => {
           updateTask(task.id, updates);
         });
+        refreshEventContent(task.id);
       } catch (e) {
         console.error("[handleEventResize] error:", e);
       }
