@@ -5,6 +5,7 @@
   import dayGridPlugin from "@fullcalendar/daygrid";
   import timeGridPlugin from "@fullcalendar/timegrid";
   import interactionPlugin from "@fullcalendar/interaction";
+  import luxonPlugin from "@fullcalendar/luxon3";
 
   import { configureGlobalMomentLocale } from "obsidian-calendar-ui";
   import { tRaw, locale } from "../i18n";
@@ -683,8 +684,10 @@
     const mirrorParent = document.body;
 
     calendar = new Calendar(calendarEl, {
-      plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin],
+      plugins: [dayGridPlugin, timeGridPlugin, interactionPlugin, luxonPlugin],
       initialView,
+      // Named timeZone requires luxonPlugin — without it FullCalendar cannot
+      // resolve offsets and event.start is shifted by the UTC offset.
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       locale: tRaw("locale.momentLocale"),
       headerToolbar,
@@ -994,6 +997,7 @@
       const statusIcon = task.status === "progress" ? "🔥"
         : task.status === "paused" ? "☕"
         : task.status === "done" ? "✓"
+        : task.status === "failed" ? "✕"
         : "";
       const statusClass = `sch-inline-${task.status}`;
       const timeHtml = displayTime ? `<span class="sch-inline-time">${displayTime}</span>` : "";
@@ -1344,7 +1348,8 @@
       "paused",
       "done",
     ];
-    const currentStatus = task.status === "all" ? "todo" : task.status;
+    // failed is terminal via context menu; click cycles through the main flow
+    const currentStatus = task.status === "all" || task.status === "failed" ? "todo" : task.status;
     const currentIdx = statusOrder.indexOf(currentStatus);
     const nextStatus = statusOrder[(currentIdx + 1) % statusOrder.length];
     updateTaskStatus(task.id, nextStatus);
@@ -1681,6 +1686,14 @@
             },
           ]
         : []),
+      ...(task.status !== "failed"
+        ? [
+            {
+              label: ` ${tRaw("schedule.statusToFailed")}`,
+              action: () => contextChangeStatus("failed"),
+            },
+          ]
+        : []),
       { divider: true },
       ...(!isMobile
         ? [
@@ -1769,7 +1782,7 @@
   }
 
   function contextChangeStatus(
-    newStatus: "todo" | "progress" | "done" | "paused",
+    newStatus: "todo" | "progress" | "done" | "paused" | "failed",
   ): void {
     if (contextMenuTask) {
       updateTaskStatus(contextMenuTask.id, newStatus);

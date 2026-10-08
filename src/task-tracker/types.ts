@@ -5,7 +5,7 @@ export interface RecurrenceConfig {
   until?: DateUID; // dateUID "day-YYYY-MM-DD" — повторение до этой даты включительно
 }
 
-export type TaskStatus = "todo" | "progress" | "done" | "paused" | "all";
+export type TaskStatus = "todo" | "progress" | "done" | "paused" | "failed" | "all";
 
 export interface ITask {
   id: string;

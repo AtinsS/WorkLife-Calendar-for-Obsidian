@@ -157,39 +157,54 @@ function renderIconPicker(
 }
 
 export class ProjectModal extends CustomModal {
+  private showAddForm = false;
+
   onOpen(): void {
+    this.contentEl.empty();
     this.containerEl.addClass("wf-project-modal");
 
-    const header = this.contentEl.createDiv("pm-modal-header");
-    header.createDiv({ text: "🗂", cls: "pm-modal-header-icon" });
-    const headerText = header.createDiv("pm-modal-header-text");
+    const allProjects = get(projects);
+    // Auto-open add form when there are no projects yet
+    if (allProjects.length === 0 && !this.showAddForm) {
+      this.showAddForm = true;
+    }
+
+    this.renderHeader(this.contentEl);
+    if (this.showAddForm) {
+      this.renderNewProjectForm(this.contentEl);
+    }
+    this.renderProjectList(this.contentEl);
+  }
+
+  private renderHeader(container: HTMLElement): void {
+    const header = container.createDiv("pm-modal-header");
+    const left = header.createDiv("pm-modal-header-left");
+    left.createDiv({ text: "🗂", cls: "pm-modal-header-icon" });
+    const headerText = left.createDiv("pm-modal-header-text");
     headerText.createEl("h2", { text: tRaw("tasks.project.title") });
     headerText.createEl("p", {
       text: tRaw("tasks.project.subtitle"),
       cls: "wf-dialog-subtitle",
     });
 
-    this.renderNewProjectForm(this.contentEl);
-    this.renderProjectList(this.contentEl);
+    const addBtn = header.createEl("button", {
+      text: this.showAddForm ? tRaw("common.cancel") : `+ ${tRaw("tasks.project.newProject")}`,
+      cls: this.showAddForm ? "pm-header-btn" : "pm-header-btn mod-cta",
+    });
+    addBtn.addEventListener("click", () => {
+      this.showAddForm = !this.showAddForm;
+      this.rerender();
+    });
   }
 
   private renderNewProjectForm(container: HTMLElement): void {
-    const section = container.createDiv("pm-new-project");
+    const section = container.createDiv("pm-new-project pm-new-project-open");
 
-    const header = section.createDiv("pm-section-header pm-section-toggle");
+    const header = section.createDiv("pm-section-header");
     header.createSpan({ text: "+", cls: "pm-section-icon" });
     header.createSpan({ text: tRaw("tasks.project.newProject"), cls: "pm-section-title" });
-    const chevron = header.createSpan({ text: "▾", cls: "pm-chevron" });
 
-    const body = section.createDiv("pm-section-body pm-section-collapsed");
-    chevron.textContent = "▸";
-
-    let isExpanded = false;
-    header.addEventListener("click", () => {
-      isExpanded = !isExpanded;
-      body.classList.toggle("pm-section-collapsed", !isExpanded);
-      chevron.textContent = isExpanded ? "▾" : "▸";
-    });
+    const body = section.createDiv("pm-section-body");
 
     let newName = "";
     let newColor = DEFAULT_PROJECT_COLORS[0];
@@ -206,12 +221,12 @@ export class ProjectModal extends CustomModal {
     nameInput.addEventListener("input", () => {
       newName = nameInput.value;
       charCount.textContent = `${newName.length}/60`;
+      updatePreview();
     });
 
     // Color + Icon row
     const row = body.createDiv("pm-row");
 
-    // Color picker
     const colorSection = row.createDiv("pm-color-section");
     colorSection.createEl("label", { text: tRaw("tasks.project.color"), cls: "pm-label" });
     renderColorPicker(colorSection, newColor, (hex) => {
@@ -219,7 +234,6 @@ export class ProjectModal extends CustomModal {
       updatePreview();
     });
 
-    // Icon picker
     const iconSection = row.createDiv("pm-icon-section");
     renderIconPicker(this.app, iconSection, newIcon, (emoji) => {
       newIcon = emoji;
@@ -244,12 +258,20 @@ export class ProjectModal extends CustomModal {
       previewName.textContent = newName || tRaw("tasks.project.name");
     }
 
-    nameInput.addEventListener("input", updatePreview);
+    // Actions
+    const actions = body.createDiv("pm-form-actions");
+    const cancelBtn = actions.createEl("button", {
+      text: tRaw("common.cancel"),
+      cls: "pm-cancel-btn",
+    });
+    cancelBtn.addEventListener("click", () => {
+      this.showAddForm = get(projects).length > 0;
+      this.rerender();
+    });
 
-    // Create button
-    const createBtn = body.createEl("button", {
+    const createBtn = actions.createEl("button", {
       text: tRaw("tasks.project.create"),
-      cls: "pm-create-btn",
+      cls: "pm-create-btn mod-cta",
     });
     createBtn.addEventListener("click", () => {
       if (!newName.trim()) {
@@ -267,8 +289,11 @@ export class ProjectModal extends CustomModal {
         archived: false,
         sortOrder: get(projects).length,
       });
+      this.showAddForm = false;
       this.rerender();
     });
+
+    window.setTimeout(() => nameInput.focus(), 50);
   }
 
   private renderProjectList(container: HTMLElement): void {
@@ -291,8 +316,10 @@ export class ProjectModal extends CustomModal {
     const list = section.createDiv("pm-project-list");
 
     allProjects.forEach((project) => {
-      const taskCount = allTasks.filter((t) => t.projectId === project.id && t.status !== "done").length;
-      const doneCount = allTasks.filter((t) => t.projectId === project.id && t.status === "done").length;
+      const projectTasks = allTasks.filter((t) => t.projectId === project.id);
+      const taskCount = projectTasks.filter((t) => t.status !== "done" && t.status !== "failed").length;
+      const doneCount = projectTasks.filter((t) => t.status === "done").length;
+      const failedCount = projectTasks.filter((t) => t.status === "failed").length;
 
       const item = list.createDiv("pm-project-item");
       item.style.setProperty("--project-color", project.color);
@@ -306,10 +333,13 @@ export class ProjectModal extends CustomModal {
 
       const stats = info.createDiv("pm-project-stats");
       if (taskCount > 0) {
-        stats.createSpan({ text: tRaw("tasks.project.activeCount", {count: taskCount}), cls: "pm-stat pm-stat-active" });
+        stats.createSpan({ text: tRaw("tasks.project.activeCount", { count: taskCount }), cls: "pm-stat pm-stat-active" });
       }
       if (doneCount > 0) {
-        stats.createSpan({ text: tRaw("tasks.project.doneCount", {count: doneCount}), cls: "pm-stat pm-stat-done" });
+        stats.createSpan({ text: tRaw("tasks.project.doneCount", { count: doneCount }), cls: "pm-stat pm-stat-done" });
+      }
+      if (failedCount > 0) {
+        stats.createSpan({ text: tRaw("tasks.project.failedCount", { count: failedCount }), cls: "pm-stat pm-stat-failed" });
       }
 
       const actions = item.createDiv("pm-project-actions");
@@ -327,17 +357,12 @@ export class ProjectModal extends CustomModal {
         }).open();
       });
     });
-
-    // Footer tip
-    const footer = container.createDiv("pm-footer-tip");
-    footer.createSpan({ cls: "pm-footer-tip-icon", text: "💡" });
-    footer.createSpan({ text: tRaw("tasks.project.footerTip") });
   }
 
   private openEditProject(project: IProject): void {
-    this.close();
+    // Keep the list open underneath — just refresh it after save
     const modal = new EditProjectModal(this.app, project, () => {
-      new ProjectModal(this.app).open();
+      this.rerender();
     });
     modal.open();
   }

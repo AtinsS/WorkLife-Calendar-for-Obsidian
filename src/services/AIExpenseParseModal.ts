@@ -302,7 +302,7 @@ export class AIExpenseParseModal extends CustomModal {
     });
 
     const md = box.querySelector(".aex-md-body");
-    if (md instanceof HTMLElement) {
+    if (md?.instanceOf(HTMLElement)) {
       renderMarkdown(md, this.expensesAsMarkdown(sel));
     }
 

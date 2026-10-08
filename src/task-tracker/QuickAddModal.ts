@@ -14,6 +14,7 @@ import {
   resolveNotePath,
   type AiQuickAddContext,
   type AiQuickTaskDraft,
+  computeEndTimeFromMinutes,
 } from "../services/aiQuickAdd";
 import type { RecurrenceConfig } from "./types";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
@@ -1525,7 +1526,8 @@ export class QuickAddModal extends Modal {
       };
       if (d.date) chip("qa2-chip-date", `📅 ${d.date}`);
       if (d.scheduledTime) {
-        chip("qa2-chip-time", `🕐 ${d.scheduledTime}${d.endTime ? `–${d.endTime}` : ""}`);
+        const endForChip = d.endTime || (d.estimatedMinutes ? computeEndTimeFromMinutes(d.scheduledTime, d.estimatedMinutes) : null);
+        chip("qa2-chip-time", `🕐 ${d.scheduledTime}${endForChip ? `–${endForChip}` : ""}`);
       }
       if (d.priority && d.priority !== "medium") {
         chip("qa2-chip-priority", d.priority === "high" ? "!! high" : "− low");
@@ -1816,6 +1818,10 @@ export class QuickAddModal extends Modal {
     let estimatedTime = draft.estimatedMinutes ?? undefined;
     if (estimatedTime === undefined && scheduledTime && endTime) {
       estimatedTime = minutesBetween(scheduledTime, endTime);
+    }
+    // Derive end when model gave only start + duration
+    if (!endTime && scheduledTime && estimatedTime && estimatedTime > 0) {
+      endTime = computeEndTimeFromMinutes(scheduledTime, estimatedTime);
     }
 
     try {

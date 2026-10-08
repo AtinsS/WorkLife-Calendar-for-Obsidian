@@ -80,6 +80,21 @@
   $: uniqueDays = new Set(filteredTimeLogs.map((log) => log.date)).size;
   $: avgPerDay = uniqueDays > 0 ? totalTimeMs / uniqueDays : 0;
 
+  // Task completion (done / failed / other) for the selected period
+  $: periodTasks = $tasks.filter((t) => {
+    const match = t.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
+    return match && match[1] >= periodStart && match[1] <= periodEnd;
+  });
+  $: doneTasksCount = periodTasks.filter((t) => t.status === "done" || t.completed).length;
+  $: failedTasksCount = periodTasks.filter((t) => t.status === "failed").length;
+  $: otherTasksCount = Math.max(0, periodTasks.length - doneTasksCount - failedTasksCount);
+  $: completionRate = periodTasks.length > 0 ? Math.round((doneTasksCount / periodTasks.length) * 100) : 0;
+  $: taskStatusSegments = [
+    { label: $t("habitAnalytics.taskDone"), value: doneTasksCount, color: "#3d9a6c" },
+    { label: $t("habitAnalytics.taskFailed"), value: failedTasksCount, color: "#c45c5c" },
+    { label: $t("habitAnalytics.otherStatus"), value: otherTasksCount, color: "#8a93a0" },
+  ].filter((s) => s.value > 0);
+
   // Tasks with time data in period (for showing the section even without time logs)
   $: tasksWithTime = $tasks.filter((t) => {
     const match = t.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
@@ -287,6 +302,15 @@
     </button>
     <button
       class="analytics-tab"
+      class:active={activeTab === "tasks"}
+      role="tab"
+      aria-selected={activeTab === "tasks"}
+      on:click={() => (activeTab = "tasks")}
+    >
+      {$t("habitAnalytics.tabTasks")}
+    </button>
+    <button
+      class="analytics-tab"
       class:active={activeTab === "time"}
       role="tab"
       aria-selected={activeTab === "time"}
@@ -333,6 +357,73 @@
   {:else if activeTab === "habits"}
     <div class="habit-analytics-section">
       <div class="time-logs-empty">{$t("habitAnalytics.noHabits")}</div>
+    </div>
+  {/if}
+
+  <!-- Tasks: done vs not done -->
+  {#if activeTab === "tasks"}
+    <div class="habit-analytics-section">
+      <div class="section-header-row">
+        <h3>{$t("habitAnalytics.taskCompletion")}</h3>
+        <div class="period-selector">
+          <input type="date" bind:value={periodStart} class="period-input" />
+          <span class="period-separator">—</span>
+          <input type="date" bind:value={periodEnd} class="period-input" />
+        </div>
+      </div>
+
+      {#if periodTasks.length === 0}
+        <div class="time-logs-empty">{$t("habitAnalytics.noTasksInPeriod")}</div>
+      {:else}
+        <div class="time-logs-stats">
+          <div class="time-stat" style="animation-delay: 0ms">
+            <span class="time-stat-value">{doneTasksCount}</span>
+            <span class="time-stat-label">{$t("habitAnalytics.taskDone")}</span>
+          </div>
+          <div class="time-stat" style="animation-delay: 70ms">
+            <span class="time-stat-value">{failedTasksCount}</span>
+            <span class="time-stat-label">{$t("habitAnalytics.taskFailed")}</span>
+          </div>
+          <div class="time-stat" style="animation-delay: 140ms">
+            <span class="time-stat-value">{completionRate}%</span>
+            <span class="time-stat-label">{$t("habitAnalytics.completionRate")}</span>
+          </div>
+        </div>
+
+        <div class="task-completion-block">
+          <div class="task-completion-layout">
+            <div class="task-completion-donut">
+              <DonutChart
+                segments={taskStatusSegments}
+                centerValue={`${completionRate}%`}
+                centerLabel={$t("habitAnalytics.completionRate")}
+              />
+            </div>
+            <div class="task-completion-stats">
+              <div class="task-completion-row">
+                <span class="tc-dot" style="background: #3d9a6c"></span>
+                <span class="tc-label">{$t("habitAnalytics.taskDone")}</span>
+                <span class="tc-value">{doneTasksCount}</span>
+              </div>
+              <div class="task-completion-row">
+                <span class="tc-dot" style="background: #c45c5c"></span>
+                <span class="tc-label">{$t("habitAnalytics.taskFailed")}</span>
+                <span class="tc-value">{failedTasksCount}</span>
+              </div>
+              <div class="task-completion-row">
+                <span class="tc-dot" style="background: #8a93a0"></span>
+                <span class="tc-label">{$t("habitAnalytics.otherStatus")}</span>
+                <span class="tc-value">{otherTasksCount}</span>
+              </div>
+              <div class="task-completion-bar" aria-hidden="true">
+                <div class="tc-bar-seg tc-bar-done" style="width: {periodTasks.length ? (doneTasksCount / periodTasks.length) * 100 : 0}%"></div>
+                <div class="tc-bar-seg tc-bar-failed" style="width: {periodTasks.length ? (failedTasksCount / periodTasks.length) * 100 : 0}%"></div>
+                <div class="tc-bar-seg tc-bar-other" style="width: {periodTasks.length ? (otherTasksCount / periodTasks.length) * 100 : 0}%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      {/if}
     </div>
   {/if}
 
@@ -779,6 +870,87 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 12px;
     margin-bottom: 16px;
+  }
+
+  /* Task completion (done / not done) */
+  .task-completion-block {
+    margin: 8px 0 18px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--background-modifier-border);
+    background: var(--background-secondary);
+  }
+
+  .task-completion-layout {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+
+  .task-completion-donut {
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: center;
+  }
+
+  .task-completion-stats {
+    flex: 1 1 180px;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .task-completion-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+
+  .tc-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tc-label {
+    flex: 1;
+    color: var(--text-muted);
+  }
+
+  .tc-value {
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .task-completion-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--background-modifier-border);
+    margin-top: 4px;
+  }
+
+  .tc-bar-seg {
+    height: 100%;
+    min-width: 0;
+    transition: width 0.35s ease;
+  }
+
+  .tc-bar-done {
+    background: #3d9a6c;
+  }
+
+  .tc-bar-failed {
+    background: #c45c5c;
+  }
+
+  .tc-bar-other {
+    background: #8a93a0;
   }
 
   .section-header-row {

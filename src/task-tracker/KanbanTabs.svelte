@@ -6,11 +6,13 @@
   $: currentDate = $selectedDate;
 
   $: counts = (() => {
-    const result = { all: 0, todo: 0, progress: 0, paused: 0, done: 0 };
+    const result = { all: 0, todo: 0, progress: 0, paused: 0, done: 0, failed: 0 };
     for (const task of $tasks) {
       if (currentDate && task.dateUID !== currentDate) continue;
       if (task.status === "done") {
         result.done++;
+      } else if (task.status === "failed") {
+        result.failed++;
       } else if (task.status === "todo") {
         result.todo++;
         result.all++;
@@ -31,6 +33,7 @@
     { key: "progress" as TaskStatus, icon: "🔥", label: $t("tasks.kanban.progress") },
     { key: "paused" as TaskStatus, icon: "☕", label: $t("tasks.kanban.paused") },
     { key: "done" as TaskStatus, icon: "✅", label: $t("tasks.kanban.done") },
+    { key: "failed" as TaskStatus, icon: "❌", label: $t("tasks.kanban.failed") },
   ];
 
   function setTab(tab: TaskStatus) {

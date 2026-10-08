@@ -13,6 +13,7 @@ import type { ExtractedTask } from "./OllamaService";
 import {
   extractTasksFromNoteStream,
   applyTasksInstruction,
+  computeEndTime,
 } from "./OllamaService";
 import { addTask, addChecklistItem, projects } from "../task-tracker/stores";
 import { settings } from "../ui/stores";
@@ -531,10 +532,16 @@ export class AIExtractModal extends CustomModal {
             const [h, m] = task.scheduledTime.split(":").map(Number);
             const taskEnd = h * 60 + m + (task.estimatedMinutes ?? 60);
             if (taskEnd > nextMinutes) nextMinutes = taskEnd;
+            if (!task.endTime && task.estimatedMinutes) {
+              task.endTime = computeEndTime(task.scheduledTime, task.estimatedMinutes);
+            }
           } else {
             const h = Math.floor(nextMinutes / 60);
             const m = nextMinutes % 60;
             task.scheduledTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+            if (task.estimatedMinutes) {
+              task.endTime = computeEndTime(task.scheduledTime, task.estimatedMinutes);
+            }
             nextMinutes += task.estimatedMinutes ?? 60;
           }
         }
@@ -675,11 +682,12 @@ export class AIExtractModal extends CustomModal {
         meta.createSpan({ text: "—", cls: "ai-task-time-sep" });
 
         // End time input
-        let endTimeValue = "";
-        if (task.scheduledTime && task.estimatedMinutes) {
-          const [sh, sm] = task.scheduledTime.split(":").map(Number);
-          const endTotal = sh * 60 + sm + task.estimatedMinutes;
-          endTimeValue = `${String(Math.floor(endTotal / 60) % 24).padStart(2, "0")}:${String(endTotal % 60).padStart(2, "0")}`;
+        let endTimeValue = task.endTime || "";
+        if (!endTimeValue && task.scheduledTime && task.estimatedMinutes) {
+          endTimeValue = computeEndTime(task.scheduledTime, task.estimatedMinutes);
+        }
+        if (endTimeValue) {
+          this.tasks[taskIdx].endTime = endTimeValue;
         }
         const endTimeInput = meta.createEl("input", {
           type: "text",
@@ -688,9 +696,11 @@ export class AIExtractModal extends CustomModal {
           value: endTimeValue,
         });
         endTimeInput.addEventListener("input", () => {
+          const end = endTimeInput.value;
+          this.tasks[taskIdx].endTime = end || undefined;
+
           // Recalculate estimatedMinutes from start+end
           const start = timeInput.value;
-          const end = endTimeInput.value;
           if (start && end && /^\d{2}:\d{2}$/.test(start) && /^\d{2}:\d{2}$/.test(end)) {
             const [sh, sm] = start.split(":").map(Number);
             const [eh, em] = end.split(":").map(Number);
@@ -745,11 +755,12 @@ export class AIExtractModal extends CustomModal {
   private updateEndTime(taskIdx: number, endTimeInput: HTMLInputElement): void {
     const task = this.tasks[taskIdx];
     if (task.scheduledTime && task.estimatedMinutes && /^\d{2}:\d{2}$/.test(task.scheduledTime)) {
-      const [sh, sm] = task.scheduledTime.split(":").map(Number);
-      const endTotal = sh * 60 + sm + task.estimatedMinutes;
-      endTimeInput.value = `${String(Math.floor(endTotal / 60) % 24).padStart(2, "0")}:${String(endTotal % 60).padStart(2, "0")}`;
+      const end = computeEndTime(task.scheduledTime, task.estimatedMinutes);
+      endTimeInput.value = end;
+      task.endTime = end;
     } else {
       endTimeInput.value = "";
+      task.endTime = undefined;
     }
   }
 
@@ -853,7 +864,11 @@ export class AIExtractModal extends CustomModal {
           sortOrder: 0,
           estimatedTime: task.estimatedMinutes,
           scheduledTime: task.scheduledTime,
-          endTime: undefined,
+          endTime:
+            task.endTime ||
+            (task.scheduledTime && task.estimatedMinutes
+              ? computeEndTime(task.scheduledTime, task.estimatedMinutes)
+              : undefined),
         });
 
         if (task.subtasks.length > 0) {

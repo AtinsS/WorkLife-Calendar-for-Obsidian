@@ -14,6 +14,7 @@ import type CalendarPlugin from "./main";
 import { fetchWeekWeather, getWeatherAttribution, type WeatherProvider } from "./services/weatherService";
 import { initLocale, tRaw } from "./i18n";
 import { testOllamaConnection, testOllamaModel } from "./services/OllamaService";
+import { checkForPluginUpdate, fetchLatestRelease, updatePluginNow, compareVersions, pluginUpdateInfo } from "./services/updateCheck";
 
 export interface ISettings {
   wordsPerDot: number;
@@ -85,6 +86,11 @@ export interface ISettings {
   ntfyTopic: string;
   ntfyScheduledEnabled: boolean;
   ntfyDailyDigestEnabled: boolean;
+  /** Digest delivery time, "HH:mm". Default 06:00. */
+  ntfyDigestTime: string;
+
+  /** Daily GitHub release check → notice when plugin update is available */
+  checkPluginUpdates: boolean;
 
   // Work task settings
   defaultPaymentType: "hour" | "day";
@@ -227,6 +233,9 @@ export const defaultSettings = Object.freeze({
   ntfyTopic: "",
   ntfyScheduledEnabled: false,
   ntfyDailyDigestEnabled: false,
+  ntfyDigestTime: "06:00",
+
+  checkPluginUpdates: true,
 
   defaultPaymentType: "hour" as const,
   defaultRate: 0,
@@ -487,6 +496,82 @@ export class CalendarSettingsTab extends PluginSettingTab {
     // General tab
     const general = tabContainers["general"];
 
+    // ── Plugin updates (first) ──
+    new Setting(general).setName(tRaw("settings.update.checkEnabled")).setHeading();
+    new Setting(general)
+      .setName(tRaw("settings.update.checkEnabled"))
+      .setDesc(tRaw("settings.update.checkEnabledDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.checkPluginUpdates !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ checkPluginUpdates: value });
+        });
+      });
+    new Setting(general)
+      .setName(tRaw("settings.update.checkNow"))
+      .addButton((btn) => {
+        btn.setButtonText(tRaw("settings.update.checkNow"));
+        btn.onClick(async () => {
+          btn.setDisabled(true);
+          btn.setButtonText(tRaw("settings.update.checking"));
+          try {
+            const latest = await checkForPluginUpdate(this.plugin, { force: true });
+            const current = this.plugin.manifest.version;
+            if (!latest) {
+              new Notice(tRaw("settings.update.upToDate", { version: current }));
+            }
+          } catch {
+            new Notice(tRaw("settings.update.checkFailed"));
+          } finally {
+            btn.setDisabled(false);
+            btn.setButtonText(tRaw("settings.update.checkNow"));
+          }
+        });
+      })
+      .addButton((btn) => {
+        const setEnabled = (enabled: boolean) => {
+          btn.setDisabled(!enabled);
+          btn.buttonEl.toggleClass("is-disabled", !enabled);
+          btn.buttonEl.toggleClass("mod-cta", enabled);
+          btn.setButtonText(tRaw("settings.update.updateNow"));
+        };
+        setEnabled(Boolean(get(pluginUpdateInfo).version));
+        const unsub = pluginUpdateInfo.subscribe((info) => {
+          setEnabled(Boolean(info.version));
+        });
+        btn.onClick(async () => {
+          if (btn.disabled) return;
+          btn.setDisabled(true);
+          btn.setButtonText(tRaw("settings.update.updating"));
+          try {
+            const latest = await fetchLatestRelease();
+            const current = this.plugin.manifest.version;
+            if (!latest) {
+              new Notice(tRaw("settings.update.checkFailed"));
+              return;
+            }
+            if (compareVersions(latest.version, current) <= 0) {
+              new Notice(tRaw("settings.update.upToDate", { version: current }));
+              return;
+            }
+            const result = await updatePluginNow(this.plugin, latest);
+            if (result.ok) {
+              new Notice(tRaw("settings.update.updateSuccess", { version: latest.version }));
+              if (result.error === "reload-required") {
+                new Notice(tRaw("settings.update.reloadRequired"));
+              }
+            } else {
+              new Notice(`${tRaw("settings.update.updateFailed")}: ${result.error || ""}`);
+            }
+          } catch {
+            new Notice(tRaw("settings.update.updateFailed"));
+          } finally {
+            setEnabled(Boolean(get(pluginUpdateInfo).version));
+          }
+        });
+        void unsub;
+      });
+
     // ── Interface ──
     new Setting(general).setName(tRaw("settings.general.sectionInterface")).setHeading();
 
@@ -535,7 +620,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addWorkTaskSettings(general);
     this.addCarryOverOverdueSetting(general);
 
-    // ── Data cleanup (not sync) ──
+    // ── Data cleanup ──
     new Setting(general).setName(tRaw("settings.general.sectionDataCleanup")).setHeading();
     this.addDataCleanupSettings(general);
 
@@ -1722,11 +1807,26 @@ export class CalendarSettingsTab extends PluginSettingTab {
           await this.plugin.writeOptions({ ntfyScheduledEnabled: value });
           if (value) {
             this.plugin.notificationService?.scheduleNtfyPush();
-            // Auto-test scheduled push
-            const result = await this.plugin.notificationService?.testNtfyScheduled();
-            if (!result?.ok) {
-              new Notice(`ntfy.sh scheduled test failed: ${result?.error || "unknown"}`);
+            // Auto-test scheduled push (skip if this device is excluded from scheduling)
+            if (!this.plugin.notificationService?.isNtfyScheduledDisabledOnThisDevice()) {
+              const result = await this.plugin.notificationService?.testNtfyScheduled();
+              if (!result?.ok) {
+                new Notice(`ntfy.sh scheduled test failed: ${result?.error || "unknown"}`);
+              }
             }
+          }
+        });
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.notifications.ntfyScheduledSkipDevice"))
+      .setDesc(tRaw("settings.notifications.ntfyScheduledSkipDeviceDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.notificationService?.isNtfyScheduledDisabledOnThisDevice() ?? false);
+        toggle.onChange((value) => {
+          this.plugin.notificationService?.setNtfyScheduledDisabledOnThisDevice(value);
+          if (!value) {
+            this.plugin.notificationService?.scheduleNtfyPush();
           }
         });
       });
@@ -1740,6 +1840,38 @@ export class CalendarSettingsTab extends PluginSettingTab {
           await this.plugin.writeOptions({ ntfyDailyDigestEnabled: value });
           if (value) {
             this.plugin.notificationService?.scheduleNtfyDailyDigest();
+          } else {
+            this.plugin.notificationService?.cancelScheduledDigest();
+          }
+        });
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.notifications.ntfyDigestTime"))
+      .setDesc(tRaw("settings.notifications.ntfyDigestTimeDesc"))
+      .addText((text) => {
+        text.inputEl.type = "time";
+        text.setValue(this.plugin.options.ntfyDigestTime || "06:00");
+        text.onChange(async (value) => {
+          const time = /^\d{2}:\d{2}$/.test(value) ? value : "06:00";
+          await this.plugin.writeOptions({ ntfyDigestTime: time });
+          if (this.plugin.options.ntfyDailyDigestEnabled) {
+            this.plugin.notificationService?.scheduleNtfyDailyDigest();
+          }
+        });
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.notifications.ntfyDigestCommand"))
+      .setDesc(tRaw("settings.notifications.ntfyDigestCommandDesc"))
+      .addButton((btn) => {
+        btn.setButtonText(tRaw("settings.notifications.ntfyDigestSendNow"));
+        btn.onClick(async () => {
+          const result = await this.plugin.notificationService?.sendDigestNow();
+          if (!result?.ok) {
+            new Notice(result?.error || "ntfy.sh digest failed");
+          } else {
+            new Notice(tRaw("settings.notifications.ntfyDigestSent"));
           }
         });
       });

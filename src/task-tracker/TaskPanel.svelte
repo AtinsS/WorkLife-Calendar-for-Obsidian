@@ -17,6 +17,7 @@
   import { TaskModal } from "./TaskModal";
   import { ProjectModal } from "./ProjectModal";
   import { t } from "../i18n";
+  import { pluginUpdateInfo, updatePluginNow, fetchLatestRelease } from "../services/updateCheck";
 
   export let appInstance: App;
 
@@ -362,11 +363,45 @@
   function getRecurringNames(): string[] {
     return [...new Set(getRecurringParents().map((t) => t.title))];
   }
+
+  let currentPluginVersion = "";
+  let updatingPlugin = false;
+  onMount(() => {
+    const plugin = (appInstance as unknown as {
+      plugins?: { getPlugin?: (id: string) => { manifest?: { version?: string } } | undefined };
+    }).plugins?.getPlugin?.("worklife-calendar");
+    currentPluginVersion = plugin?.manifest?.version || "";
+  });
+  async function runPluginUpdate() {
+    if (updatingPlugin) return;
+    updatingPlugin = true;
+    try {
+      const plugin = (appInstance as unknown as {
+        plugins?: { getPlugin?: (id: string) => import("../main").default | undefined };
+      }).plugins?.getPlugin?.("worklife-calendar");
+      if (!plugin) return;
+      const latest = await fetchLatestRelease();
+      if (!latest) return;
+      await updatePluginNow(plugin, latest);
+    } catch {
+      /* notice shown by updatePluginNow path */
+    } finally {
+      updatingPlugin = false;
+    }
+  }
 </script>
 
 <svelte:window on:click={closeMenu} />
 
 <div class="task-tracker-panel" role="region" aria-label={$t("tasks.panel.title")}>
+  {#if $pluginUpdateInfo.version}
+    <div class="task-update-banner">
+      <span class="task-update-text">{$t("settings.update.availableTitle", { version: $pluginUpdateInfo.version, current: currentPluginVersion })}</span>
+      <button class="task-update-btn" disabled={updatingPlugin} on:click={runPluginUpdate}>
+        {updatingPlugin ? $t("settings.update.updating") : `${$t("settings.update.updateNow")} · ${$pluginUpdateInfo.version}`}
+      </button>
+    </div>
+  {/if}
   <!-- ═══════ MOBILE HEADER ═══════ -->
   {#if isMobile}
     <div class="task-tracker-mob-header">
@@ -452,6 +487,7 @@
       <button class="mob-filter-btn" class:active={$activeTab === "progress"} on:click={() => activeTab.set("progress")}>{$t("tasks.tabs.progress")}</button>
       <button class="mob-filter-btn" class:active={$activeTab === "paused"} on:click={() => activeTab.set("paused")}>{$t("tasks.tabs.paused")}</button>
       <button class="mob-filter-btn" class:active={$activeTab === "done"} on:click={() => activeTab.set("done")}>{$t("tasks.tabs.done")}</button>
+      <button class="mob-filter-btn" class:active={$activeTab === "failed"} on:click={() => activeTab.set("failed")}>{$t("tasks.tabs.failed")}</button>
     </div>
     <div class="task-tracker-mob-date">
       {#if currentDate}

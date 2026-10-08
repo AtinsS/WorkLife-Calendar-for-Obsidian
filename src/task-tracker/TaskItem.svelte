@@ -208,7 +208,7 @@
       items.push({ divider: true });
     };
 
-    if (task.status === "done") {
+    if (task.status === "done" || task.status === "failed") {
       items.push({ label: translate("tasks.item.returnToTodo"), action: () => { quickStatus("todo"); } });
       items.push({ label: translate("tasks.item.returnToWork"), action: () => { quickStatus("progress"); } });
       items.push({ divider: true });
@@ -222,6 +222,7 @@
       if (task.status === "paused")
         items.push({ label: translate("tasks.item.continue"), action: () => { quickStatus("progress"); } });
       items.push({ label: translate("tasks.item.markDone"), action: () => { dispatch("complete", { task }); } });
+      items.push({ label: translate("tasks.item.markFailed"), action: () => { quickStatus("failed"); } });
       items.push({ divider: true });
       if (optsAiSubtasksEnabled()) {
         items.push({ label: translate("ai.contextMenuSubtasks"), action: () => { void handleAiSubtasks(); } });
@@ -285,6 +286,7 @@
 <div
   class="task-item"
   class:completed={task.status === "done"}
+  class:failed={task.status === "failed"}
   class:carried-over={isCarriedOver}
   data-status={task.status}
   draggable="true"
@@ -295,22 +297,24 @@
   on:contextmenu={openContextMenu}
 >
   <div class="task-item-row-main">
-    <button class="task-status-btn status-{task.status}" disabled={task.status === "done"} on:click|stopPropagation={() => { if (task.status !== "done") quickStatus("done"); }}>
+    <button class="task-status-btn status-{task.status}" disabled={task.status === "done" || task.status === "failed"} on:click|stopPropagation={() => { if (task.status !== "done" && task.status !== "failed") quickStatus("done"); }}>
       {#if task.status === "todo"}
         <svg class="check-hover" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5L5 9l4.5-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
       {:else if task.status === "progress"}
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v4l3 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.5" opacity="0.4"/></svg>
       {:else if task.status === "done"}
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.5L5 9l4.5-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {:else if task.status === "failed"}
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3L3 9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       {:else if task.status === "paused"}
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="3" y="2.5" width="2" height="7" rx="1" fill="currentColor"/><rect x="7" y="2.5" width="2" height="7" rx="1" fill="currentColor"/></svg>
       {/if}
     </button>
 
     {#if task.boundNotePath}
-      <a class="task-title note-link" class:strikethrough={task.status === "done"} href={task.boundNotePath} on:click|preventDefault={openNote}>{task.title}</a>
+      <a class="task-title note-link" class:strikethrough={task.status === "done" || task.status === "failed"} href={task.boundNotePath} on:click|preventDefault={openNote}>{task.title}</a>
     {:else}
-      <span class="task-title" class:strikethrough={task.status === "done"}>{task.title}</span>
+      <span class="task-title" class:strikethrough={task.status === "done" || task.status === "failed"}>{task.title}</span>
     {/if}
 
     {#if task.description && !isMobile}
@@ -370,6 +374,8 @@
     {#if task.scheduledTime}
       {#if task.status === "done"}
         <span class="task-scheduled done">{$t("tasks.item.done")}</span>
+      {:else if task.status === "failed"}
+        <span class="task-scheduled failed">{$t("tasks.item.failed")}</span>
       {:else}
         <span class="task-scheduled {scheduledTimePassed ? 'passed' : ''}">
           {scheduledTimePassed ? "⚠" : "🕐"} {task.scheduledTime}{#if task.endTime} — {task.endTime}{/if}
@@ -377,7 +383,7 @@
       {/if}
     {/if}
 
-    {#if hasDeadline && task.status !== "done"}
+    {#if hasDeadline && task.status !== "done" && task.status !== "failed"}
       <span class="task-deadline {deadlineOverdue ? 'overdue' : ''}">⏰ {deadlineLabel}</span>
     {/if}
 

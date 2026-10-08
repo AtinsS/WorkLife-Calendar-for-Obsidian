@@ -45,7 +45,7 @@ export function getTaskSlotEndMs(task: ITask, defaultSlotMinutes = DEFAULT_SLOT_
  * Being "in progress" / "paused" is not overdue — the user is working on it.
  */
 export function isTaskOverdue(task: ITask, nowMs: number = Date.now(), defaultSlotMinutes?: number): boolean {
-  if (task.completed || task.status === "done") return false;
+  if (task.completed || task.status === "done" || task.status === "failed") return false;
   if (task.status === "progress" || task.status === "paused") return false;
 
   const endMs = getTaskSlotEndMs(task, defaultSlotMinutes);
@@ -63,6 +63,6 @@ export function isTaskOverdue(task: ITask, nowMs: number = Date.now(), defaultSl
 export function overdueDurationMs(task: ITask, nowMs: number = Date.now()): number {
   const endMs = getTaskSlotEndMs(task);
   if (endMs === null || nowMs < endMs) return 0;
-  if (task.completed || task.status === "done" || task.status === "progress" || task.status === "paused") return 0;
+  if (task.completed || task.status === "done" || task.status === "failed" || task.status === "progress" || task.status === "paused") return 0;
   return nowMs - endMs;
 }

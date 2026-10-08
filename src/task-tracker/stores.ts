@@ -425,7 +425,13 @@ function setTaskStatus(id: string, status: TaskStatus): void {
   tasks.update((current) =>
     current.map((t) =>
       t.id === id
-        ? { ...t, status, completed: status === "done", carriedOverFrom: status === "done" ? undefined : t.carriedOverFrom, updatedAt: Date.now() }
+        ? {
+            ...t,
+            status,
+            completed: status === "done",
+            carriedOverFrom: status === "done" || status === "failed" ? undefined : t.carriedOverFrom,
+            updatedAt: Date.now(),
+          }
         : t
     )
   );

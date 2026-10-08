@@ -28,8 +28,16 @@ export interface ExtractedTask {
   date?: string;
   dayTheme?: string;
   scheduledTime?: string;
+  endTime?: string;
   subtasks: ExtractedSubtask[];
   selected: boolean;
+}
+
+/** HH:MM start + duration minutes → HH:MM end (wraps past midnight). */
+export function computeEndTime(scheduledTime: string, minutes: number): string {
+  const [h, m] = scheduledTime.split(":").map(Number);
+  const total = h * 60 + m + minutes;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 export interface WeekContext {
@@ -363,11 +371,13 @@ function parseDailyList(content: string): { tasks: ExtractedTask[]; weekContext:
     let title = cleanLineText(body);
     // Strip inline time "в 10:00" / "10:00–11:00"
     let scheduledTime: string | undefined;
+    let endTime: string | undefined;
     let estimatedMinutes: number | undefined;
     const range = parseTimeRange(title);
     if (range) {
       scheduledTime = range.start;
       estimatedMinutes = range.minutes;
+      endTime = computeEndTime(range.start, range.minutes);
       title = stripTimeFromTitle(title);
     } else {
       const single = parseSingleTime(title);
@@ -392,6 +402,7 @@ function parseDailyList(content: string): { tasks: ExtractedTask[]; weekContext:
       weekday: currentWeekday,
       date: currentDate,
       scheduledTime,
+      endTime: endTime || (scheduledTime && estimatedMinutes ? computeEndTime(scheduledTime, estimatedMinutes) : undefined),
       subtasks: [],
       selected: true,
     });
@@ -440,6 +451,7 @@ interface RawOllamaResponse {
     date?: string;
     dayTheme?: string;
     scheduledTime?: string;
+    endTime?: string;
     subtasks?: Array<{ title?: string }>;
   }>;
   weekContext?: {
@@ -572,7 +584,16 @@ function enrichTask(t: ExtractedTask): ExtractedTask {
     estimatedMinutes = durationHint;
   }
 
-  return { ...t, title, scheduledTime, estimatedMinutes, priority };
+  // Derive endTime when missing: explicit end → else start + estimate
+  let endTime = t.endTime;
+  if (!endTime && range && range.minutes && scheduledTime === range.start) {
+    endTime = computeEndTime(range.start, range.minutes);
+  }
+  if (!endTime && scheduledTime && estimatedMinutes) {
+    endTime = computeEndTime(scheduledTime, estimatedMinutes);
+  }
+
+  return { ...t, title, scheduledTime, estimatedMinutes, endTime, priority };
 }
 
 // ---------------------------------------------------------------------------
@@ -970,6 +991,7 @@ export function normalizeExtractedTasks(parsed: RawOllamaResponse): {
       date: t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : undefined,
       dayTheme: t.dayTheme || undefined,
       scheduledTime: t.scheduledTime && /^\d{2}:\d{2}$/.test(t.scheduledTime) ? t.scheduledTime : undefined,
+      endTime: t.endTime && /^\d{2}:\d{2}$/.test(t.endTime) ? t.endTime : undefined,
       subtasks: Array.isArray(t.subtasks) ? t.subtasks.filter((s) => s.title).map((s) => ({ title: s.title })) : [],
       selected: true,
     };

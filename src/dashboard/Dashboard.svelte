@@ -13,7 +13,7 @@
     deleteLink,
     reorderCards,
   } from "./storage";
-  import { tasks, projects, updateTaskStatus, addTask, updateTask, removeTask } from "../task-tracker/stores";
+  import { tasks, projects, updateTaskStatus, updateTask, removeTask } from "../task-tracker/stores";
   import { habits, habitLogs, toggleHabitCompletion, getHabitProgressOnDate, addHabit, updateHabit, removeHabit } from "../habit-tracker/stores";
   import { TaskModal } from "../task-tracker/TaskModal";
   import { HabitModal } from "../habit-tracker/HabitModal";

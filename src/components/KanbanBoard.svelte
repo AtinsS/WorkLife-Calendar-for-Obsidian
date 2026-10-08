@@ -4,7 +4,7 @@
   import type { App } from "obsidian";
   import { get } from "svelte/store";
   import { getDateUID } from "obsidian-daily-notes-interface";
-  import { tasks, projects, updateTaskStatus, updateTask, removeTask, addTask, carryOverOverdueTasks } from "../task-tracker/stores";
+  import { tasks, projects, updateTaskStatus, updateTask, removeTask, carryOverOverdueTasks } from "../task-tracker/stores";
   import { activeTimers, formatDuration } from "../task-tracker/TimerManager";
   import type { ITask, TaskStatus, IProject } from "../task-tracker/types";
   import { t } from "../i18n";
@@ -26,12 +26,14 @@
     { key: "progress", icon: "🔥", label: "", color: "rgba(180, 145, 85, 0.85)", statusIcon: "◐" },
     { key: "paused", icon: "☕", label: "", color: "rgba(180, 150, 100, 0.7)", statusIcon: "⏸" },
     { key: "done", icon: "✅", label: "", color: "rgba(85, 160, 130, 0.8)", statusIcon: "✓" },
+    { key: "failed", icon: "❌", label: "", color: "rgba(180, 90, 90, 0.85)", statusIcon: "✕" },
   ];
 
   $: columns[0].label = $t("tasks.kanban.todo");
   $: columns[1].label = $t("tasks.kanban.progress");
   $: columns[2].label = $t("tasks.kanban.paused");
   $: columns[3].label = $t("tasks.kanban.done");
+  $: columns[4].label = $t("tasks.kanban.failed");
 
   let draggedTask: ITask | null = null;
   let dragOverColumn: TaskStatus | null = null;
@@ -119,6 +121,16 @@
   $: doneTasks = $tasks
     .filter((t) => {
       if (t.status !== "done" && !t.completed) return false;
+      if (projectFilterId && t.projectId !== projectFilterId) return false;
+      if (filterMode === "all") return true;
+      return t.dateUID === filterDateUID;
+    })
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, 50);
+
+  $: failedTasks = $tasks
+    .filter((t) => {
+      if (t.status !== "failed") return false;
       if (projectFilterId && t.projectId !== projectFilterId) return false;
       if (filterMode === "all") return true;
       return t.dateUID === filterDateUID;
@@ -318,7 +330,7 @@
 
 <div class="kanban-board">
   {#each columns as col (col.key)}
-    {@const columnTasks = col.key === "todo" ? todoTasks : col.key === "progress" ? progressTasks : col.key === "paused" ? pausedTasks : doneTasks}
+    {@const columnTasks = col.key === "todo" ? todoTasks : col.key === "progress" ? progressTasks : col.key === "paused" ? pausedTasks : col.key === "failed" ? failedTasks : doneTasks}
     <div
       class="kanban-column"
       class:drag-over={dragOverColumn === col.key}
@@ -344,6 +356,7 @@
           <div
             class="kanban-card"
             class:done={task.status === "done"}
+            class:failed={task.status === "failed"}
             class:overdue
             style="border-left: 3px solid {proj?.color || col.color}"
             draggable="true"
@@ -356,7 +369,7 @@
               {#if proj}
                 <span class="kanban-card-project" style="color: {proj.color}">{proj.icon || "📁"}</span>
               {/if}
-              <span class="kanban-card-title" class:strike={task.status === "done"}>{task.title}</span>
+              <span class="kanban-card-title" class:strike={task.status === "done" || task.status === "failed"}>{task.title}</span>
             </div>
 
             <!-- Description -->

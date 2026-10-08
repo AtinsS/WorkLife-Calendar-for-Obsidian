@@ -329,12 +329,28 @@ function draftsFromParsed(parsed: unknown): AiQuickTaskDraft[] {
     };
     const enriched = enrichDraftRate(draft, t as Record<string, unknown>);
     if (enriched.rate != null) enriched.isWorkTask = true;
-    out.push(enriched);
+    out.push(ensureDraftEndTime(enriched));
   }
   return out;
 }
 
-/** Pull rate from title/description when the model left it in text. */
+/** HH:MM start + minutes → HH:MM end (wraps midnight). */
+export function computeEndTimeFromMinutes(scheduledTime: string, minutes: number): string {
+  const [h, m] = scheduledTime.split(":").map(Number);
+  const total = (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0) + minutes;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** Ensure draft has endTime when start + duration/estimate is known. */
+export function ensureDraftEndTime(draft: AiQuickTaskDraft): AiQuickTaskDraft {
+  if (draft.endTime || !draft.scheduledTime) return draft;
+  const start = normalizeAiTime(draft.scheduledTime);
+  if (!start) return draft;
+  if (draft.estimatedMinutes && draft.estimatedMinutes > 0) {
+    return { ...draft, endTime: computeEndTimeFromMinutes(start, draft.estimatedMinutes) };
+  }
+  return draft;
+}
 function enrichDraftRate(draft: AiQuickTaskDraft, rawItem: Record<string, unknown>): AiQuickTaskDraft {
   if (draft.rate != null && draft.paymentType) return draft;
   const sources = [

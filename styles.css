@@ -13399,3 +13399,604 @@ input.ai-task-time-input.ai-task-time-input {
     display: none;
   }
 }
+
+/* Plugin update notice */
+.worklife-update-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.worklife-update-notes {
+  opacity: 0.85;
+  font-size: 12px;
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+}
+.worklife-update-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.worklife-update-actions a.mod-cta {
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  text-decoration: none;
+}
+.worklife-update-actions button {
+  padding: 4px 10px;
+}
+
+/* Failed (not done) task status */
+.task-item.failed {
+  opacity: 0.55;
+}
+.task-item.failed .task-title.strikethrough {
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+.task-status-btn.status-failed {
+  color: var(--text-error, #e74c3c);
+}
+.ms-status-failed {
+  color: var(--text-error, #e74c3c);
+}
+.pm-stat-failed {
+  color: var(--text-error, #e74c3c);
+}
+
+/* Project modal layout */
+.pm-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.pm-modal-header-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.pm-header-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.pm-new-project-open {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+  background: var(--background-secondary);
+}
+.pm-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.pm-existing {
+  margin-top: 4px;
+}
+
+.worklife-update-link {
+  opacity: 0.85;
+  text-decoration: underline;
+}
+
+/* ============================================
+   PROJECT MODAL — v2 restyle
+   ============================================ */
+.wf-project-modal {
+  width: 580px;
+  max-width: 96vw;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+}
+
+.wf-project-modal .modal-content,
+.wf-project-modal .wf-dialog-content {
+  padding: 0 0 16px;
+}
+
+.wf-project-modal .pm-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px 14px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--mcp-accent, #7c5cfc) 14%, transparent),
+    transparent 70%
+  );
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 0;
+}
+
+.wf-project-modal .pm-modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.wf-project-modal .pm-modal-header-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--mcp-accent, #7c5cfc);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--mcp-accent, #7c5cfc) 35%, transparent);
+}
+
+.wf-project-modal .pm-modal-header-text h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.wf-project-modal .wf-dialog-subtitle {
+  padding: 0;
+  margin: 2px 0 0;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.wf-project-modal .pm-header-btn {
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.wf-project-modal .pm-header-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.wf-project-modal .pm-header-btn.mod-cta {
+  background: var(--mcp-accent, #7c5cfc);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* Add form */
+.wf-project-modal .pm-new-project-open {
+  margin: 14px 16px 8px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 14px;
+  background: var(--background-secondary);
+  padding: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.wf-project-modal .pm-new-project-open .pm-section-header {
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 12px;
+}
+
+.wf-project-modal .pm-new-project-open .pm-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wf-project-modal .pm-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+  font-weight: 600;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.wf-project-modal .pm-input,
+.wf-project-modal .pm-icon-custom-input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  padding: 10px 12px;
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.wf-project-modal .pm-input:focus,
+.wf-project-modal .pm-icon-custom-input:focus {
+  outline: none;
+  border-color: var(--mcp-accent, #7c5cfc);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mcp-accent, #7c5cfc) 22%, transparent);
+}
+
+.wf-project-modal .pm-char-count {
+  display: block;
+  text-align: right;
+  font-size: 11px;
+  opacity: 0.55;
+  margin-top: 4px;
+}
+
+.wf-project-modal .pm-row {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .wf-project-modal .pm-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wf-project-modal .pm-color-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.wf-project-modal .pm-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  background: var(--swatch-color, #ccc);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.wf-project-modal .pm-color-swatch:hover {
+  transform: scale(1.1);
+}
+
+.wf-project-modal .pm-color-swatch.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 2px var(--mcp-accent, #7c5cfc);
+}
+
+.wf-project-modal .pm-preview-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--background-primary);
+  border: 1px dashed var(--background-modifier-border);
+}
+
+.wf-project-modal .pm-preview-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--dot-color, var(--mcp-accent));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dot-color, var(--mcp-accent)) 25%, transparent);
+}
+
+.wf-project-modal .pm-preview-icon {
+  font-size: 20px;
+}
+
+.wf-project-modal .pm-preview-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.wf-project-modal .pm-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.wf-project-modal .pm-form-actions .pm-cancel-btn,
+.wf-project-modal .pm-form-actions .pm-create-btn {
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.wf-project-modal .pm-form-actions .pm-cancel-btn {
+  background: transparent;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.wf-project-modal .pm-form-actions .pm-create-btn {
+  background: var(--mcp-accent, #7c5cfc);
+  color: #fff;
+  border: none;
+}
+
+/* List */
+.wf-project-modal .pm-existing {
+  margin-top: 8px;
+}
+
+.wf-project-modal .pm-existing .pm-section-header {
+  padding: 6px 20px 10px;
+}
+
+.wf-project-modal .pm-project-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px 8px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.wf-project-modal .pm-project-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--project-color, var(--mcp-accent));
+  transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+}
+
+.wf-project-modal .pm-project-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.12);
+  border-color: color-mix(in srgb, var(--project-color, var(--mcp-accent)) 45%, var(--background-modifier-border));
+}
+
+.wf-project-modal .pm-project-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.wf-project-modal .pm-project-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dot-color, var(--mcp-accent));
+  flex-shrink: 0;
+}
+
+.wf-project-modal .pm-project-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.wf-project-modal .pm-project-info {
+  min-width: 0;
+}
+
+.wf-project-modal .pm-project-name {
+  font-weight: 650;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wf-project-modal .pm-project-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.wf-project-modal .pm-stat {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  opacity: 0.9;
+}
+
+.wf-project-modal .pm-stat-active {
+  color: var(--text-accent, var(--mcp-accent));
+  border-color: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 35%, transparent);
+}
+
+.wf-project-modal .pm-stat-done {
+  color: #3d9a6c;
+  border-color: color-mix(in srgb, #3d9a6c 35%, transparent);
+}
+
+.wf-project-modal .pm-stat-failed {
+  color: var(--text-error, #e74c3c);
+  border-color: color-mix(in srgb, #e74c3c 35%, transparent);
+}
+
+.wf-project-modal .pm-project-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.wf-project-modal .pm-action-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.75;
+  transition: opacity 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+.wf-project-modal .pm-action-btn:hover {
+  opacity: 1;
+  background: var(--background-modifier-hover);
+}
+
+.wf-project-modal .pm-delete-btn:hover {
+  color: var(--text-error, #e74c3c);
+  border-color: color-mix(in srgb, #e74c3c 40%, transparent);
+}
+
+.wf-project-modal .pm-empty {
+  padding: 18px 20px 24px;
+  text-align: center;
+  opacity: 0.7;
+  font-size: 13px;
+}
+
+/* Edit modal matches */
+.wf-edit-modal {
+  width: 520px;
+  max-width: 94vw;
+  border-radius: 16px;
+}
+
+.wf-edit-modal .modal-content,
+.wf-edit-modal .wf-dialog-content {
+  padding: 22px;
+}
+
+.wf-edit-modal h2 {
+  margin: 0 0 16px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.wf-edit-modal .pm-modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.wf-edit-modal .pm-cancel-btn,
+.wf-edit-modal .pm-save-btn {
+  border-radius: 10px;
+  padding: 9px 16px;
+  font-weight: 600;
+}
+
+.wf-edit-modal .pm-save-btn {
+  background: var(--mcp-accent, #7c5cfc);
+  color: #fff;
+  border: none;
+}
+
+/* Kanban failed column */
+.kanban-card.failed {
+  opacity: 0.72;
+}
+.kanban-card.failed .kanban-card-title.strike {
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+.kanban-column.drag-over .kanban-column-header {
+  box-shadow: inset 0 -2px 0 var(--col-color);
+}
+
+/* Fix: project icon input must stay compact (not full-width) */
+.wf-project-modal .pm-icon-custom-input {
+  width: 56px !important;
+  min-width: 56px !important;
+  max-width: 56px !important;
+  text-align: center;
+  font-size: 18px;
+  padding: 8px 4px;
+}
+.wf-project-modal .pm-icon-input-wrap {
+  display: flex !important;
+  align-items: center;
+  gap: 6px;
+  width: fit-content !important;
+  max-width: 100%;
+}
+.wf-project-modal .pm-icon-apply-btn {
+  width: 32px;
+  height: 34px;
+  flex-shrink: 0;
+}
+.wf-project-modal .pm-icon-custom-row {
+  width: 100%;
+}
+.wf-project-modal .pm-icon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.worklife-update-link-cta {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent) !important;
+  text-decoration: none !important;
+  font-weight: 600;
+}
+
+/* Tasks panel update banner */
+.task-update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 8px 10px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--mcp-accent, #7c5cfc) 35%, transparent);
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 12%, transparent);
+}
+.task-update-text {
+  font-size: 12px;
+  line-height: 1.35;
+  min-width: 0;
+}
+.task-update-btn {
+  flex-shrink: 0;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-weight: 600;
+  font-size: 12px;
+  background: var(--mcp-accent, #7c5cfc);
+  color: #fff;
+  border: none;
+  white-space: nowrap;
+}
+.task-update-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+.pm-header-btn.is-disabled,
+button.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Keep header actions clear of the modal close (?) */
+.wf-project-modal .pm-modal-header {
+  padding-right: 52px;
+}
+.wf-project-modal .modal-close-button,
+.wf-edit-modal .modal-close-button {
+  z-index: 5;
+}
+.wf-project-modal .pm-header-btn {
+  position: relative;
+  z-index: 2;
+  margin-right: 2px;
+}

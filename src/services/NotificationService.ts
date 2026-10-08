@@ -39,14 +39,22 @@ export const defaultNotificationSettings: NotificationSettings = {
 };
 
 const NTFY_DEDUP_KEY = "worklife-ntfy-scheduled";
+/** Device-local (not synced): skip scheduling deferred ntfy pushes from this device. */
+const NTFY_SKIP_DEVICE_KEY = "worklife-ntfy-skip-device";
 const DIGEST_ENSURE_INTERVAL_MS = 15 * 60_000;
+const DIGEST_CMD_POLL_MS = 2 * 60_000;
+/** Stable sequence ID for the pending daily digest — replaces on reschedule. */
+const DIGEST_SEQ = "daily-digest";
+const DIGEST_CMD_SEQ = "daily-digest-now";
 
 export class NotificationService {
   private plugin: CalendarPlugin;
   private timer: number | null = null;
   private digestTimer: number | null = null;
+  private digestCmdTimer: number | null = null;
   private digestScheduling = false;
   private lastDigestDate = "";
+  private lastDigestCmdPoll = 0;
   private firedReminders = new Set<string>();
   private firedDueNow = new Set<string>();
   private firedOverdue = new Set<string>();
@@ -55,6 +63,23 @@ export class NotificationService {
 
   constructor(plugin: CalendarPlugin) {
     this.plugin = plugin;
+  }
+
+  /** Device-local: when true, this device must not schedule deferred ntfy pushes. */
+  isNtfyScheduledDisabledOnThisDevice(): boolean {
+    try {
+      return this.plugin.app.loadLocalStorage(NTFY_SKIP_DEVICE_KEY) === true;
+    } catch {
+      return false;
+    }
+  }
+
+  setNtfyScheduledDisabledOnThisDevice(disabled: boolean): void {
+    try {
+      this.plugin.app.saveLocalStorage(NTFY_SKIP_DEVICE_KEY, disabled);
+    } catch {
+      /* quota exceeded — ignore */
+    }
   }
 
   /** Load the ntfy scheduled-notification dedup map from localStorage.
@@ -101,6 +126,7 @@ export class NotificationService {
     const opts = this.plugin.options;
     if (opts.ntfyEnabled && opts.ntfyDailyDigestEnabled && opts.ntfyTopic) {
       this.ensureDailyDigestLoop();
+      this.ensureDigestCommandLoop();
     }
   }
 
@@ -110,6 +136,7 @@ export class NotificationService {
       this.timer = null;
     }
     this.stopDailyDigestLoop();
+    this.stopDigestCommandLoop();
     this.firedReminders.clear();
     this.firedDueNow.clear();
     this.firedOverdue.clear();
@@ -151,7 +178,7 @@ export class NotificationService {
     const now = Date.now();
 
     for (const task of allTasks) {
-      if (task.completed || task.status === "done") continue;
+      if (task.completed || task.status === "done" || task.status === "failed") continue;
 
       // Scheduled time reminders
       if (task.scheduledTime && task.dateUID) {
@@ -169,7 +196,8 @@ export class NotificationService {
             this.notify(
               tRaw("taskStore.notificationTitle"),
               tRaw("notifications.reminder", { title: task.title, minutes: String(this.getSettings().reminderMinutesBefore), time: task.scheduledTime || "" }),
-              "reminder"
+              "reminder",
+              task.id
             );
           }
 
@@ -179,7 +207,8 @@ export class NotificationService {
             this.notify(
               tRaw("taskStore.notificationTitle"),
               tRaw("notifications.dueNow", { title: task.title, time: task.scheduledTime || "" }),
-              "due-now"
+              "due-now",
+              `${task.id}-due-now`
             );
           }
 
@@ -194,7 +223,8 @@ export class NotificationService {
             this.notify(
               tRaw("taskStore.notificationTitle"),
               tRaw("notifications.overdue", { title: task.title, time: task.scheduledTime || "" }),
-              "overdue"
+              "overdue",
+              `${task.id}-overdue`
             );
           }
         }
@@ -218,7 +248,8 @@ export class NotificationService {
             this.notify(
               tRaw("taskStore.notificationTitle"),
               tRaw("notifications.estimateExceeded", { title: task.title, expected: estStr, actual: actStr }),
-              "estimate-exceeded"
+              "estimate-exceeded",
+              `${task.id}-estimate`
             );
           }
         }
@@ -243,7 +274,8 @@ export class NotificationService {
             this.notify(
               tRaw("taskStore.notificationTitle"),
               tRaw("notifications.deadlineToday", { title: task.title, time: timeStr }),
-              "deadline-today"
+              "deadline-today",
+              `${task.id}-deadline`
             );
           }
 
@@ -257,7 +289,8 @@ export class NotificationService {
                 this.notify(
                   tRaw("taskStore.notificationTitle"),
                   tRaw("notifications.deadlineExpired", { title: task.title, time: task.deadlineTime || "" }),
-                  "deadline-expired"
+                  "deadline-expired",
+                  `${task.id}-deadline-expired`
                 );
               }
             }
@@ -271,7 +304,8 @@ export class NotificationService {
             this.notify(
               tRaw("taskStore.notificationTitle"),
               tRaw("notifications.deadlineTomorrow", { title: task.title, time: timeStr }),
-              "deadline-tomorrow"
+              "deadline-tomorrow",
+              `${task.id}-deadline-tomorrow`
             );
           }
         }
@@ -289,7 +323,7 @@ export class NotificationService {
     return momentFn(`${dateStr} ${task.scheduledTime}`, "YYYY-MM-DD HH:mm", true);
   }
 
-  private notify(title: string, body: string, source: string): void {
+  private notify(title: string, body: string, source: string, sequenceId?: string): void {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
 
     const notification: Notification = new Notification(title, {
@@ -313,10 +347,10 @@ export class NotificationService {
     }).catch((e: unknown) => console.warn("[notification] history write failed:", e));
 
     // Also send via ntfy.sh if enabled
-    this.sendNtfy(title, body, source);
+    this.sendNtfy(title, body, source, sequenceId);
   }
 
-  private sendNtfy(title: string, body: string, source: string): void {
+  private sendNtfy(title: string, body: string, source: string, sequenceId?: string): void {
     const opts: ISettings = this.plugin.options;
     if (!opts.ntfyEnabled) return;
     if (!opts.ntfyTopic) {
@@ -331,9 +365,13 @@ export class NotificationService {
       return;
     }
 
+    const headers: Record<string, string> = {};
+    if (sequenceId) headers["X-Sequence-ID"] = this.toSequenceId(sequenceId);
+
     void requestUrl({
       url: `https://ntfy.sh/${encodeURIComponent(opts.ntfyTopic)}`,
       method: "POST",
+      headers,
       body,
     }).then((response) => {
       const status: "sent" | "failed" = response.status >= 200 && response.status < 300 ? "sent" : "failed";
@@ -368,6 +406,7 @@ export class NotificationService {
   scheduleNtfyPush(): void {
     const opts: ISettings = this.plugin.options;
     if (!opts.ntfyEnabled || !opts.ntfyScheduledEnabled || !opts.ntfyTopic) return;
+    if (this.isNtfyScheduledDisabledOnThisDevice()) return;
 
     const allTasks = get(tasks);
     const now = momentFn();
@@ -378,7 +417,7 @@ export class NotificationService {
     let changed = false;
 
     for (const task of allTasks) {
-      if (task.completed || task.status === "done" || task.status === "paused") continue;
+      if (task.completed || task.status === "done" || task.status === "failed" || task.status === "paused") continue;
 
       // Task with scheduledTime on a specific date
       if (task.scheduledTime && task.dateUID) {
@@ -429,68 +468,204 @@ export class NotificationService {
     if (changed) this.saveNtfySchedule(scheduled);
   }
 
-  /** Schedule an ntfy.sh push at 06:00 with the current day's task list.
+  /** Parse configured digest time "HH:mm" into hour/minute (fallback 06:00). */
+  private getDigestHourMinute(): { hour: number; minute: number } {
+    const raw = this.plugin.options.ntfyDigestTime || "06:00";
+    const m = /^(\d{1,2}):(\d{2})$/.exec(raw);
+    if (!m) return { hour: 6, minute: 0 };
+    const hour = Math.min(23, Math.max(0, parseInt(m[1], 10)));
+    const minute = Math.min(59, Math.max(0, parseInt(m[2], 10)));
+    return { hour, minute };
+  }
+
+  /** Next digest delivery moment from configured time. */
+  private getDigestDeliveryMoment(): Moment {
+    const now = momentFn();
+    const { hour, minute } = this.getDigestHourMinute();
+    const delivery = now.clone().hour(hour).minute(minute).second(0).millisecond(0);
+    if (delivery.isSameOrBefore(now)) {
+      delivery.add(1, "day");
+    }
+    return delivery;
+  }
+
+  /** Schedule ntfy.sh push with the day's task summary at the configured time.
    *  Delivery is delayed via X-Delay so it arrives even if Obsidian is closed.
-   *  Idempotent: one message per calendar day (key `daily-digest-YYYY-MM-DD`). */
+   *  Idempotent via sequence ID `daily-digest`: reschedule replaces the pending push. */
   scheduleNtfyDailyDigest(): void {
     const opts: ISettings = this.plugin.options;
     if (!opts.ntfyEnabled || !opts.ntfyDailyDigestEnabled || !opts.ntfyTopic) return;
+    if (this.isNtfyScheduledDisabledOnThisDevice()) return;
     if (this.digestScheduling) return;
 
     // Keep checking daily so long-running sessions still get tomorrow's digest
     this.ensureDailyDigestLoop();
+    this.ensureDigestCommandLoop();
 
-    const now = momentFn();
-    let delivery = now.clone().hour(6).minute(0).second(0).millisecond(0);
-    if (delivery.isSameOrBefore(now)) {
-      delivery = delivery.add(1, "day");
-    }
-
+    const delivery = this.getDigestDeliveryMoment();
     const digestDate = delivery.format("YYYY-MM-DD");
-    const dedupeKey = `daily-digest-${digestDate}`;
     const fireUnix = Math.floor(delivery.valueOf() / 1000);
     const scheduled = this.loadNtfySchedule();
 
-    // Already queued for this date — never send a second copy
-    if (scheduled[dedupeKey] !== undefined) return;
+    // Already queued for this exact delivery — skip (same time + day)
+    if (scheduled[DIGEST_SEQ] === fireUnix) return;
 
     this.digestScheduling = true;
     try {
-      const dayTasks = get(tasks)
-        .filter((t) => {
-          if (t.completed || t.status === "done" || t.status === "paused") return false;
-          const match = /^day-(\d{4}-\d{2}-\d{2})/.exec(t.dateUID);
-          return match?.[1] === digestDate;
-        })
-        .sort((a, b) => {
-          const at = a.scheduledTime || "99:99";
-          const bt = b.scheduledTime || "99:99";
-          return at.localeCompare(bt) || a.title.localeCompare(b.title);
-        });
-
-      const dateLabel = delivery.format("DD.MM.YYYY");
-      const body = dayTasks.length
-        ? tRaw("notifications.dailyDigest", {
-            date: dateLabel,
-            list: dayTasks
-              .map((t) => {
-                const time = t.scheduledTime || "—".padStart(5);
-                return `${time}  ${t.title}`;
-              })
-              .join("\n"),
-            count: String(dayTasks.length),
-          })
-        : tRaw("notifications.dailyDigestEmpty", { date: dateLabel });
+      const body = this.buildDigestBody(delivery);
 
       // Mark BEFORE network call so a concurrent tick cannot double-send
-      scheduled[dedupeKey] = fireUnix;
+      scheduled[DIGEST_SEQ] = fireUnix;
       this.lastDigestDate = digestDate;
       this.saveNtfySchedule(scheduled);
 
-      this.sendNtfyDelayed(tRaw("taskStore.notificationTitle"), body, delivery.toISOString(), dedupeKey);
+      // Same sequence ID replaces any previously queued digest (time changed, etc.)
+      this.sendNtfyDelayed(tRaw("taskStore.notificationTitle"), body, delivery.toISOString(), DIGEST_SEQ);
     } finally {
       this.digestScheduling = false;
     }
+  }
+
+  /** Build a richer digest body for the given delivery day. */
+  private buildDigestBody(delivery: Moment): string {
+    const dateStr = delivery.format("YYYY-MM-DD");
+    const dateLabel = delivery.format("ddd DD.MM.YYYY");
+    const dayTasks = get(tasks)
+      .filter((t) => {
+        if (t.completed || t.status === "done" || t.status === "failed" || t.status === "paused") return false;
+        const match = /^day-(\d{4}-\d{2}-\d{2})/.exec(t.dateUID);
+        return match?.[1] === dateStr;
+      })
+      .sort((a, b) => {
+        const at = a.scheduledTime || "99:99";
+        const bt = b.scheduledTime || "99:99";
+        return at.localeCompare(bt) || a.title.localeCompare(b.title);
+      });
+
+    if (!dayTasks.length) {
+      return tRaw("notifications.dailyDigestEmpty", { date: dateLabel });
+    }
+
+    const fmtEst = (min: number): string => {
+      const h = Math.floor(min / 60);
+      const m = min % 60;
+      if (h > 0 && m > 0) return tRaw("notifications.durationHm", { h: String(h), m: String(m) });
+      if (h > 0) return tRaw("notifications.durationH", { h: String(h) });
+      return tRaw("notifications.durationM", { m: String(m) });
+    };
+
+    const timed: string[] = [];
+    const untimed: string[] = [];
+    const high: string[] = [];
+    const deadlines: string[] = [];
+    let totalEst = 0;
+
+    for (const t of dayTasks) {
+      if (t.estimatedTime) totalEst += t.estimatedTime;
+      if (t.priority === "high") high.push(t.title);
+      if (t.deadline === `day-${dateStr}`) {
+        deadlines.push(t.deadlineTime ? `${t.title} (${t.deadlineTime})` : t.title);
+      }
+
+      const est = t.estimatedTime ? ` ⏱${fmtEst(t.estimatedTime)}` : "";
+      const mark = t.priority === "high" ? " !" : t.priority === "medium" ? " ·" : "";
+      const line = t.scheduledTime
+        ? `${t.scheduledTime}  ${t.title}${est}${mark}`
+        : `${t.title}${est}${mark}`;
+      if (t.scheduledTime) timed.push(line);
+      else untimed.push(line);
+    }
+
+    const extra: string[] = [];
+    if (untimed.length) {
+      extra.push(tRaw("notifications.dailyDigestNoTime", { count: String(untimed.length), list: untimed.join("\n") }));
+    }
+    if (high.length) {
+      extra.push(tRaw("notifications.dailyDigestHighPriority", { list: high.join(", ") }));
+    }
+    if (deadlines.length) {
+      extra.push(tRaw("notifications.dailyDigestDeadline", { list: deadlines.join(", ") }));
+    }
+
+    const summary = tRaw("notifications.dailyDigestSummary", {
+      count: String(dayTasks.length),
+      totalTime: totalEst ? fmtEst(totalEst) : "—",
+    });
+
+    return tRaw("notifications.dailyDigest", {
+      date: dateLabel,
+      list: timed.join("\n"),
+      extra: extra.length ? `\n${extra.join("\n")}` : "",
+      summary,
+    });
+  }
+
+  /** Send the digest immediately (on-demand / ntfy command / settings test). */
+  async sendDigestNow(): Promise<{ ok: boolean; error?: string }> {
+    const opts: ISettings = this.plugin.options;
+    if (!opts.ntfyEnabled) return { ok: false, error: "ntfy is disabled" };
+    if (!opts.ntfyTopic) return { ok: false, error: "ntfy topic is empty" };
+    if (this.isNtfyScheduledDisabledOnThisDevice()) {
+      return { ok: false, error: "deferred notifications disabled on this device" };
+    }
+
+    const body = this.buildDigestBody(momentFn());
+    try {
+      const resp = await requestUrl({
+        url: `https://ntfy.sh/${encodeURIComponent(opts.ntfyTopic)}`,
+        method: "POST",
+        headers: {
+          "X-Title": tRaw("taskStore.notificationTitle"),
+          "X-Tags": "worklife",
+          "X-Sequence-ID": DIGEST_CMD_SEQ,
+        },
+        body,
+      });
+      const ok = resp.status >= 200 && resp.status < 300;
+      void recordNotificationEvent(this.plugin.app, {
+        channel: "ntfy",
+        status: ok ? "sent" : "failed",
+        title: tRaw("taskStore.notificationTitle"),
+        body,
+        source: "digest-now",
+        topic: opts.ntfyTopic,
+        error: ok ? undefined : `HTTP ${resp.status}`,
+      });
+      return ok ? { ok: true } : { ok: false, error: `HTTP ${resp.status}` };
+    } catch (e: unknown) {
+      const msg = errorMessage(e);
+      void recordNotificationEvent(this.plugin.app, {
+        channel: "ntfy",
+        status: "failed",
+        title: tRaw("taskStore.notificationTitle"),
+        body,
+        source: "digest-now",
+        topic: opts.ntfyTopic,
+        error: msg,
+      });
+      return { ok: false, error: msg };
+    }
+  }
+
+  /** Cancel the pending delayed digest on ntfy (feature turned off). */
+  cancelScheduledDigest(): void {
+    const opts: ISettings = this.plugin.options;
+    if (!opts.ntfyTopic) return;
+    if (this.isNtfyScheduledDisabledOnThisDevice()) return;
+
+    const scheduled = this.loadNtfySchedule();
+    if (scheduled[DIGEST_SEQ] === undefined) return;
+
+    delete scheduled[DIGEST_SEQ];
+    this.saveNtfySchedule(scheduled);
+    this.lastDigestDate = "";
+
+    void requestUrl({
+      url: `https://ntfy.sh/${encodeURIComponent(opts.ntfyTopic)}/${encodeURIComponent(DIGEST_SEQ)}`,
+      method: "DELETE",
+    }).catch((e: unknown) => {
+      console.warn("[ntfy] digest cancel failed:", e);
+    });
   }
 
   /** Re-check periodically so a multi-day session still schedules tomorrow's digest. */
@@ -510,7 +685,72 @@ export class NotificationService {
     this.digestScheduling = false;
   }
 
-  private sendNtfyDelayed(title: string, body: string, deliveryIso: string, _dedupeId: string): void {
+  /** Poll ntfy for a "digest" command published to the topic (works while Obsidian is open). */
+  private ensureDigestCommandLoop(): void {
+    if (this.digestCmdTimer) return;
+    this.lastDigestCmdPoll = Math.floor(Date.now() / 1000);
+    this.digestCmdTimer = window.setInterval(() => {
+      void this.pollDigestCommand();
+    }, DIGEST_CMD_POLL_MS);
+  }
+
+  private stopDigestCommandLoop(): void {
+    if (this.digestCmdTimer) {
+      window.clearInterval(this.digestCmdTimer);
+      this.digestCmdTimer = null;
+    }
+    this.lastDigestCmdPoll = 0;
+  }
+
+  private async pollDigestCommand(): Promise<void> {
+    const opts: ISettings = this.plugin.options;
+    if (!opts.ntfyEnabled || !opts.ntfyDailyDigestEnabled || !opts.ntfyTopic) return;
+    if (this.isNtfyScheduledDisabledOnThisDevice()) return;
+
+    const since = this.lastDigestCmdPoll;
+    this.lastDigestCmdPoll = Math.floor(Date.now() / 1000);
+
+    try {
+      const resp = await requestUrl({
+        url: `https://ntfy.sh/${encodeURIComponent(opts.ntfyTopic)}/json?poll=1&since=${since}`,
+        method: "GET",
+      });
+      if (resp.status < 200 || resp.status >= 300) return;
+
+      const lines = String(resp.text || "")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+      for (const line of lines) {
+        let msg: { event?: string; message?: string; tags?: string[]; title?: string };
+        try {
+          msg = JSON.parse(line) as typeof msg;
+        } catch {
+          continue;
+        }
+        if (msg.event !== "message") continue;
+        // Ignore our own pushes so a digest does not re-trigger itself
+        if (Array.isArray(msg.tags) && msg.tags.includes("worklife")) continue;
+
+        const body = (msg.message || "").trim();
+        if (!/^\/?(digest|дайджест|дайдж)$/i.test(body)) continue;
+
+        await this.sendDigestNow();
+        return; // one command is enough
+      }
+    } catch (e: unknown) {
+      console.warn("[ntfy] digest command poll failed:", e);
+    }
+  }
+
+  /** Stable ntfy sequence ID — second publish with the same ID replaces the first
+   *  (including a pending X-Delay), so multi-device open does not double-schedule. */
+  private toSequenceId(id: string): string {
+    return id.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 120);
+  }
+
+  private sendNtfyDelayed(title: string, body: string, deliveryIso: string, dedupeId: string): void {
     const opts: ISettings = this.plugin.options;
     if (!opts.ntfyTopic) return;
 
@@ -524,6 +764,7 @@ export class NotificationService {
         "X-Delay": String(unixSec),
         "X-Title": title,
         "X-Tags": "worklife",
+        "X-Sequence-ID": this.toSequenceId(dedupeId),
       },
       body,
     }).then((response) => {

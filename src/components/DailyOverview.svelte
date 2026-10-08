@@ -23,7 +23,7 @@
   });
 
   function isDone(task: ITask): boolean {
-    return task.completed || task.status === "done";
+    return task.completed || task.status === "done" || task.status === "failed";
   }
 
   function taskDate(value?: string): string {
@@ -102,6 +102,7 @@
     if (task.status === "progress") return $t("tasks.tabs.progress");
     if (task.status === "paused") return $t("tasks.tabs.paused");
     if (task.status === "done") return $t("tasks.tabs.done");
+    if (task.status === "failed") return $t("tasks.tabs.failed");
     return $t("tasks.tabs.todo");
   }
 

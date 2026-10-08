@@ -262,6 +262,7 @@
       ...(task.status !== "progress" ? [{ label: tRaw("schedule.statusToWork"), action: () => contextChangeStatus("progress") }] : []),
       ...(task.status !== "paused" ? [{ label: tRaw("schedule.statusToPause"), action: () => contextChangeStatus("paused") }] : []),
       ...(task.status !== "done" ? [{ label: tRaw("schedule.statusToDone"), action: () => contextChangeStatus("done") }] : []),
+      ...(task.status !== "failed" ? [{ label: tRaw("schedule.statusToFailed"), action: () => contextChangeStatus("failed") }] : []),
       { divider: true },
       { label: tRaw("schedule.deleteEvent"), action: () => contextDeleteTask(), danger: true },
     ];
@@ -317,7 +318,7 @@
     closeContextMenu();
   }
 
-  function contextChangeStatus(status: "todo" | "progress" | "done" | "paused") {
+  function contextChangeStatus(status: "todo" | "progress" | "done" | "paused" | "failed") {
     if (contextMenuTask) {
       updateTaskStatus(contextMenuTask.id, status);
       if (status === "todo") {
@@ -501,6 +502,8 @@
               <span class="ms-task-status ms-status-paused">{$t("schedule.statusPaused")}</span>
             {:else if task.status === "done"}
               <span class="ms-task-status ms-status-done">{$t("schedule.statusDone")}</span>
+            {:else if task.status === "failed"}
+              <span class="ms-task-status ms-status-failed">{$t("schedule.statusFailed")}</span>
             {/if}
           </div>
           {#if task.description}

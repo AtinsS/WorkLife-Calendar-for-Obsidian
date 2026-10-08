@@ -54,6 +54,7 @@ import DateTimeWeather from "./components/DateTimeWeather.svelte";
 import Dashboard from "./dashboard/Dashboard.svelte";
 import HelloView from "./components/HelloView.svelte";
 import { NotificationService } from "./services/NotificationService";
+import { checkForPluginUpdate } from "./services/updateCheck";
 import { initGistSync } from "./services/GistSyncService";
 import { AIExtractModal } from "./services/AIExtractModal";
 import {
@@ -623,6 +624,13 @@ export default class CalendarPlugin extends Plugin {
       this.notificationService.scheduleNtfyDailyDigest();
     }
 
+    // Check for a new plugin version on every Obsidian open
+    if (this.options.checkPluginUpdates !== false) {
+      window.setTimeout(() => {
+        void checkForPluginUpdate(this);
+      }, 2_000);
+    }
+
     // Watch for vault sync file changes (modify + create)
     const debouncedSyncReload = () => {
       if (this.syncReloadTimer) window.clearTimeout(this.syncReloadTimer);
@@ -883,7 +891,7 @@ export default class CalendarPlugin extends Plugin {
    * Find the actual plugin directory path inside .obsidian/plugins/.
    * The folder name may differ from manifest.id (e.g. "WorkLife Calendar" vs "calendar-plugin-remastered").
    */
-  private async findPluginDir(): Promise<string | null> {
+  async findPluginDir(): Promise<string | null> {
     const configDir = this.app.vault.configDir;
     const pluginsDir = `${configDir}/plugins`;
     try {
