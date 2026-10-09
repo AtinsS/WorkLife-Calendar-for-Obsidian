@@ -13,6 +13,33 @@ export const defaultOllamaSettings: OllamaSettings = {
   ollamaModel: "llama3.1",
 };
 
+/**
+ * Model roles.
+ * - "reason": long prompts, prose, analysis (summaries, forecasts, insights)
+ * - "extract": structured JSON parsing (expenses, quick add, subtasks, task extract)
+ */
+export type ModelRole = "reason" | "extract";
+
+export interface ModelSettingsShape {
+  ollamaModel?: string;
+  ollamaModelExtract?: string;
+  /** "single" (default) — one model for all roles; "dual" — separate extract model. */
+  ollamaModelMode?: "single" | "dual";
+}
+
+/**
+ * Resolve which model to use for a role.
+ * Fallback chain: role model → main model → default.
+ * In "single" mode (or when extract is unset) both roles share the main model.
+ */
+export function resolveModel(role: ModelRole, opts: ModelSettingsShape): string {
+  const main = (opts.ollamaModel || "").trim() || "llama3.1";
+  if (role === "reason") return main;
+  if (opts.ollamaModelMode !== "dual") return main;
+  const extract = (opts.ollamaModelExtract || "").trim();
+  return extract || main;
+}
+
 export interface ExtractedSubtask {
   title: string;
 }

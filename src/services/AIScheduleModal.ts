@@ -6,7 +6,7 @@ import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
 import { tasks } from "../task-tracker/stores";
 import type { ITask } from "../task-tracker/types";
-import { streamOllamaChat } from "./OllamaService";
+import { streamOllamaChat, resolveModel } from "./OllamaService";
 import { errorMessage } from "../utils/sanitize";
 
 type PeriodKey = "view" | "week" | "lastWeek" | "month" | "last7" | "last30";
@@ -659,7 +659,7 @@ export class AIScheduleModal extends CustomModal {
     try {
       const result = await streamOllamaChat(
         opts.ollamaUrl || "http://localhost:11434",
-        opts.ollamaModel || "llama3.1",
+        resolveModel("reason", opts),
         [
           { role: "system", content: buildSystem(this.action, lang) },
           { role: "user", content: this.buildUserPrompt() },

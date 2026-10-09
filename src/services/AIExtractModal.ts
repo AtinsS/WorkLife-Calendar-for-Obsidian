@@ -10,6 +10,7 @@ import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { tRaw } from "../i18n";
 import { errorMessage } from "../utils/sanitize";
 import type { ExtractedTask } from "./OllamaService";
+import { resolveModel } from "./OllamaService";
 import {
   extractTasksFromNoteStream,
   applyTasksInstruction,
@@ -147,7 +148,7 @@ export class AIExtractModal extends CustomModal {
     const opts: ISettings = get(settings);
     return {
       url: opts.ollamaUrl || "http://localhost:11434",
-      model: opts.ollamaModel || "llama3.1",
+      model: resolveModel("extract", opts),
       contextSize: opts.ollamaContextSize || 0,
     };
   }

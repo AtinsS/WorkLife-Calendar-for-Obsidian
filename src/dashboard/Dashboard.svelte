@@ -22,6 +22,7 @@
   import { getDateUID } from "obsidian-daily-notes-interface";
   import { getCurrentMonthKey, financeData, ensureGoalsRollover, getArchivedGoals, deleteArchivedGoal, updateMonthData } from "../finance/storage";
   import { generateGoalId, isGoalComplete, resolveGoalAdjustment, type GoalAdjustMode, type MonthGoal } from "../finance/types";
+  import { resolveStoredIncome } from "../finance/income";
   import { settings } from "../ui/stores";
   import { t } from "../i18n";
 
@@ -211,7 +212,9 @@
       const brought = g.broughtForward ?? 0;
       return s + Math.max(0, (g.currentAmount || 0) - brought);
     }, 0);
-    return (d.monthlyIncome || 0) - main - contributed;
+    const key = getCurrentMonthKey();
+    const [y, m] = key.split("-").map(Number);
+    return resolveStoredIncome(d, y, m).total - main - contributed;
   })();
 
   function openEditGoal(goal: MonthGoal) {

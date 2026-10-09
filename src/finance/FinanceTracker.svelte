@@ -27,14 +27,18 @@
   import { get } from "svelte/store";
   import {
     tasks,
-    getEarningsForMonth,
-    getExpectedEarningsForMonth,
   } from "../task-tracker/stores";
   import { financialAnalyticsData } from "./financialAnalyticsStorage";
+  import { financeTabRequest, type FinanceTab } from "./financeUiStore";
+  import { resolveMonthIncome, getMonthIncomeTotal, normalizeIncomeMode, type IncomeMode } from "./income";
+  import { exportMonthSummary } from "./monthSummaryExport";
+  import FinancialAnalytics from "./FinancialAnalytics.svelte";
   import { t, tArray, locale } from "../i18n";
   import { clampAmount } from "../utils/sanitize";
 
-  type DistributionIncomeSource = "plan" | "fact" | "manual";
+  export let initialTab: FinanceTab = "income";
+
+  type DistributionIncomeSource = IncomeMode;
 
   function inputVal(e: Event): string {
     return (e.target as HTMLInputElement).value;
@@ -134,8 +138,20 @@
   $: goalsMonthContributions = monthData
     ? (monthData.monthGoals || []).reduce((sum, g) => sum + getGoalMonthContribution(g), 0)
     : 0;
+  // Effective income is always resolved from sources (see finance/income.ts).
+  // `monthData.monthlyIncome` is only the manual override / persisted cache.
+  $: effectiveIncome = (() => {
+    void $tasks;
+    void $financialAnalyticsData;
+    const [y, m] = monthKey.split("-").map(Number);
+    return resolveMonthIncome(y, m, {
+      mode: incomeSource,
+      manualOverride: incomeSource === "manual" ? manualIncome : monthData.monthlyIncome,
+    }).total;
+  })();
+
   $: balance = monthData
-    ? monthData.monthlyIncome - mainTotal - goalsMonthContributions
+    ? effectiveIncome - mainTotal - goalsMonthContributions
     : 0;
 
   // Recalculate savings amounts from percentages when balance changes
@@ -165,43 +181,29 @@
     return all[key] || null;
   })();
 
-  $: incomeDelta = prevMonthData ? monthData.monthlyIncome - prevMonthData.monthlyIncome : 0;
+  $: prevIncome = (() => {
+    if (!prevMonthData) return 0;
+    const d = new Date(displayYear, displayMonth - 2, 1);
+    return resolveMonthIncome(d.getFullYear(), d.getMonth() + 1, {
+      mode: normalizeIncomeMode(prevMonthData.incomeSource),
+      manualOverride: prevMonthData.monthlyIncome,
+    }).total;
+  })();
+  $: incomeDelta = prevMonthData ? effectiveIncome - prevIncome : 0;
   $: expenseDelta = prevMonthData ? mainTotal - (prevMonthData.mainAccountCategories?.reduce((s, c) => s + c.amount, 0) || 0) : 0;
   $: balanceDelta = prevMonthData
-    ? balance - ((prevMonthData.monthlyIncome || 0)
+    ? balance - (prevIncome
         - (prevMonthData.mainAccountCategories?.reduce((s, c) => s + c.amount, 0) || 0)
         - (prevMonthData.monthGoals || []).reduce((s, g) => s + getGoalMonthContribution(g), 0))
     : 0;
 
   function normalizeIncomeSource(source: FinanceMonthData["incomeSource"]): DistributionIncomeSource {
-    if (source === "manual") return "manual";
-    if (source === "plan") return "plan";
-    return "fact";
-  }
-
-  function isManualIncomeInMonth(dateStr: string, year: number, month: number): boolean {
-    const match = dateStr?.match(/^(\d{4})-(\d{2})/);
-    if (match) {
-      return parseInt(match[1], 10) === year && parseInt(match[2], 10) === month;
-    }
-    const date = new Date(dateStr);
-    if (Number.isNaN(date.getTime())) return false;
-    return date.getFullYear() === year && date.getMonth() + 1 === month;
-  }
-
-  function getManualIncomeForMonth(year: number, month: number): number {
-    return get(financialAnalyticsData).manualIncomeSources
-      .filter((source) => isManualIncomeInMonth(source.date, year, month))
-      .reduce((sum, source) => sum + source.amount, 0);
+    return normalizeIncomeMode(source);
   }
 
   function getIncomeForSource(source: Exclude<DistributionIncomeSource, "manual">): number {
     const [year, month] = monthKey.split("-").map(Number);
-    const manualIncomeForMonth = getManualIncomeForMonth(year, month);
-    if (source === "plan") {
-      return getExpectedEarningsForMonth(year, month) + manualIncomeForMonth;
-    }
-    return getEarningsForMonth(year, month) + manualIncomeForMonth;
+    return getMonthIncomeTotal(year, month, { mode: source });
   }
 
   function setIncomeSource(source: DistributionIncomeSource) {
@@ -443,7 +445,13 @@
   }
 
   // ── Tabs ──
-  let activeTab: "plan" | "expenses" = "plan";
+  let activeTab: FinanceTab = initialTab;
+
+  // External views can request a specific finance tab (income / expenses / budget)
+  $: if ($financeTabRequest) {
+    activeTab = $financeTabRequest;
+    financeTabRequest.set(null);
+  }
 
   // ── Expense log (actual money spent — separate from the budget plan) ──
   $: expenses = monthData?.expenses || [];
@@ -621,7 +629,7 @@
     new AIFinanceModal(app, mode, {
       getSummary: () =>
         buildFinanceSummary({
-          monthlyIncome: monthData.monthlyIncome,
+          monthlyIncome: effectiveIncome,
           mainCategories: monthData.mainAccountCategories,
           goals: monthData.monthGoals || [],
           savings: monthData.savingsCategories || [],
@@ -645,6 +653,11 @@
       },
     }).open();
   }
+
+  function exportSummary(): void {
+    const app = window.app as never;
+    void exportMonthSummary(app, monthKey, displayMonthName);
+  }
 </script>
 
 <div class="finance-tracker">
@@ -665,11 +678,11 @@
     <div class="fin-tabs" role="tablist">
       <button
         class="fin-tab"
-        class:is-active={activeTab === "plan"}
+        class:is-active={activeTab === "income"}
         role="tab"
-        aria-selected={activeTab === "plan"}
-        on:click={() => activeTab = "plan"}
-      >{$t("finance.tabBudget")}</button>
+        aria-selected={activeTab === "income"}
+        on:click={() => activeTab = "income"}
+      >{$t("finance.tabIncome")}</button>
       <button
         class="fin-tab"
         class:is-active={activeTab === "expenses"}
@@ -677,10 +690,24 @@
         aria-selected={activeTab === "expenses"}
         on:click={() => activeTab = "expenses"}
       >{$t("finance.tabExpenses")}</button>
+      <button
+        class="fin-tab"
+        class:is-active={activeTab === "budget"}
+        role="tab"
+        aria-selected={activeTab === "budget"}
+        on:click={() => activeTab = "budget"}
+      >{$t("finance.tabBudget")}</button>
     </div>
+    <button
+      class="fin-export-btn"
+      on:click={exportSummary}
+      title={$t("finance.exportButton")}
+    >{$t("finance.exportButton")}</button>
   </div>
 
-  {#if activeTab === "plan"}
+  {#if activeTab === "income"}
+    <FinancialAnalytics embedded selectedYear={displayYear} selectedMonth={displayMonth} />
+  {:else if activeTab === "budget"}
     {#if ollamaOn}
       <div class="ai-finance-bar">
         <button class="ai-finance-bar-btn" on:click={() => openAiFinance("forecast")} title={$t("ai.finance.forecastHint")}>
@@ -733,7 +760,7 @@
             class="balance-input income-input"
           />
         {:else}
-          <span class="balance-value income">{formatMoney(monthData.monthlyIncome)} {$t("locale.currencySymbol")}</span>
+          <span class="balance-value income">{formatMoney(effectiveIncome)} {$t("locale.currencySymbol")}</span>
         {/if}
         {#if incomeDelta !== 0}
           <span class="balance-delta" class:delta-up={incomeDelta > 0} class:delta-down={incomeDelta < 0}>
@@ -1186,6 +1213,26 @@
     border-radius: 12px;
     background: var(--fi-surface);
     border: 1px solid var(--fi-border);
+  }
+
+  .fin-export-btn {
+    padding: 7px 14px;
+    border: 1px solid var(--fi-border);
+    border-radius: 9px;
+    background: var(--fi-surface);
+    color: var(--fi-text);
+    font-size: 12.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+
+  .fin-export-btn:hover {
+    background: var(--fi-surface-hover);
+    border-color: var(--fi-border-focus);
+    color: var(--fi-accent);
   }
 
   .fin-tab {

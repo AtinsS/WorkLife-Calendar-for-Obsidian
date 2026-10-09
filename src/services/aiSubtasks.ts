@@ -16,6 +16,8 @@ export async function splitTaskIntoSubtasks(
     aiSubtasksEnabled?: boolean;
     ollamaUrl?: string;
     ollamaModel?: string;
+    ollamaModelMode?: "single" | "dual";
+    ollamaModelExtract?: string;
   };
   if (!opts.ollamaEnabled) {
     new Notice(tRaw("ai.summaryNeedOllama"));
@@ -30,10 +32,10 @@ export async function splitTaskIntoSubtasks(
     ? get(projects).find((p) => p.id === task.projectId)?.name ?? null
     : null;
 
-  const { generateSubtasks } = await import("./OllamaService");
+  const { generateSubtasks, resolveModel } = await import("./OllamaService");
   const titles = await generateSubtasks(
     opts.ollamaUrl || "http://localhost:11434",
-    opts.ollamaModel || "llama3.1",
+    resolveModel("extract", opts),
     task.title,
     task.description || null,
     projectName,

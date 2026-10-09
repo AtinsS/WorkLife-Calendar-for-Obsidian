@@ -9,6 +9,27 @@ const translations: Record<Locale, Translations> = { ru, en };
 
 export const locale = writable<Locale>("ru");
 
+/**
+ * Currency symbol override (set from plugin settings).
+ * When null, falls back to the locale default (₽ for ru, $ for en).
+ */
+export const currencyOverride = writable<string | null>(null);
+
+/** Effective currency symbol. */
+export function getCurrencySymbol(): string {
+  const custom = get(currencyOverride);
+  if (custom && custom.trim()) return custom.trim();
+  return get(locale) === "en" ? "$" : "₽";
+}
+
+function resolveCurrencyKey(key: string, value: string | string[] | undefined): string | string[] | undefined {
+  if (key === "locale.currencySymbol") {
+    const custom = get(currencyOverride);
+    if (custom && custom.trim()) return custom.trim();
+  }
+  return value;
+}
+
 /** Resolve nested key like "tasks.panel.title" from an object */
 function getNestedValue(obj: unknown, path: string): string | string[] | undefined {
   const parts = path.split(".");
@@ -25,7 +46,7 @@ function getNestedValue(obj: unknown, path: string): string | string[] | undefin
  * Usage: import { t } from "../i18n";  then  $t("key.path")
  */
 function createT() {
-  return derived(locale, ($locale) => {
+  return derived([locale, currencyOverride], ([$locale]) => {
     const dict = translations[$locale] || translations.ru;
     return (key: string, params?: Record<string, string | number>): string => {
       let value = getNestedValue(dict, key);
@@ -33,6 +54,7 @@ function createT() {
         // Fallback to Russian
         value = getNestedValue(translations.ru, key);
       }
+      value = resolveCurrencyKey(key, value);
       if (value === undefined) {
         return key; // Return key itself as last resort
       }
@@ -82,6 +104,7 @@ export function tRaw(key: string, params?: Record<string, string | number>): str
   if (value === undefined) {
     value = getNestedValue(translations.ru, key);
   }
+  value = resolveCurrencyKey(key, value);
   if (value === undefined) return key;
   if (Array.isArray(value)) return value.join(", ");
   if (params) {

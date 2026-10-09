@@ -49,6 +49,8 @@ interface AiQuickAddOptions {
   aiQuickAddEnabled?: boolean;
   ollamaUrl?: string;
   ollamaModel?: string;
+  ollamaModelMode?: "single" | "dual";
+  ollamaModelExtract?: string;
 }
 
 /** True when AI smart quick-add can be shown (desktop + Ollama + feature flag). */
@@ -462,8 +464,8 @@ export async function parseQuickTasksWithAI(
     throw new Error("ai-quick-add-unavailable");
   }
   const url = opts.ollamaUrl || "http://localhost:11434";
-  const model = opts.ollamaModel || "llama3.1";
-  const { streamOllamaChat } = await import("./OllamaService");
+  const { streamOllamaChat, resolveModel } = await import("./OllamaService");
+  const model = resolveModel("extract", opts);
   const out = await streamOllamaChat(
     url,
     model,
@@ -497,8 +499,8 @@ export async function generateTaskDescription(
   const opts = get(settings) as AiQuickAddOptions;
   if (!opts.ollamaEnabled) throw new Error("ai-quick-add-unavailable");
   const url = opts.ollamaUrl || "http://localhost:11434";
-  const model = opts.ollamaModel || "llama3.1";
-  const { streamOllamaChat } = await import("./OllamaService");
+  const { streamOllamaChat, resolveModel } = await import("./OllamaService");
+  const model = resolveModel("reason", opts);
   const user = hint && hint.trim() ? `${title}\n\nHint: ${hint.trim()}` : title;
   const out = await streamOllamaChat(
     url,

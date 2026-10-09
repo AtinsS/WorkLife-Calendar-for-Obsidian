@@ -17,6 +17,12 @@
   import { analyticsTabRequest } from "../stores/analyticsStore";
   import { VIEW_TYPE_HABIT_ANALYTICS } from "../constants";
 
+  /** When true, the component is rendered inside the unified Finance block:
+   *  month is owned by the parent, and the standalone header is hidden. */
+  export let embedded = false;
+  export let selectedYear = new Date().getFullYear();
+  export let selectedMonth = new Date().getMonth() + 1;
+
   async function openAnalyticsFinance(): Promise<void> {
     const appInstance = get(app);
     if (!appInstance) return;
@@ -54,10 +60,6 @@
   let editAmount = 0;
   let editDate = "";
   let editCategory = "";
-
-  const now = new Date();
-  let selectedYear = now.getFullYear();
-  let selectedMonth = now.getMonth() + 1;
 
   $: monthNames = $tArray("common.months.long");
 
@@ -263,7 +265,8 @@
   };
 </script>
 
-<div class="financial-analytics">
+<div class="financial-analytics" class:embedded>
+  {#if !embedded}
   <div class="fa-header">
     <h2>{$t("financeAnalytics.title")}</h2>
     <button class="fa-analytics-link" on:click={openAnalyticsFinance} title={$t("financeAnalytics.openAnalyticsFinance")}>
@@ -293,6 +296,7 @@
       }}>▶</button>
     </div>
   </div>
+  {/if}
 
   <!-- Summary Cards -->
   <div class="fa-summary">
@@ -560,6 +564,13 @@
     background: transparent;
     max-width: 1200px;
     margin: 0 auto;
+  }
+
+  .financial-analytics.embedded {
+    padding: 0;
+    height: auto;
+    overflow: visible;
+    max-width: none;
   }
 
   .fa-header h2 {

@@ -851,12 +851,12 @@ export class QuickAddModal extends Modal {
     btn.setAttribute("disabled", "true");
     btn.addClass("is-busy");
     try {
-      const { generateSubtasks } = await import("../services/OllamaService");
+      const { generateSubtasks, resolveModel } = await import("../services/OllamaService");
       const { settings } = await import("../ui/stores");
-      const opts = get(settings) as { ollamaUrl?: string; ollamaModel?: string };
+      const opts = get(settings) as { ollamaUrl?: string; ollamaModel?: string; ollamaModelMode?: "single" | "dual"; ollamaModelExtract?: string };
       const titles = await generateSubtasks(
         opts.ollamaUrl || "http://localhost:11434",
-        opts.ollamaModel || "llama3.1",
+        resolveModel("extract", opts),
         title,
         this.descEl?.value || null,
         parsed.projectName || null,

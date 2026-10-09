@@ -96,6 +96,14 @@ export interface ISettings {
   defaultPaymentType: "hour" | "day";
   defaultRate: number;
 
+  // Finance settings
+  /** Currency symbol override (e.g. ₽, $, €). Empty = locale default. */
+  financeCurrency?: string;
+  /** Folder for month-summary MD export. Empty = vault root. */
+  financeExportFolder?: string;
+  /** AI tips section inside the month summary (requires Ollama). */
+  aiFinanceInsightsEnabled?: boolean;
+
   // GitHub Gist sync settings
   githubToken?: string;
   gistId?: string;
@@ -160,6 +168,10 @@ export interface ISettings {
   ollamaEnabled: boolean;
   ollamaUrl: string;
   ollamaModel: string;
+  /** "single" — one model for all roles; "dual" — separate model for structured extraction. */
+  ollamaModelMode?: "single" | "dual";
+  /** Model for structured extraction (JSON parsing). Used only in "dual" mode. */
+  ollamaModelExtract?: string;
   ollamaContextSize: number;
   /** Извлечение задач из заметок (ПКМ → заметка) */
   aiExtractEnabled: boolean;
@@ -240,6 +252,10 @@ export const defaultSettings = Object.freeze({
   defaultPaymentType: "hour" as const,
   defaultRate: 0,
 
+  financeCurrency: "",
+  financeExportFolder: "",
+  aiFinanceInsightsEnabled: true,
+
   accentColor: "#5f99e1",
   glassBgColor: "#1e2332",
   glassOpacity: 55,
@@ -289,6 +305,8 @@ export const defaultSettings = Object.freeze({
   ollamaEnabled: false,
   ollamaUrl: "http://localhost:11434",
   ollamaModel: "llama3.1",
+  ollamaModelMode: "single" as const,
+  ollamaModelExtract: "",
   ollamaContextSize: 0,
   aiExtractEnabled: true,
   aiSummaryEnabled: true,
@@ -456,6 +474,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       { key: "general", label: tRaw("settings.tabs.general") },
       { key: "dashboard", label: tRaw("settings.tabs.dashboard") },
       { key: "schedule", label: tRaw("settings.tabs.schedule") },
+      { key: "finance", label: tRaw("settings.tabs.finance") },
       { key: "weather", label: tRaw("settings.tabs.weather") },
       { key: "appearance", label: tRaw("settings.tabs.appearance") },
       { key: "sync", label: tRaw("settings.tabs.sync") },
@@ -676,16 +695,32 @@ export class CalendarSettingsTab extends PluginSettingTab {
     new Setting(schedule).setName(tRaw("settings.schedule.sectionDisplay")).setHeading();
     this.addScheduleDisplaySettings(schedule);
 
+    // Finance tab
+    const finance = tabContainers["finance"];
+    this.addFinanceSettings(finance);
+
     // Weather tab
     const weather = tabContainers["weather"];
     this.addWeatherSettings(weather);
 
     // Appearance tab
     const appearance = tabContainers["appearance"];
-    new Setting(appearance).setName(tRaw("settings.appearance.sectionColors")).setHeading();
+    // Intro so the user knows what this tab is for
+    const appearanceIntro = appearance.createDiv({ cls: "setting-item-description" });
+    appearanceIntro.setText(tRaw("settings.appearance.intro"));
+
+    // 1. Quick look — the two controls most people need
+    new Setting(appearance).setName(tRaw("settings.appearance.sectionQuick")).setHeading();
     this.addAccentColorSetting(appearance);
     this.addGlassBgColorSetting(appearance);
+
+    // 2. Advanced colors (collapsed behind a toggle)
+    new Setting(appearance).setName(tRaw("settings.appearance.sectionAdvanced")).setHeading();
+    const advancedDesc = appearance.createDiv({ cls: "setting-item-description" });
+    advancedDesc.setText(tRaw("settings.appearance.sectionAdvancedDesc"));
     this.addColorSettings(appearance);
+
+    // 3. Nav panel in notes
     new Setting(appearance).setName(tRaw("settings.appearance.sectionNav")).setHeading();
     this.addNavPanelInstructions(appearance);
     new Setting(appearance).setName(tRaw("settings.appearance.sectionNavStyle")).setHeading();
@@ -1499,6 +1534,85 @@ export class CalendarSettingsTab extends PluginSettingTab {
       });
   }
 
+  /** Finance: currency symbol + month-summary export folder. */
+  addFinanceSettings(container: HTMLElement): void {
+    new Setting(container)
+      .setName(tRaw("settings.finance.sectionCurrency"))
+      .setHeading();
+
+    new Setting(container)
+      .setName(tRaw("settings.finance.currency"))
+      .setDesc(tRaw("settings.finance.currencyDesc"))
+      .addDropdown((dropdown) => {
+        const presets = [
+          { value: "", label: tRaw("settings.finance.currencyDefault") },
+          { value: "₽", label: "₽ — RUB" },
+          { value: "$", label: "$ — USD" },
+          { value: "€", label: "€ — EUR" },
+          { value: "£", label: "£ — GBP" },
+          { value: "₸", label: "₸ — KZT" },
+          { value: "₴", label: "₴ — UAH" },
+          { value: "₺", label: "₺ — TRY" },
+          { value: "¥", label: "¥ — CNY/JPY" },
+          { value: "₮", label: "₮ — MNT" },
+          { value: "₾", label: "₾ — GEL" },
+          { value: "₿", label: "₿ — BTC" },
+        ];
+        for (const p of presets) dropdown.addOption(p.value, p.label);
+        const current = this.plugin.options.financeCurrency ?? "";
+        if (current && !presets.some((p) => p.value === current)) {
+          dropdown.addOption(current, `${current} — ${tRaw("settings.finance.currencyCustom")}`);
+        }
+        dropdown.setValue(current);
+        dropdown.onChange(async (value) => {
+          await this.plugin.writeOptions({ financeCurrency: value });
+        });
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.finance.currencyCustom"))
+      .setDesc(tRaw("settings.finance.currencyCustomDesc"))
+      .addText((text) => {
+        text
+          .setPlaceholder("₽")
+          .setValue(this.plugin.options.financeCurrency ?? "")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ financeCurrency: value.trim() });
+          });
+        text.inputEl.addClass("mcp-input-md");
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.finance.sectionExport"))
+      .setHeading();
+
+    new Setting(container)
+      .setName(tRaw("settings.finance.exportFolder"))
+      .setDesc(tRaw("settings.finance.exportFolderDesc"))
+      .addText((text) => {
+        text
+          .setPlaceholder(tRaw("settings.finance.exportFolderPlaceholder"))
+          .setValue(this.plugin.options.financeExportFolder ?? "")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ financeExportFolder: value.trim() });
+          });
+        text.inputEl.addClass("mcp-input-md");
+      })
+      .addExtraButton((btn) => {
+        btn
+          .setIcon("folder")
+          .setTooltip(tRaw("settings.finance.exportFolderPick"))
+          .onClick(() => {
+            void import("./modals/FolderSuggestModal").then(({ FolderSuggestModal }) => {
+              new FolderSuggestModal(this.app, (folder) => {
+                void this.plugin.writeOptions({ financeExportFolder: folder });
+                this.render();
+              }).open();
+            });
+          });
+      });
+  }
+
   addCarryOverOverdueSetting(container: HTMLElement): void {
     new Setting(container)
       .setName(tRaw("settings.general.carryOverOverdue"))
@@ -2133,16 +2247,16 @@ export class CalendarSettingsTab extends PluginSettingTab {
   }
 
   addOllamaSettings(container: HTMLElement): void {
-    new Setting(container).setName(tRaw("settings.ai.sectionOllama")).setHeading();
-
     // AI is desktop-only: hide the whole surface on mobile (user rule)
     const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
     if (isMobile) {
+      new Setting(container).setName(tRaw("settings.ai.sectionOllama")).setHeading();
       const notice = container.createDiv({ cls: "setting-item-description" });
       notice.setText(tRaw("settings.ai.mobileOnlyDesktop"));
       return;
     }
 
+    // ── 1. On / off ──────────────────────────────────────────────────────
     new Setting(container)
       .setName(tRaw("settings.ai.enabled"))
       .setDesc(tRaw("settings.ai.enabledDesc"))
@@ -2150,7 +2264,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         toggle.setValue(this.plugin.options.ollamaEnabled);
         toggle.onChange(async (value) => {
           await this.plugin.writeOptions({ ollamaEnabled: value });
-          this.render(); // refresh to show/hide fields
+          this.render();
         });
       });
 
@@ -2160,7 +2274,9 @@ export class CalendarSettingsTab extends PluginSettingTab {
       return;
     }
 
-    // ── Connection / model ────────────────────────────────────────────────
+    // ── 2. Connection ────────────────────────────────────────────────────
+    new Setting(container).setName(tRaw("settings.ai.sectionConnection")).setHeading();
+
     new Setting(container)
       .setName(tRaw("settings.ai.url"))
       .setDesc(tRaw("settings.ai.urlDesc"))
@@ -2173,52 +2289,6 @@ export class CalendarSettingsTab extends PluginSettingTab {
           });
         text.inputEl.addClass("mcp-input-xl");
       });
-
-    // Model selector with "Find models" button
-    const modelSetting = container.createDiv({ cls: "setting-item" });
-    const modelInfo = modelSetting.createDiv({ cls: "setting-item-info" });
-    modelInfo.createDiv({ cls: "setting-item-name", text: tRaw("settings.ai.model") });
-    modelInfo.createDiv({ cls: "setting-item-description", text: tRaw("settings.ai.modelDesc") });
-    const modelControl = modelSetting.createDiv({ cls: "setting-item-control" });
-
-    // Dropdown for model selection
-    const modelSelect = modelControl.createEl("select", { cls: "dropdown" });
-    const currentModel = this.plugin.options.ollamaModel || "llama3.1";
-    modelSelect.createEl("option", { value: currentModel, text: currentModel });
-    modelSelect.value = currentModel;
-    modelSelect.addEventListener("change", () => {
-      void this.plugin.writeOptions({ ollamaModel: modelSelect.value });
-    });
-
-    // "Find models" button
-    const findModelsBtn = modelControl.createEl("button", { text: tRaw("settings.ai.findModels") });
-    findModelsBtn.addClass("mod-cta");
-    findModelsBtn.addEventListener("click", () => {
-      void (async () => {
-        findModelsBtn.disabled = true;
-        findModelsBtn.textContent = tRaw("settings.ai.finding");
-        const url = this.plugin.options.ollamaUrl || "http://localhost:11434";
-        const result = await testOllamaConnection(url);
-        findModelsBtn.disabled = false;
-        findModelsBtn.textContent = tRaw("settings.ai.findModels");
-
-        if (result.ok && result.models && result.models.length > 0) {
-          // Preserve current selection
-          const prev = modelSelect.value;
-          modelSelect.empty();
-          for (const name of result.models) {
-            modelSelect.createEl("option", { value: name, text: name });
-          }
-          // Restore selection if still available, otherwise pick first
-          if (result.models.includes(prev)) {
-            modelSelect.value = prev;
-          } else {
-            modelSelect.value = result.models[0];
-            await this.plugin.writeOptions({ ollamaModel: result.models[0] });
-          }
-        }
-      })();
-    });
 
     new Setting(container)
       .setName(tRaw("settings.ai.contextSize"))
@@ -2238,10 +2308,234 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.addClass("mcp-input-md");
       });
 
-    // Test connection button
-    const btnRow = container.createDiv();
-    btnRow.addClass("mcp-btn-row");
+    const btnRow = container.createDiv({ cls: "mcp-btn-row" });
+    this.addTestConnectionButton(btnRow);
+    this.addTestAiButton(btnRow);
 
+    // ── 3. Models ────────────────────────────────────────────────────────
+    new Setting(container).setName(tRaw("settings.ai.sectionModels")).setHeading();
+
+    const modelMode = this.plugin.options.ollamaModelMode === "dual" ? "dual" : "single";
+
+    new Setting(container)
+      .setName(tRaw("settings.ai.modelMode"))
+      .setDesc(tRaw("settings.ai.modelModeDesc"))
+      .addDropdown((dropdown) => {
+        dropdown.addOption("single", tRaw("settings.ai.modelModeSingle"));
+        dropdown.addOption("dual", tRaw("settings.ai.modelModeDual"));
+        dropdown.setValue(modelMode);
+        dropdown.onChange(async (value) => {
+          await this.plugin.writeOptions({
+            ollamaModelMode: value === "dual" ? "dual" : "single",
+          });
+          this.render();
+        });
+      });
+
+    // Main model — always visible
+    this.addModelPicker(container, {
+      name: tRaw("settings.ai.model"),
+      desc: tRaw("settings.ai.modelDesc"),
+      getValue: () => this.plugin.options.ollamaModel || "llama3.1",
+      setValue: (v) => this.plugin.writeOptions({ ollamaModel: v }),
+    });
+
+    // Extract model — only in dual mode
+    if (modelMode === "dual") {
+      this.addModelPicker(container, {
+        name: tRaw("settings.ai.modelExtract"),
+        desc: tRaw("settings.ai.modelExtractDesc"),
+        getValue: () => this.plugin.options.ollamaModelExtract || "",
+        setValue: (v) => this.plugin.writeOptions({ ollamaModelExtract: v }),
+        emptyLabel: tRaw("settings.ai.modelExtractSame"),
+      });
+    }
+
+    // ── 4. Actions ───────────────────────────────────────────────────────
+    new Setting(container).setName(tRaw("settings.ai.sectionActions")).setHeading();
+
+    this.addCompactToggle(container, "aiExtractEnabled", "extractEnabled", "extractEnabledDesc");
+    this.addCompactToggle(container, "aiSubtasksEnabled", "subtasksEnabled", "subtasksEnabledDesc");
+    this.addCompactToggle(container, "aiQuickAddEnabled", "quickAddEnabled", "quickAddEnabledDesc", {
+      onAfter: () => this.render(),
+    });
+
+    if (this.plugin.options.aiQuickAddEnabled !== false) {
+      this.addCompactToggle(container, "aiConfirmBeforeAdd", "confirmBeforeAdd", "confirmBeforeAddDesc");
+      const quickAddHowTo = container.createDiv({ cls: "setting-item-description ai-howto-text" });
+      quickAddHowTo.setText(tRaw("settings.ai.quickAddHowTo"));
+    }
+
+    this.addCompactToggle(container, "aiScheduleActionsEnabled", "scheduleActionsEnabled", "scheduleActionsEnabledDesc");
+
+    this.addCompactToggle(container, "aiSummaryEnabled", "summaryEnabled", "summaryEnabledDesc", {
+      onAfter: () => this.render(),
+    });
+    if (this.plugin.options.aiSummaryEnabled !== false) {
+      new Setting(container)
+        .setName(tRaw("settings.ai.summaryStyle"))
+        .setDesc(tRaw("settings.ai.summaryStyleDesc"))
+        .addDropdown((dropdown) => {
+          dropdown.addOption("brief", tRaw("settings.ai.summaryStyleBrief"));
+          dropdown.addOption("detailed", tRaw("settings.ai.summaryStyleDetailed"));
+          dropdown.addOption("bullets", tRaw("settings.ai.summaryStyleBullets"));
+          dropdown.addOption("executive", tRaw("settings.ai.summaryStyleExecutive"));
+          const raw = this.plugin.options.aiSummaryStyle;
+          dropdown.setValue(
+            raw === "brief" || raw === "bullets" || raw === "executive" ? raw : "detailed",
+          );
+          dropdown.onChange(async (value: string) => {
+            await this.plugin.writeOptions({
+              aiSummaryStyle:
+                value === "brief" || value === "bullets" || value === "executive"
+                  ? value
+                  : "detailed",
+            });
+            this.render();
+          });
+        });
+
+      // One-line explanation of the chosen style
+      const style = this.plugin.options.aiSummaryStyle === "brief"
+        || this.plugin.options.aiSummaryStyle === "bullets"
+        || this.plugin.options.aiSummaryStyle === "executive"
+        ? this.plugin.options.aiSummaryStyle
+        : "detailed";
+      const styleDescMap: Record<string, string> = {
+        brief: tRaw("settings.ai.summaryStyleBriefDesc"),
+        detailed: tRaw("settings.ai.summaryStyleDetailedDesc"),
+        bullets: tRaw("settings.ai.summaryStyleBulletsDesc"),
+        executive: tRaw("settings.ai.summaryStyleExecutiveDesc"),
+      };
+      const styleHint = container.createDiv({ cls: "setting-item-description ai-howto-text" });
+      styleHint.setText(styleDescMap[style] || "");
+
+      new Setting(container)
+        .setName(tRaw("settings.ai.summaryPrompt"))
+        .setDesc(tRaw("settings.ai.summaryPromptDesc"))
+        .addTextArea((area) => {
+          area
+            .setPlaceholder(tRaw("settings.ai.summaryPromptPlaceholder"))
+            .setValue(this.plugin.options.aiSummaryPrompt || "")
+            .onChange(async (value) => {
+              await this.plugin.writeOptions({ aiSummaryPrompt: value });
+            });
+          area.inputEl.rows = 2;
+          area.inputEl.addClass("mcp-input-xl");
+        });
+    }
+
+    // Finance AI tips toggle (privacy warnings live in the Privacy section below)
+    this.addCompactToggle(container, "aiFinanceInsightsEnabled", "financeInsights", "financeInsightsDesc");
+
+    // ── 5. Privacy ───────────────────────────────────────────────────────
+    new Setting(container).setName(tRaw("settings.ai.sectionPrivacy")).setHeading();
+
+    const cloudWarn = container.createDiv({ cls: "settings-banner" });
+    new Setting(cloudWarn)
+      .setName(tRaw("settings.ai.cloudWarning"))
+      .setHeading();
+    cloudWarn.createEl("p", {
+      cls: "setting-item-description",
+      text: tRaw("settings.ai.cloudWarningDesc"),
+    });
+
+    const dataSent = container.createDiv({ cls: "setting-item-description ai-howto-text" });
+    dataSent.createEl("strong", { text: tRaw("settings.ai.dataSentTitle") });
+    dataSent.createEl("p", {
+      text: tRaw("settings.ai.dataSentDesc"),
+    });
+
+    // ── 6. How-to ────────────────────────────────────────────────────────
+    new Setting(container).setName(tRaw("settings.ai.howToTitle")).setHeading();
+    const howTo = container.createDiv({ cls: "setting-item-description ai-howto-text" });
+    howTo.setText(tRaw("settings.ai.howToSteps"));
+  }
+
+  /** Small helper: toggle with short label, one-line desc. */
+  private addCompactToggle(
+    container: HTMLElement,
+    key:
+      | "aiExtractEnabled"
+      | "aiSubtasksEnabled"
+      | "aiQuickAddEnabled"
+      | "aiConfirmBeforeAdd"
+      | "aiScheduleActionsEnabled"
+      | "aiSummaryEnabled"
+      | "aiFinanceInsightsEnabled",
+    nameKey: string,
+    descKey: string,
+    opts?: { onAfter?: () => void },
+  ): void {
+    new Setting(container)
+      .setName(tRaw(`settings.ai.${nameKey}`))
+      .setDesc(tRaw(`settings.ai.${descKey}`))
+      .addToggle((toggle) => {
+        const current = (this.plugin.options as unknown as Record<string, unknown>)[key];
+        toggle.setValue(current !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ [key]: value });
+          opts?.onAfter?.();
+        });
+      });
+  }
+
+  /** Model dropdown + "Find models" button. */
+  private addModelPicker(
+    container: HTMLElement,
+    opts: {
+      name: string;
+      desc: string;
+      getValue: () => string;
+      setValue: (v: string) => Promise<void>;
+      emptyLabel?: string;
+    },
+  ): void {
+    const row = container.createDiv({ cls: "setting-item" });
+    const info = row.createDiv({ cls: "setting-item-info" });
+    info.createDiv({ cls: "setting-item-name", text: opts.name });
+    info.createDiv({ cls: "setting-item-description", text: opts.desc });
+    const control = row.createDiv({ cls: "setting-item-control" });
+
+    const select = control.createEl("select", { cls: "dropdown" });
+    const fill = (models: string[], selected: string) => {
+      select.empty();
+      if (opts.emptyLabel) {
+        select.createEl("option", { value: "", text: opts.emptyLabel });
+      }
+      for (const name of models) {
+        select.createEl("option", { value: name, text: name });
+      }
+      if (!models.includes(selected)) {
+        select.createEl("option", { value: selected, text: selected });
+      }
+      select.value = selected;
+    };
+
+    const current = opts.getValue();
+    fill(current ? [current] : [], current);
+    select.addEventListener("change", () => {
+      void opts.setValue(select.value);
+    });
+
+    const findBtn = control.createEl("button", { text: tRaw("settings.ai.findModels") });
+    findBtn.addClass("mod-cta");
+    findBtn.addEventListener("click", () => {
+      void (async () => {
+        findBtn.disabled = true;
+        findBtn.textContent = tRaw("settings.ai.finding");
+        const url = this.plugin.options.ollamaUrl || "http://localhost:11434";
+        const result = await testOllamaConnection(url);
+        findBtn.disabled = false;
+        findBtn.textContent = tRaw("settings.ai.findModels");
+        if (result.ok && result.models && result.models.length > 0) {
+          fill(result.models, opts.getValue());
+        }
+      })();
+    });
+  }
+
+  private addTestConnectionButton(btnRow: HTMLElement): void {
     const testBtn = btnRow.createEl("button", { text: tRaw("settings.ai.testConnection") });
     testBtn.addClass("mcp-btn");
     testBtn.addEventListener("click", () => {
@@ -2274,8 +2568,9 @@ export class CalendarSettingsTab extends PluginSettingTab {
         }, 5000);
       })();
     });
+  }
 
-    // Live AI test button
+  private addTestAiButton(btnRow: HTMLElement): void {
     const aiTestBtn = btnRow.createEl("button", { text: tRaw("settings.ai.testAI") });
     aiTestBtn.addClass("mcp-btn");
     aiTestBtn.addEventListener("click", () => {
@@ -2285,7 +2580,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
         aiTestBtn.removeClass("mcp-color-success", "mcp-color-danger");
 
         const url = this.plugin.options.ollamaUrl || "http://localhost:11434";
-        const model = this.plugin.options.ollamaModel || "llama3.1";
+        const { resolveModel } = await import("./services/OllamaService");
+        const model = resolveModel("reason", this.plugin.options);
         const result = await testOllamaModel(url, model);
 
         if (result.ok) {
@@ -2303,122 +2599,5 @@ export class CalendarSettingsTab extends PluginSettingTab {
         }, 8000);
       })();
     });
-
-    // ── Per-action toggles + help ─────────────────────────────────────────
-    new Setting(container).setName(tRaw("settings.ai.sectionActions")).setHeading();
-    const actionsDesc = container.createDiv({ cls: "setting-item-description" });
-    actionsDesc.setText(tRaw("settings.ai.sectionActionsDesc"));
-
-    new Setting(container)
-      .setName(tRaw("settings.ai.extractEnabled"))
-      .setDesc(tRaw("settings.ai.extractEnabledDesc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.options.aiExtractEnabled !== false);
-        toggle.onChange(async (value) => {
-          await this.plugin.writeOptions({ aiExtractEnabled: value });
-        });
-      });
-
-    new Setting(container)
-      .setName(tRaw("settings.ai.summaryEnabled"))
-      .setDesc(tRaw("settings.ai.summaryEnabledDesc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.options.aiSummaryEnabled !== false);
-        toggle.onChange(async (value) => {
-          await this.plugin.writeOptions({ aiSummaryEnabled: value });
-          this.render();
-        });
-      });
-
-    if (this.plugin.options.aiSummaryEnabled !== false) {
-      new Setting(container)
-        .setName(tRaw("settings.ai.summaryStyle"))
-        .setDesc(tRaw("settings.ai.summaryStyleDesc"))
-        .addDropdown((dropdown) => {
-          dropdown.addOption("brief", tRaw("settings.ai.summaryStyleBrief"));
-          dropdown.addOption("detailed", tRaw("settings.ai.summaryStyleDetailed"));
-          dropdown.addOption("bullets", tRaw("settings.ai.summaryStyleBullets"));
-          dropdown.addOption("executive", tRaw("settings.ai.summaryStyleExecutive"));
-          const raw = this.plugin.options.aiSummaryStyle;
-          dropdown.setValue(
-            raw === "brief" || raw === "bullets" || raw === "executive"
-              ? raw
-              : "detailed",
-          );
-          dropdown.onChange(async (value: string) => {
-            await this.plugin.writeOptions({
-              aiSummaryStyle:
-                value === "brief" || value === "bullets" || value === "executive"
-                  ? value
-                  : "detailed",
-            });
-          });
-        });
-
-      new Setting(container)
-        .setName(tRaw("settings.ai.summaryPrompt"))
-        .setDesc(tRaw("settings.ai.summaryPromptDesc"))
-        .addTextArea((area) => {
-          area
-            .setPlaceholder(tRaw("settings.ai.summaryPromptPlaceholder"))
-            .setValue(this.plugin.options.aiSummaryPrompt || "")
-            .onChange(async (value) => {
-              await this.plugin.writeOptions({ aiSummaryPrompt: value });
-            });
-          area.inputEl.rows = 3;
-          area.inputEl.addClass("mcp-input-xl");
-        });
-    }
-
-    new Setting(container)
-      .setName(tRaw("settings.ai.subtasksEnabled"))
-      .setDesc(tRaw("settings.ai.subtasksEnabledDesc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.options.aiSubtasksEnabled !== false);
-        toggle.onChange(async (value) => {
-          await this.plugin.writeOptions({ aiSubtasksEnabled: value });
-        });
-      });
-
-    // Smart quick add (AI): work / note / recurrence + multi-task prompt
-    new Setting(container)
-      .setName(tRaw("settings.ai.quickAddEnabled"))
-      .setDesc(tRaw("settings.ai.quickAddEnabledDesc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.options.aiQuickAddEnabled !== false);
-        toggle.onChange(async (value) => {
-          await this.plugin.writeOptions({ aiQuickAddEnabled: value });
-        });
-      });
-
-    // Confirm AI-parsed tasks before adding
-    new Setting(container)
-      .setName(tRaw("settings.ai.confirmBeforeAdd"))
-      .setDesc(tRaw("settings.ai.confirmBeforeAddDesc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.options.aiConfirmBeforeAdd !== false);
-        toggle.onChange(async (value) => {
-          await this.plugin.writeOptions({ aiConfirmBeforeAdd: value });
-        });
-      });
-
-    // Schedule AI actions button
-    new Setting(container)
-      .setName(tRaw("settings.ai.scheduleActionsEnabled"))
-      .setDesc(tRaw("settings.ai.scheduleActionsEnabledDesc"))
-      .addToggle((toggle) => {
-        toggle.setValue(this.plugin.options.aiScheduleActionsEnabled !== false);
-        toggle.onChange(async (value) => {
-          await this.plugin.writeOptions({ aiScheduleActionsEnabled: value });
-        });
-      });
-
-    const quickAddHowTo = container.createDiv({ cls: "setting-item-description ai-howto-text" });
-    quickAddHowTo.setText(tRaw("settings.ai.quickAddHowTo"));
-
-    // How-to
-    new Setting(container).setName(tRaw("settings.ai.howToTitle")).setHeading();
-    const howTo = container.createDiv({ cls: "setting-item-description ai-howto-text" });
-    howTo.setText(tRaw("settings.ai.howToSteps"));
   }
 }

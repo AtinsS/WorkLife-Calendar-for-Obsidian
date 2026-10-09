@@ -4,7 +4,7 @@ import { CustomModal } from "../ui/CustomModal";
 import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
 import { get } from "svelte/store";
-import { streamOllamaChat } from "./OllamaService";
+import { streamOllamaChat, resolveModel } from "./OllamaService";
 import { errorMessage } from "../utils/sanitize";
 
 const MAX_NOTES = 40;
@@ -312,7 +312,7 @@ export class AISummaryModal extends CustomModal {
 
       const result = await streamOllamaChat(
         opts.ollamaUrl || "http://localhost:11434",
-        opts.ollamaModel || "llama3.1",
+        resolveModel("reason", opts),
         [
           { role: "system", content: system },
           {

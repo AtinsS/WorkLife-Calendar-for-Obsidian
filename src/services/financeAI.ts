@@ -1,5 +1,5 @@
 import { get } from "svelte/store";
-import { streamOllamaChat, parseOllamaJson } from "./OllamaService";
+import { streamOllamaChat, parseOllamaJson, resolveModel, type ModelRole } from "./OllamaService";
 import { settings } from "../ui/stores";
 import {
   type ExpenseCategoryDef,
@@ -77,21 +77,23 @@ export function buildFinanceSummary(input: {
   };
 }
 
-function ollamaOpts(): { url: string; model: string; enabled: boolean } {
+function ollamaOpts(role: ModelRole = "reason"): { url: string; model: string; enabled: boolean } {
   const s = get(settings) as {
     ollamaEnabled?: boolean;
     ollamaUrl?: string;
     ollamaModel?: string;
+    ollamaModelMode?: "single" | "dual";
+    ollamaModelExtract?: string;
   };
   return {
     enabled: s.ollamaEnabled === true,
     url: s.ollamaUrl || "http://localhost:11434",
-    model: s.ollamaModel || "llama3.1",
+    model: resolveModel(role, s),
   };
 }
 
 export function getFinanceAiConfig(): { url: string; model: string; enabled: boolean } {
-  return ollamaOpts();
+  return ollamaOpts("reason");
 }
 
 // ── 1. Parse expenses from free text ──────────────────────────────────────────
@@ -115,7 +117,7 @@ export async function parseExpensesFromText(
   categories: ExpenseCategoryDef[],
   signal?: AbortSignal,
 ): Promise<ParsedExpense[]> {
-  const { url, model, enabled } = ollamaOpts();
+  const { url, model, enabled } = ollamaOpts("extract");
 
   const catList = categories.map((c) => `${c.id}=${c.name} ${c.icon}`).join(", ");
   const userContent = `Categories: ${catList}\n\nText:\n${text.slice(0, 8000)}`;
@@ -214,7 +216,7 @@ export async function forecastBalance(
   signal?: AbortSignal,
   onDelta?: (full: string) => void,
 ): Promise<string> {
-  const { url, model, enabled } = ollamaOpts();
+  const { url, model, enabled } = ollamaOpts("reason");
   if (!enabled) throw new Error("ollama-disabled");
 
   const payload = JSON.stringify(summary);
@@ -250,7 +252,7 @@ export async function suggestDistribution(
   summary: FinanceSummary,
   signal?: AbortSignal,
 ): Promise<DistributionSuggestion> {
-  const { url, model, enabled } = ollamaOpts();
+  const { url, model, enabled } = ollamaOpts("reason");
   if (!enabled) throw new Error("ollama-disabled");
 
   const raw = await streamOllamaChat(
@@ -284,4 +286,47 @@ export async function suggestDistribution(
     categoryPercents,
     explanation: typeof parsed.explanation === "string" ? parsed.explanation : "",
   };
+}
+
+// ── 4. Month insights (tips for the MD summary) ─────────────────────────────
+
+const INSIGHTS_SYSTEM = `You are a personal finance assistant. Analyze the month snapshot and write short tips.
+Write in the SAME language as the category names (Russian if they are Russian).
+Return ONLY markdown bullets (no code fences, no heading).
+- 3–5 bullets, each one sentence
+- Be concrete: name categories, amounts, percentages when possible
+- Cover: what stands out, where money goes, one risk, one actionable tip
+- No fluff, no "consider reviewing your budget" clichés
+Keep it under 120 words.`;
+
+/**
+ * Generate short AI tips for the month summary.
+ * Returns markdown bullets (without heading). Throws when Ollama is off.
+ */
+export async function suggestMonthInsights(
+  summary: FinanceSummary,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { url, model, enabled } = ollamaOpts("reason");
+  if (!enabled) throw new Error("ollama-disabled");
+
+  const raw = await streamOllamaChat(
+    url,
+    model,
+    [
+      { role: "system", content: INSIGHTS_SYSTEM },
+      { role: "user", content: `Month snapshot:\n${JSON.stringify(summary)}` },
+    ],
+    { signal, temperature: 0.4 },
+  );
+  return raw.trim();
+}
+
+/** Whether AI tips should be generated for the month summary. */
+export function isFinanceInsightsEnabled(): boolean {
+  const s = get(settings) as {
+    ollamaEnabled?: boolean;
+    aiFinanceInsightsEnabled?: boolean;
+  };
+  return s.ollamaEnabled === true && s.aiFinanceInsightsEnabled !== false;
 }

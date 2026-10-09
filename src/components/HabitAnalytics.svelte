@@ -25,10 +25,12 @@
     getTotalManualIncome,
     getManualIncomeForMonth,
   } from "../finance/financialAnalyticsStorage";
+  import { resolveStoredIncome } from "../finance/income";
   import { financeData, getCurrentMonthKey, getMonthData, getCustomExpenseCategories } from "../finance/storage";
   import { getGoalMonthContribution } from "../finance/types";
   import { mergeCategories, categoryByName, type ExpenseCategoryDef } from "../finance/expenseCategories";
-  import { VIEW_TYPE_FINANCIAL_ANALYTICS } from "../constants";
+  import { VIEW_TYPE_FINANCE } from "../constants";
+  import { requestFinanceTab } from "../finance/financeUiStore";
   import { t, tArray, locale } from "../i18n";
   import { settings } from "../ui/stores";
   import { derived as derivedStore } from "svelte/store";
@@ -212,6 +214,7 @@
   $: financeMonth = (() => {
     void $financeData;
     void $financialAnalyticsData;
+    void $tasks;
     const key = getCurrentMonthKey();
     const data = getMonthData(key);
     const expenseList = data.expenses || [];
@@ -220,10 +223,12 @@
     // If no expense log yet, fall back to budget plan main categories
     const planExpenses = (data.mainAccountCategories || []).reduce((s, c) => s + (c.amount || 0), 0);
     const totalExpenses = expensesFromLog > 0 ? expensesFromLog + goalContrib : planExpenses + goalContrib;
+    const [y, m] = key.split("-").map(Number);
+    const income = resolveStoredIncome(data, y, m).total;
     return {
-      income: monthlyEarnings || data.monthlyIncome || 0,
+      income,
       expenses: totalExpenses,
-      balance: (monthlyEarnings || data.monthlyIncome || 0) - totalExpenses,
+      balance: income - totalExpenses,
       expenseList,
     };
   })();
@@ -254,9 +259,8 @@
     const appInstance = get(app);
     if (!appInstance) return;
 
-    const existing = appInstance.workspace.getLeavesOfType(
-      VIEW_TYPE_FINANCIAL_ANALYTICS,
-    );
+    requestFinanceTab("income");
+    const existing = appInstance.workspace.getLeavesOfType(VIEW_TYPE_FINANCE);
     if (existing.length) {
       appInstance.workspace.revealLeaf(existing[0]);
       return;
@@ -265,7 +269,7 @@
     const leaf = appInstance.workspace.getLeaf("tab");
     if (leaf) {
       await leaf.setViewState({
-        type: VIEW_TYPE_FINANCIAL_ANALYTICS,
+        type: VIEW_TYPE_FINANCE,
         active: true,
       });
       appInstance.workspace.revealLeaf(leaf);

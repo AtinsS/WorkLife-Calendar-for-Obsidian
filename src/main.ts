@@ -48,7 +48,7 @@ import { initHabitStores, reloadHabitStores, immediateSave as immediateHabitSave
 import { initFinanceStores, reloadFinanceStores, immediateFinanceSave } from "./finance/storage";
 import { initFinancialAnalyticsStores, reloadFinancialAnalyticsStores, immediateAnalyticsSave } from "./finance/financialAnalyticsStorage";
 import { initWeightStores, reloadWeightStores, immediateWeightSave } from "./weight/stores";
-import { initLocale, locale, tRaw } from "./i18n";
+import { initLocale, locale, tRaw, currencyOverride } from "./i18n";
 import CalendarNav from "./components/CalendarNav.svelte";
 import DateTimeWeather from "./components/DateTimeWeather.svelte";
 import Dashboard from "./dashboard/Dashboard.svelte";
@@ -207,6 +207,7 @@ export default class CalendarPlugin extends Plugin {
   async onload(): Promise<void> {
     // Initialize locale from settings
     initLocale(this.options?.language || "system");
+    currencyOverride.set(this.options?.financeCurrency || null);
 
     // Set moment locale based on i18n locale
     const currentLocale = get(locale) || "ru";
@@ -220,6 +221,7 @@ export default class CalendarPlugin extends Plugin {
       settings.subscribe((value) => {
         this.options = value;
         this.notificationService?.restart();
+        currencyOverride.set(value.financeCurrency || null);
         // Update locale when language setting changes
         if (value.language) {
           initLocale(value.language);
@@ -855,8 +857,11 @@ export default class CalendarPlugin extends Plugin {
     return this.activateView(VIEW_TYPE_TASKS);
   }
 
+  /** Opens the unified Finance block on the Income tab. */
   async activateFinancialAnalyticsView(): Promise<void> {
-    return this.activateView(VIEW_TYPE_FINANCIAL_ANALYTICS);
+    const { requestFinanceTab } = await import("./finance/financeUiStore");
+    requestFinanceTab("income");
+    return this.activateView(VIEW_TYPE_FINANCE);
   }
 
   async activateKanbanView(): Promise<void> {
