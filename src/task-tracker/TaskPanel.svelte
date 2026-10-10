@@ -82,13 +82,19 @@
   $: filteredTasks = allTasksForDate.filter((t) => {
     if ($taskFilter.projectId && t.projectId !== $taskFilter.projectId) return false;
     if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    if (t.deadline && t.status !== "done") return true;
-    // When viewing all tasks (no date selected), show all statuses including done
-    if ($activeTab === "all") return showAllDates ? true : t.status !== "done";
+    if ($activeTab === "all") {
+      // «Все задачи» (все даты) — вообще все статусы
+      if (showAllDates) return true;
+      // Вкладка «Все» на дне — только активные (без done/failed)
+      return t.status !== "done" && t.status !== "failed";
+    }
+    if (t.deadline && t.status !== "done" && t.status !== "failed") return true;
     return t.status === $activeTab;
   });
 
   $: showAllDates = !currentDate;
+  /** Есть ли задачи в текущем контексте (день / все даты) до фильтров вкладки/поиска. */
+  $: hasTasksForView = showAllDates ? $tasks.length > 0 : allTasksForDate.length > 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   $: taskGroups = (showAllDates
     ? groupTasksByDateAndProject(filteredTasks, $projects)
@@ -599,10 +605,15 @@
     <div class="task-tracker-list">
       {#if filteredTasks.length === 0}
         <div class="task-tracker-empty">
-          <div class="empty-illustration">✅</div>
-          <div class="empty-title">{$t("tasks.panel.empty")}</div>
-          <div class="empty-subtitle">{$t("tasks.panel.emptyHint")}</div>
-          <button class="empty-cta" on:click={openCreateTask}>+ {$t("tasks.modal.newTask")}</button>
+          {#if !hasTasksForView}
+            <div class="empty-illustration">✅</div>
+            <div class="empty-title">{$t("tasks.panel.empty")}</div>
+            <div class="empty-subtitle">{$t("tasks.panel.emptyHint")}</div>
+            <button class="empty-cta" on:click={openCreateTask}>+ {$t("tasks.modal.newTask")}</button>
+          {:else}
+            <div class="empty-illustration">🌿</div>
+            <div class="empty-title">{$t("tasks.panel.emptyToday")}</div>
+          {/if}
         </div>
       {:else if showAllDates}
         {#each taskGroups as dateGroup (dateGroup.dateUID)}

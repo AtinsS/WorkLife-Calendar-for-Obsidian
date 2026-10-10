@@ -6,6 +6,7 @@ import { settings } from "../ui/stores";
 import { get } from "svelte/store";
 import { streamOllamaChat, resolveModel } from "./OllamaService";
 import { errorMessage } from "../utils/sanitize";
+import { renderMarkdown } from "../ui/markdown";
 
 const MAX_NOTES = 40;
 const MAX_CHARS_PER_NOTE = 6000;
@@ -16,23 +17,32 @@ Do NOT create a separate section per source file.
 Do NOT list notes one by one.
 Synthesize common themes, decisions, facts, and takeaways across all sources.
 Return ONLY markdown (no code fences around the whole answer).
-Write in the SAME language as the source notes.
+Write body text in the SAME language as the source notes.
+Use the exact section headings provided below (do not translate or bilingualize them).
 Preserve important names, dates, numbers.`;
 
 type SummaryStyle = "brief" | "detailed" | "bullets" | "executive";
 
 function buildSummarySystem(style: SummaryStyle, extra?: string): string {
+  const h = {
+    overview: tRaw("ai.summaryHeadings.overview"),
+    keyIdeas: tRaw("ai.summaryHeadings.keyIdeas"),
+    takeaways: tRaw("ai.summaryHeadings.takeaways"),
+    tldr: tRaw("ai.summaryHeadings.tldr"),
+    facts: tRaw("ai.summaryHeadings.facts"),
+    risks: tRaw("ai.summaryHeadings.risks"),
+  };
   const blocks: Record<SummaryStyle, string> = {
     brief: `Style: BRIEF.
 # <short shared title>
 2–4 sentences covering the whole corpus in one flow.`,
     detailed: `Style: DETAILED (still one shared summary).
 # <short shared title>
-## Обзор / Overview
+## ${h.overview}
 2–4 sentences about the whole set.
-## Ключевые идеи / Key ideas
+## ${h.keyIdeas}
 - bullets synthesizing topics across notes
-## Выводы / Takeaways
+## ${h.takeaways}
 - bullets
 Do not split sections by source note.`,
     bullets: `Style: BULLETS ONLY (one shared list).
@@ -41,11 +51,11 @@ Do not split sections by source note.`,
 - no per-file blocks, no long prose`,
     executive: `Style: EXECUTIVE SUMMARY (one shared brief).
 # <short shared title>
-## Суть / TL;DR
+## ${h.tldr}
 1–2 sentences on the whole set.
-## Факты и цифры / Facts
+## ${h.facts}
 - decisions, numbers, dates, owners from any notes
-## Риски и вопросы / Risks
+## ${h.risks}
 - open questions, blockers (if any)
 Never separate by note.`,
   };
@@ -103,11 +113,14 @@ export class AISummaryModal extends CustomModal {
 
   private titleEl: HTMLInputElement | null = null;
   private textareaEl: HTMLTextAreaElement | null = null;
+  private previewEl: HTMLElement | null = null;
+  private modeBtn: HTMLButtonElement | null = null;
   private statusEl: HTMLElement | null = null;
   private progressEl: HTMLElement | null = null;
   private progressFillEl: HTMLElement | null = null;
   private generateBtn: HTMLButtonElement | null = null;
   private createBtn: HTMLButtonElement | null = null;
+  private viewMode: "preview" | "edit" = "edit";
 
   constructor(
     app: App,
@@ -181,8 +194,15 @@ export class AISummaryModal extends CustomModal {
       this.summaryText = this.textareaEl?.value ?? "";
       this.syncCreateBtn();
     });
+    this.previewEl = scanShell.createDiv({ cls: "ai-summary-preview ai-hidden" });
 
     const footer = this.contentEl.createDiv({ cls: "ai-summary-footer" });
+    this.modeBtn = footer.createEl("button", {
+      text: tRaw("ai.summaryPreview"),
+      cls: "ai-summary-mode-btn",
+    });
+    this.modeBtn.addEventListener("click", () => this.toggleViewMode());
+
     this.generateBtn = footer.createEl("button", {
       text: tRaw("ai.summaryGenerate"),
       cls: "mod-cta",
@@ -207,11 +227,32 @@ export class AISummaryModal extends CustomModal {
     this.abort = null;
     this.titleEl = null;
     this.textareaEl = null;
+    this.previewEl = null;
+    this.modeBtn = null;
     this.statusEl = null;
     this.progressEl = null;
     this.progressFillEl = null;
     this.generateBtn = null;
     this.createBtn = null;
+  }
+
+  private toggleViewMode(): void {
+    this.viewMode = this.viewMode === "preview" ? "edit" : "preview";
+    this.applyViewMode();
+  }
+
+  private applyViewMode(): void {
+    const preview = this.viewMode === "preview";
+    this.textareaEl?.toggleClass("ai-hidden", preview);
+    this.previewEl?.toggleClass("ai-hidden", !preview);
+    if (this.modeBtn) {
+      this.modeBtn.textContent = preview
+        ? tRaw("ai.summaryEdit")
+        : tRaw("ai.summaryPreview");
+    }
+    if (preview && this.previewEl) {
+      renderMarkdown(this.previewEl, this.summaryText);
+    }
   }
 
   private syncCreateBtn(): void {
@@ -289,6 +330,8 @@ export class AISummaryModal extends CustomModal {
     if (this.generateBtn) this.generateBtn.disabled = true;
     this.abort = new AbortController();
     this.contentEl.addClass("scanning");
+    this.viewMode = "edit";
+    this.applyViewMode();
 
     try {
       this.setStatus(tRaw("ai.summaryReading"), false, true);
@@ -364,6 +407,10 @@ export class AISummaryModal extends CustomModal {
         this.titleEl.value = this.noteTitle;
       }
 
+      // Show readable preview after generation; user can switch to edit
+      this.viewMode = "preview";
+      this.applyViewMode();
+
       this.setStatus(tRaw("ai.summaryReady"));
       window.setTimeout(() => this.clearProgress(), 400);
       this.syncCreateBtn();
@@ -409,7 +456,9 @@ export class AISummaryModal extends CustomModal {
     try {
       const file = await this.app.vault.create(path, content);
       new Notice(tRaw("ai.summaryCreated", { path: file.path }));
-      await this.app.workspace.getLeaf("tab").openFile(file);
+      await this.app.workspace.getLeaf("tab").openFile(file, {
+        state: { mode: "source" },
+      });
       this.close();
     } catch (e) {
       const msg = errorMessage(e);

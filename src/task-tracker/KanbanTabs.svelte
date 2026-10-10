@@ -15,12 +15,13 @@
         result.failed++;
       } else if (task.status === "todo") {
         result.todo++;
-        result.all++;
       } else if (task.status === "progress") {
         result.progress++;
-        result.all++;
       } else if (task.status === "paused") {
         result.paused++;
+      }
+      // «Все задачи» (без даты) — все статусы; на дне — только активные
+      if (!currentDate || (task.status !== "done" && task.status !== "failed")) {
         result.all++;
       }
     }
@@ -28,7 +29,7 @@
   })();
 
   $: tabs = [
-    { key: "all" as TaskStatus, icon: "📋", label: $t("tasks.kanban.all") },
+    { key: "all" as TaskStatus, icon: "🌐", label: $t("tasks.kanban.all") },
     { key: "todo" as TaskStatus, icon: "🟢", label: $t("tasks.kanban.todo") },
     { key: "progress" as TaskStatus, icon: "🔥", label: $t("tasks.kanban.progress") },
     { key: "paused" as TaskStatus, icon: "☕", label: $t("tasks.kanban.paused") },

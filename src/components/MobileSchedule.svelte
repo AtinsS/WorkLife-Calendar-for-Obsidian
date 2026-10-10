@@ -473,6 +473,7 @@
         <div
           class="ms-task-block"
           class:done={task.status === "done"}
+          class:failed={task.status === "failed"}
           class:paused={task.status === "paused"}
           style={getTaskStyle(task)}
           on:click={(e) => openContextMenu(task, e)}
@@ -525,6 +526,7 @@
             <div
               class="ms-untimed-task"
               class:done={task.status === "done"}
+              class:failed={task.status === "failed"}
               on:click={(e) => openContextMenu(task, e)}
               on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openContextMenu(task, e); }}
               role="button"
@@ -548,6 +550,8 @@
                 <span class="ms-task-status ms-status-paused">{$t("schedule.statusPaused")}</span>
               {:else if task.status === "done"}
                 <span class="ms-task-status ms-status-done">{$t("schedule.statusDone")}</span>
+              {:else if task.status === "failed"}
+                <span class="ms-task-status ms-status-failed">{$t("schedule.statusFailed")}</span>
               {/if}
             </div>
           {/each}
@@ -789,6 +793,21 @@
     opacity: 0.5;
   }
 
+  .ms-task-block.done .ms-task-title {
+    text-decoration: line-through;
+    opacity: 0.75;
+  }
+
+  .ms-task-block.failed {
+    opacity: 0.55;
+    border-left-color: rgba(220, 100, 100, 0.65);
+  }
+
+  .ms-task-block.failed .ms-task-title {
+    text-decoration: line-through;
+    opacity: 0.75;
+  }
+
   .ms-task-block.paused {
     opacity: 0.7;
   }
@@ -880,6 +899,11 @@
   .ms-status-done {
     background: rgba(110, 190, 160, 0.2);
     color: rgba(140, 205, 175, 0.85);
+  }
+
+  .ms-status-failed {
+    background: rgba(220, 100, 100, 0.22);
+    color: rgba(230, 120, 120, 0.95);
   }
 
   /* Context menu */
@@ -1189,6 +1213,15 @@
 
   .ms-untimed-task.done .ms-untimed-task-title {
     text-decoration: line-through;
+  }
+
+  .ms-untimed-task.failed {
+    opacity: 0.55;
+  }
+
+  .ms-untimed-task.failed .ms-untimed-task-title {
+    text-decoration: line-through;
+    opacity: 0.75;
   }
 
   .ms-untimed-task-title {

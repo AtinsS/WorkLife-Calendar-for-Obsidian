@@ -7388,6 +7388,27 @@ h2.tm-title.tm-title {
   opacity: 0.4;
 }
 
+/* Not-done (failed) tasks in schedule — strikethrough */
+.sch-event-failed .sch-event-title {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.sch-event-failed .sch-event-time {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
+
+.sch-event-failed .sch-event-description {
+  text-decoration: line-through;
+  opacity: 0.4;
+}
+
+.sch-event-failed .sch-inline-title {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
 /* РўСѓР»Р±Р°СЂ СЂР°СЃРїРёСЃР°РЅРёСЏ */
 .schedule-toolbar {
   display: flex;
@@ -7594,6 +7615,10 @@ h2.tm-title.tm-title {
   color: var(--mcp-accent, rgba(95, 153, 225, 0.55));
 }
 
+.dtw-tooltip-status.failed {
+  color: var(--text-error, #e74c3c);
+}
+
 .dtw-tooltip-name {
   flex: 1;
   white-space: nowrap;
@@ -7604,6 +7629,11 @@ h2.tm-title.tm-title {
 .dtw-tooltip-name.done-name {
   text-decoration: line-through;
   opacity: 0.5;
+}
+
+.dtw-tooltip-name.failed-name {
+  text-decoration: line-through;
+  opacity: 0.55;
 }
 
 /* ============================================
@@ -13439,7 +13469,17 @@ input.ai-task-time-input.ai-task-time-input {
   color: var(--text-error, #e74c3c);
 }
 .ms-status-failed {
+  background: rgba(220, 100, 100, 0.22);
   color: var(--text-error, #e74c3c);
+}
+.task-scheduled.failed {
+  background: rgba(220, 100, 100, 0.12);
+  color: var(--text-error, #e74c3c);
+  font-weight: 600;
+}
+.status-badge-failed {
+  color: var(--text-error, #e74c3c);
+  background: rgba(220, 100, 100, 0.12);
 }
 .pm-stat-failed {
   color: var(--text-error, #e74c3c);
@@ -13486,7 +13526,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 /* ============================================
-   PROJECT MODAL � v2 restyle
+   PROJECT MODAL � v2 restyle
    ============================================ */
 .wf-project-modal {
   width: 580px;
@@ -13999,4 +14039,20 @@ button.is-disabled {
   position: relative;
   z-index: 2;
   margin-right: 2px;
+}
+
+/* AI Summary: preview / edit mode */
+.ai-summary-preview {
+  min-height: 280px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding: 12px 14px;
+  color: var(--text-normal);
+  font-size: 12.5px;
+  line-height: 1.5;
+  overscroll-behavior: contain;
+}
+
+.ai-summary-mode-btn {
+  margin-right: auto;
 }

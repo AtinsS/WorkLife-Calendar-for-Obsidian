@@ -53,9 +53,10 @@
     tooltip.appendChild(titleDiv);
 
     for (const r of rows) {
-      const statusClass = r.status === "done" ? " done" : r.status === "progress" ? " progress" : "";
-      const nameClass = r.status === "done" ? " done-name" : "";
-      const icon = r.status === "done" ? "✓" : r.status === "progress" ? "▶" : "○";
+      const statusClass =
+        r.status === "done" ? " done" : r.status === "progress" ? " progress" : r.status === "failed" ? " failed" : "";
+      const nameClass = r.status === "done" ? " done-name" : r.status === "failed" ? " failed-name" : "";
+      const icon = r.status === "done" ? "✓" : r.status === "progress" ? "▶" : r.status === "failed" ? "✕" : "○";
       const rowDiv = document.createElement("div");
       rowDiv.className = `dtw-tooltip-row${statusClass}`;
       const statusSpan = document.createElement("span");
@@ -195,7 +196,7 @@
         return 0;
       })
       .map((t) => ({ title: t.title, status: t.status, scheduledTime: t.scheduledTime }));
-    const overdue = all.filter((t) => t.carriedOverFrom && t.status !== "done");
+    const overdue = all.filter((t) => t.carriedOverFrom && t.status !== "done" && t.status !== "failed");
     overdueCount = overdue.length;
     overdueTaskList = overdue.map((t) => ({ title: t.title, status: t.status, scheduledTime: t.scheduledTime }));
   }

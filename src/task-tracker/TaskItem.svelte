@@ -353,7 +353,7 @@
       </span>
     {/if}
 
-    {#if $activeTab === "all" && task.status !== "done"}
+    {#if $activeTab === "all" && task.status !== "done" && task.status !== "failed"}
       <span class="task-status-badge status-badge-{task.status}">
         {#if task.status === "todo"}{$t("tasks.tabs.todo")}{:else if task.status === "progress"}{$t("tasks.item.progress")}{:else if task.status === "paused"}{$t("tasks.item.paused")}{/if}
       </span>

@@ -1037,7 +1037,9 @@
           ? tRaw("schedule.statusPaused")
           : task.status === "done"
             ? tRaw("schedule.statusDone")
-            : ""
+            : task.status === "failed"
+              ? tRaw("schedule.statusFailed")
+              : ""
       : "";
     const statusHtml = statusLabel
       ? `<span class="sch-event-status sch-status-${task.status}" data-action="toggle-status" title="${tRaw("schedule.clickToChange")}">${statusLabel}</span>`
@@ -1179,9 +1181,11 @@
       return;
     }
 
-    // Completed task strikethrough
+    // Completed / not-done task strikethrough
     if (task.status === "done") {
       el.classList.add("sch-event-done");
+    } else if (task.status === "failed") {
+      el.classList.add("sch-event-failed");
     }
 
     // Tooltip: full title + description + recurrence + estimated time
@@ -2754,6 +2758,9 @@
   :global(.sch-event-inline .sch-inline-done) {
     color: rgba(130, 220, 170, 0.95);
   }
+  :global(.sch-event-inline .sch-inline-failed) {
+    color: rgba(230, 120, 120, 0.95);
+  }
   :global(.sch-event-inline .sch-inline-progress) {
     color: rgba(255, 200, 100, 0.95);
   }
@@ -3021,6 +3028,11 @@
     color: rgba(140, 205, 175, 0.75);
   }
 
+  :global(.sch-status-failed) {
+    background: rgba(220, 100, 100, 0.15);
+    color: rgba(230, 120, 120, 0.9);
+  }
+
   /* Task completed strikethrough (reference pattern) */
   :global(.fc .fc-event.sch-event-done .fc-event-title) {
     background-image: linear-gradient(currentColor, currentColor);
@@ -3036,6 +3048,20 @@
     background-repeat: no-repeat;
     background-size: 100% 1px;
     opacity: 0.6;
+  }
+
+  /* Not-done (failed) task strikethrough + dim */
+  :global(.fc .fc-event.sch-event-failed .fc-event-title) {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-position: 0 50%;
+    background-repeat: no-repeat;
+    background-size: 100% 1px;
+    opacity: 0.5;
+    text-decoration: line-through;
+  }
+  :global(.fc .fc-list-event.sch-event-failed .fc-list-event-title a) {
+    text-decoration: line-through;
+    opacity: 0.5;
   }
 
   :global(.sch-status-paused) {
