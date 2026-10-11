@@ -82,20 +82,66 @@
   $: uniqueDays = new Set(filteredTimeLogs.map((log) => log.date)).size;
   $: avgPerDay = uniqueDays > 0 ? totalTimeMs / uniqueDays : 0;
 
-  // Task completion (done / failed / other) for the selected period
+  // Task completion (done / failed / in progress / other) for the selected period
   $: periodTasks = $tasks.filter((t) => {
     const match = t.dateUID.match(/^day-(\d{4}-\d{2}-\d{2})/);
     return match && match[1] >= periodStart && match[1] <= periodEnd;
   });
+  $: totalTasksCount = periodTasks.length;
   $: doneTasksCount = periodTasks.filter((t) => t.status === "done" || t.completed).length;
   $: failedTasksCount = periodTasks.filter((t) => t.status === "failed").length;
-  $: otherTasksCount = Math.max(0, periodTasks.length - doneTasksCount - failedTasksCount);
-  $: completionRate = periodTasks.length > 0 ? Math.round((doneTasksCount / periodTasks.length) * 100) : 0;
+  $: progressTasksCount = periodTasks.filter((t) => t.status === "progress").length;
+  $: otherTasksCount = Math.max(0, totalTasksCount - doneTasksCount - failedTasksCount - progressTasksCount);
+  $: donePct = totalTasksCount > 0 ? Math.round((doneTasksCount / totalTasksCount) * 100) : 0;
+  $: failedPct = totalTasksCount > 0 ? Math.round((failedTasksCount / totalTasksCount) * 100) : 0;
+  $: progressPct = totalTasksCount > 0 ? Math.round((progressTasksCount / totalTasksCount) * 100) : 0;
+  $: otherPct = totalTasksCount > 0 ? Math.round((otherTasksCount / totalTasksCount) * 100) : 0;
+  $: completionRate = donePct;
   $: taskStatusSegments = [
     { label: $t("habitAnalytics.taskDone"), value: doneTasksCount, color: "#3d9a6c" },
     { label: $t("habitAnalytics.taskFailed"), value: failedTasksCount, color: "#c45c5c" },
+    { label: $t("habitAnalytics.taskInProgress"), value: progressTasksCount, color: "#5b8def" },
     { label: $t("habitAnalytics.otherStatus"), value: otherTasksCount, color: "#8a93a0" },
   ].filter((s) => s.value > 0);
+
+  // Task status distribution by project for the selected period
+  $: projectStatusStats = (() => {
+    type Row = {
+      key: string;
+      name: string;
+      color: string;
+      done: number;
+      failed: number;
+      progress: number;
+      other: number;
+      total: number;
+    };
+    const map = new Map<string, Row>();
+    const noKey = "__none__";
+    for (const task of periodTasks) {
+      const pKey = task.projectId || noKey;
+      if (!map.has(pKey)) {
+        const proj = task.projectId ? $projects.find((p) => p.id === task.projectId) : null;
+        map.set(pKey, {
+          key: pKey,
+          name: proj?.name || $t("projectAnalytics.noProject"),
+          color: proj?.color || "#647177",
+          done: 0,
+          failed: 0,
+          progress: 0,
+          other: 0,
+          total: 0,
+        });
+      }
+      const entry = map.get(pKey)!;
+      entry.total++;
+      if (task.status === "done" || task.completed) entry.done++;
+      else if (task.status === "failed") entry.failed++;
+      else if (task.status === "progress") entry.progress++;
+      else entry.other++;
+    }
+    return Array.from(map.values()).sort((a, b) => b.total - a.total);
+  })();
 
   // Tasks with time data in period (for showing the section even without time logs)
   $: tasksWithTime = $tasks.filter((t) => {
@@ -379,18 +425,26 @@
       {#if periodTasks.length === 0}
         <div class="time-logs-empty">{$t("habitAnalytics.noTasksInPeriod")}</div>
       {:else}
-        <div class="time-logs-stats">
+        <div class="time-logs-stats time-logs-stats--4">
           <div class="time-stat" style="animation-delay: 0ms">
-            <span class="time-stat-value">{doneTasksCount}</span>
+            <span class="time-stat-value">{donePct}%</span>
             <span class="time-stat-label">{$t("habitAnalytics.taskDone")}</span>
+            <span class="time-stat-sub">{doneTasksCount}</span>
           </div>
           <div class="time-stat" style="animation-delay: 70ms">
-            <span class="time-stat-value">{failedTasksCount}</span>
+            <span class="time-stat-value">{failedPct}%</span>
             <span class="time-stat-label">{$t("habitAnalytics.taskFailed")}</span>
+            <span class="time-stat-sub">{failedTasksCount}</span>
           </div>
           <div class="time-stat" style="animation-delay: 140ms">
+            <span class="time-stat-value">{progressPct}%</span>
+            <span class="time-stat-label">{$t("habitAnalytics.taskInProgress")}</span>
+            <span class="time-stat-sub">{progressTasksCount}</span>
+          </div>
+          <div class="time-stat" style="animation-delay: 210ms">
             <span class="time-stat-value">{completionRate}%</span>
             <span class="time-stat-label">{$t("habitAnalytics.completionRate")}</span>
+            <span class="time-stat-sub">{doneTasksCount}/{totalTasksCount}</span>
           </div>
         </div>
 
@@ -407,24 +461,58 @@
               <div class="task-completion-row">
                 <span class="tc-dot" style="background: #3d9a6c"></span>
                 <span class="tc-label">{$t("habitAnalytics.taskDone")}</span>
-                <span class="tc-value">{doneTasksCount}</span>
+                <span class="tc-value">{doneTasksCount} · {donePct}%</span>
               </div>
               <div class="task-completion-row">
                 <span class="tc-dot" style="background: #c45c5c"></span>
                 <span class="tc-label">{$t("habitAnalytics.taskFailed")}</span>
-                <span class="tc-value">{failedTasksCount}</span>
+                <span class="tc-value">{failedTasksCount} · {failedPct}%</span>
+              </div>
+              <div class="task-completion-row">
+                <span class="tc-dot" style="background: #5b8def"></span>
+                <span class="tc-label">{$t("habitAnalytics.taskInProgress")}</span>
+                <span class="tc-value">{progressTasksCount} · {progressPct}%</span>
               </div>
               <div class="task-completion-row">
                 <span class="tc-dot" style="background: #8a93a0"></span>
                 <span class="tc-label">{$t("habitAnalytics.otherStatus")}</span>
-                <span class="tc-value">{otherTasksCount}</span>
+                <span class="tc-value">{otherTasksCount} · {otherPct}%</span>
               </div>
               <div class="task-completion-bar" aria-hidden="true">
-                <div class="tc-bar-seg tc-bar-done" style="width: {periodTasks.length ? (doneTasksCount / periodTasks.length) * 100 : 0}%"></div>
-                <div class="tc-bar-seg tc-bar-failed" style="width: {periodTasks.length ? (failedTasksCount / periodTasks.length) * 100 : 0}%"></div>
-                <div class="tc-bar-seg tc-bar-other" style="width: {periodTasks.length ? (otherTasksCount / periodTasks.length) * 100 : 0}%"></div>
+                <div class="tc-bar-seg tc-bar-done" style="width: {donePct}%"></div>
+                <div class="tc-bar-seg tc-bar-failed" style="width: {failedPct}%"></div>
+                <div class="tc-bar-seg tc-bar-progress" style="width: {progressPct}%"></div>
+                <div class="tc-bar-seg tc-bar-other" style="width: {otherPct}%"></div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- Status distribution by project -->
+        <div class="task-by-project">
+          <h4>{$t("habitAnalytics.byProject")}</h4>
+          <div class="project-table">
+            <div class="project-table-header">
+              <span class="pt-col-name">{$t("projectAnalytics.project")}</span>
+              <span class="pt-col-status">{$t("habitAnalytics.taskDone")}</span>
+              <span class="pt-col-status">{$t("habitAnalytics.taskInProgress")}</span>
+              <span class="pt-col-status">{$t("habitAnalytics.taskFailed")}</span>
+              <span class="pt-col-share">{$t("habitAnalytics.completionRate")}</span>
+            </div>
+            {#each projectStatusStats as p (p.key)}
+              <div class="project-table-row">
+                <span class="pt-col-name">
+                  <span class="pt-dot" style="background: {p.color}"></span>
+                  {p.name}
+                </span>
+                <span class="pt-col-status pt-done">{p.done}</span>
+                <span class="pt-col-status pt-progress">{p.progress}</span>
+                <span class="pt-col-status pt-failed">{p.failed}</span>
+                <span class="pt-col-share">
+                  {p.total > 0 ? Math.round((p.done / p.total) * 100) : 0}%
+                </span>
+              </div>
+            {/each}
           </div>
         </div>
       {/if}
@@ -953,8 +1041,111 @@
     background: #c45c5c;
   }
 
+  .tc-bar-progress {
+    background: #5b8def;
+  }
+
   .tc-bar-other {
     background: #8a93a0;
+  }
+
+  .time-logs-stats--4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .time-stat-sub {
+    font-size: 11px;
+    color: var(--text-faint);
+    font-weight: 500;
+  }
+
+  .task-by-project {
+    margin: 8px 0 18px;
+  }
+
+  .task-by-project h4 {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .task-by-project .project-table-header,
+  .task-by-project .project-table-row {
+    grid-template-columns: 1fr 64px 72px 64px 72px;
+  }
+
+  .pt-col-status {
+    text-align: right;
+    font-weight: 600;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+  }
+
+  .pt-done {
+    color: #3d9a6c;
+  }
+
+  .pt-progress {
+    color: #5b8def;
+  }
+
+  .pt-failed {
+    color: #c45c5c;
+  }
+
+  .task-by-project .project-table-header {
+    display: grid;
+    gap: 8px;
+    padding: 6px 0;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--background-modifier-border);
+  }
+
+  .task-by-project .project-table-row {
+    display: grid;
+    gap: 8px;
+    padding: 8px 0;
+    align-items: center;
+    font-size: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  }
+
+  .task-by-project .project-table-row:last-child {
+    border-bottom: none;
+  }
+
+  .task-by-project .pt-col-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-muted);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .task-by-project .pt-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .task-by-project .pt-col-share {
+    text-align: right;
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
   }
 
   .section-header-row {
@@ -1442,6 +1633,23 @@
 
     .time-logs-stats {
       grid-template-columns: 1fr;
+    }
+
+    .time-logs-stats--4 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .task-by-project .project-table-header,
+    .task-by-project .project-table-row {
+      grid-template-columns: 1fr 48px 56px 48px 56px;
+      gap: 4px;
+      font-size: 11px;
+    }
+
+    .task-by-project .pt-col-name {
+      white-space: normal;
+      overflow: visible;
+      text-overflow: unset;
     }
 
     .time-project-bottom {

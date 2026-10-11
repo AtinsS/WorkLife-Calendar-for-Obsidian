@@ -527,6 +527,7 @@ export class AIScheduleModal extends CustomModal {
         if (taskM[1].toLowerCase() === "x") box.createSpan({ text: "✓", cls: "ai-sch-out-check-mark" });
         const label = wrap.createDiv({ cls: "ai-sch-out-task-label" });
         this.renderInline(label, taskM[2]);
+        if (label.querySelector(".ai-sch-out-strike")) label.addClass("is-done");
         i++;
         continue;
       }

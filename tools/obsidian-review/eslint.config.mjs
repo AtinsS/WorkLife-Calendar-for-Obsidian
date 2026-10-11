@@ -34,9 +34,6 @@ export default [
     rules: {
       // Sample-plugin naming noise for a real product plugin
       "obsidianmd/sample-names": "off",
-      // Custom settings UI: getSettingDefinitions() returns [] so display()
-      // remains the render path (Obsidian only bypasses it for non-empty defs).
-      "obsidianmd/settings-tab/no-deprecated-display": "off",
       // Technical token placeholders (hex colors, CSS lengths, API tokens)
       // are not prose; forcing sentence case would corrupt them.
       "obsidianmd/ui/sentence-case": "off",

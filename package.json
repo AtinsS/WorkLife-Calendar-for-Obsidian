@@ -1,6 +1,6 @@
 {
   "name": "worklife-calendar",
-  "version": "2.28.0",
+  "version": "2.28.1",
   "description": "Calendar, task tracker, habit tracker, and financial planner for Obsidian",
   "author": "AtinsS",
   "main": "main.js",
@@ -30,7 +30,11 @@
   "overrides": {
     "obsidian": "1.13.1",
     "obsidian-daily-notes-interface": "0.9.5",
-    "@types/node": "18.19.64"
+    "@types/node": "18.19.64",
+    "moment": "2.31.0",
+    "obsidian-calendar-ui": {
+      "svelte": "3.59.2"
+    }
   },
   "devDependencies": {
     "@codemirror/state": "6.5.0",
@@ -46,7 +50,7 @@
     "@typescript-eslint/parser": "4.20.0",
     "eslint": "^7.32.0",
     "jest": "26.6.3",
-    "moment": "2.29.1",
+    "moment": "2.31.0",
     "rollup": "2.44.0",
     "rollup-plugin-svelte": "7.1.0",
     "svelte-check": "^2.9.2",

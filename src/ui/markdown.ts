@@ -166,6 +166,7 @@ export function renderMarkdown(el: HTMLElement, md: string): void {
         box.createSpan({ text: "✓", cls: "ai-sch-out-check-mark" });
       const label = wrap.createDiv({ cls: "ai-sch-out-task-label" });
       renderInline(label, taskM[2]);
+      if (label.querySelector(".ai-sch-out-strike")) label.addClass("is-done");
       i++;
       continue;
     }

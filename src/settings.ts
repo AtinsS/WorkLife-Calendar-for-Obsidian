@@ -419,26 +419,37 @@ export class CalendarSettingsTab extends PluginSettingTab {
   }
 
   getSettingDefinitions(): SettingDefinitionItem[] {
-    // Custom imperative UI; see display() fallback below.
-    return [];
+    // Rich custom UI (tabs, banners, color pickers) is imperative, so it is
+    // mounted from a single custom row. PluginSettingTab.display() is
+    // deprecated since Obsidian 1.13 and must not be used at minAppVersion 1.13.
+    return [
+      {
+        type: "group",
+        cls: "worklife-settings-host",
+        items: [
+          {
+            name: tRaw("settings.general.tabGeneral"),
+            searchable: false,
+            render: (setting: Setting) => {
+              this.renderInto(setting.settingEl);
+            },
+          },
+        ],
+      },
+    ];
   }
 
-  /**
-   * Imperative settings UI.
-   * Obsidian 1.13+ prefers getSettingDefinitions(); this tab needs a rich custom
-   * layout (tabs, banners, color pickers) so it implements the display() fallback.
-   * display() is only bypassed when getSettingDefinitions() returns a non-empty
-   * array — empty definitions keep this method as the render path.
-   */
-  display(): void {
-    this.render();
+  private renderInto(host: HTMLElement): void {
+    host.empty();
+    host.addClass("worklife-settings-ui");
+    this.render(host);
   }
 
-  private render(): void {
-    this.containerEl.empty();
+  private render(containerEl: HTMLElement = this.containerEl): void {
+    containerEl.empty();
 
     // Coffee banner
-    const coffeeBanner = this.containerEl.createDiv({
+    const coffeeBanner = containerEl.createDiv({
       cls: "settings-coffee-banner",
     });
     new Setting(coffeeBanner)
@@ -465,7 +476,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     starBtn.setAttribute("rel", "noopener");
 
     if (!appHasDailyNotesPluginLoaded()) {
-      const banner = this.containerEl.createDiv({ cls: "settings-banner" });
+      const banner = containerEl.createDiv({ cls: "settings-banner" });
       new Setting(banner)
         .setName(tRaw("settings.general.dailyNotesWarning"))
         .setHeading();
@@ -476,7 +487,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     }
 
     // Tab bar
-    const tabBar = this.containerEl.createDiv({ cls: "settings-tab-bar" });
+    const tabBar = containerEl.createDiv({ cls: "settings-tab-bar" });
     const tabs: { key: string; label: string }[] = [
       { key: "general", label: tRaw("settings.tabs.general") },
       { key: "dashboard", label: tRaw("settings.tabs.dashboard") },
@@ -503,7 +514,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
     // Tab content containers
     for (const tab of tabs) {
-      const container = this.containerEl.createDiv({
+      const container = containerEl.createDiv({
         cls: "settings-tab-content",
       });
       container.style.display = tab.key === this.activeTab ? "" : "none";
