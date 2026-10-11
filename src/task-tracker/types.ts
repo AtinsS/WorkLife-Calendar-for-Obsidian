@@ -7,6 +7,9 @@ export interface RecurrenceConfig {
 
 export type TaskStatus = "todo" | "progress" | "done" | "paused" | "failed" | "all";
 
+/** Special task kinds with dedicated AI actions / streaks. */
+export type TaskKind = "default" | "workout";
+
 export interface ITask {
   id: string;
   title: string;
@@ -38,6 +41,10 @@ export interface ITask {
   deadline?: DateUID; // deadline date (format: "day-YYYY-MM-DD")
   deadlineTime?: string; // deadline time (format: "HH:MM")
   carriedOverFrom?: string; // dateUID откуда была перенесена просроченная задача
+  /** "workout" sessions participate in AI plan + streak habit. */
+  kind?: TaskKind;
+  workoutLocation?: "gym" | "home" | "outdoors";
+  workoutDayKey?: string;
 }
 
 export interface IProject {

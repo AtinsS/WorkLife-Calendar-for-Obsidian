@@ -17,6 +17,8 @@
   import { TaskModal } from "./TaskModal";
   import { ProjectModal } from "./ProjectModal";
   import { t } from "../i18n";
+  import { settings } from "../ui/stores";
+  import { errorMessage } from "../utils/sanitize";
   import { pluginUpdateInfo, updatePluginNow, fetchLatestRelease } from "../services/updateCheck";
 
   export let appInstance: App;
@@ -370,6 +372,28 @@
     return [...new Set(getRecurringParents().map((t) => t.title))];
   }
 
+  function aiWorkoutAvailable(): boolean {
+    const opts = get(settings) as { ollamaEnabled?: boolean; aiWorkoutEnabled?: boolean };
+    return opts.ollamaEnabled === true && opts.aiWorkoutEnabled !== false;
+  }
+
+  async function openCreateTasksAi() {
+    closeMenu();
+    try {
+      const { openWorkoutPlanModal } = await import("../workout/WorkoutPlanModal");
+      const plugin = (
+        appInstance as unknown as {
+          plugins?: { getPlugin?: (id: string) => { writeOptions?: (c: Record<string, unknown>) => Promise<void> } | undefined };
+        }
+      ).plugins?.getPlugin?.("worklife-calendar");
+      await openWorkoutPlanModal(appInstance, async (changes) => {
+        if (plugin?.writeOptions) await plugin.writeOptions(changes);
+      });
+    } catch (e) {
+      alert(get(t)("ai.summaryError", { error: errorMessage(e) }));
+    }
+  }
+
   let currentPluginVersion = "";
   let updatingPlugin = false;
   onMount(() => {
@@ -558,6 +582,9 @@
           {#if showMenu}
             <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
           <div class="task-tracker-dropdown" on:click|stopPropagation on:keydown|stopPropagation role="menu" tabindex="-1">
+              {#if aiWorkoutAvailable()}
+                <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { void openCreateTasksAi(); }}>{$t("workout.menuCreateTasksAi")}</button>
+              {/if}
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { openProjectSettings(); closeMenu(); }}>{$t("tasks.panel.menuProjects")}</button>
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { showTimeLogs = true; closeMenu(); }}>{$t("tasks.panel.menuTimeLogs")}</button>
               <button class="task-tracker-dropdown-item" role="menuitem" on:click|stopPropagation={() => { clearCompletedTasks(); closeMenu(); }}>{$t("tasks.panel.menuCleanDone")}</button>

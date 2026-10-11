@@ -1,5 +1,5 @@
-/* ============================================
-   WORKLIFE CALENDAR — DARK PREMIUM THEME
+﻿/* ============================================
+   WORKLIFE CALENDAR вЂ” DARK PREMIUM THEME
    Inspired by Linear, Arc, Notion Calendar
    ============================================ */
 
@@ -10,7 +10,7 @@
   --mcp-surface-2: #1E222B;
   --mcp-surface-hover: #252A36;
 
-  /* Accent — indigo/purple gradient */
+  /* Accent вЂ” indigo/purple gradient */
   --mcp-accent: #7C5CFC;
   --mcp-accent-dim: rgba(124, 92, 252, 0.12);
   --mcp-accent-faint: rgba(124, 92, 252, 0.08);
@@ -43,7 +43,7 @@
   --mcp-radius-lg: 20px;
   --mcp-radius-sm: 12px;
 
-  /* Shadows — layered depth */
+  /* Shadows вЂ” layered depth */
   --mcp-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.04);
   --mcp-shadow-glow: 0 0 40px rgba(124, 92, 252, 0.08);
   --mcp-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
@@ -132,7 +132,7 @@
 }
 
 /* ============================================
-   MAIN VIEW — side-by-side adaptive layout
+   MAIN VIEW вЂ” side-by-side adaptive layout
    ============================================ */
 .calendar-main-view {
   display: flex;
@@ -184,7 +184,7 @@
   border-radius: var(--mcp-radius);
 }
 
-/* ── Larger sizes for main view ─────────────────────── */
+/* в”Ђв”Ђ Larger sizes for main view в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 
 /* Calendar nav and title */
 .calendar-main-view #calendar-container .nav .title {
@@ -210,7 +210,7 @@
   height: 18px;
 }
 
-/* Calendar day cells — bigger */
+/* Calendar day cells вЂ” bigger */
 .calendar-main-view #calendar-container .day,
 .calendar-main-view #calendar-container .week-num {
   min-height: 56px;
@@ -218,7 +218,7 @@
   padding: 14px 10px;
 }
 
-/* Wide screens — even bigger calendar */
+/* Wide screens вЂ” even bigger calendar */
 @media (min-width: 1200px) {
   .calendar-main-view .calendar-layout {
     max-width: 1600px;
@@ -279,7 +279,7 @@
   border-spacing: 6px;
 }
 
-/* Task badges on calendar days — bigger */
+/* Task badges on calendar days вЂ” bigger */
 .calendar-main-view #calendar-container .day[data-task-count]::after {
   font-size: 15px;
   min-width: 20px;
@@ -297,7 +297,7 @@
   left: 2px;
 }
 
-/* Task panel — bigger */
+/* Task panel вЂ” bigger */
 .calendar-main-view .task-tracker-panel {
   padding: 24px 26px;
 }
@@ -393,7 +393,7 @@
   font-size: 17px;
 }
 
-/* Habit panel — bigger */
+/* Habit panel вЂ” bigger */
 .calendar-main-view .habit-tracker-panel {
   padding: 24px 26px;
 }
@@ -477,7 +477,7 @@
   }
 }
 
-/* Medium screens — compress but keep side-by-side */
+/* Medium screens вЂ” compress but keep side-by-side */
 @media (min-width: 801px) and (max-width: 1100px) {
   .calendar-main-view .calendar-layout {
     gap: 16px;
@@ -535,7 +535,7 @@
   box-shadow: 0 2px 8px var(--mcp-accent-faint);
 }
 
-/* ── Month goals indicator ────────────────────────────── */
+/* в”Ђв”Ђ Month goals indicator в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 .month-goals-indicator {
   margin-bottom: 8px;
 }
@@ -592,7 +592,7 @@
   z-index: 10000;
 }
 
-/* ── Goals modal ─────────────────────────────────────── */
+/* в”Ђв”Ђ Goals modal в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
 .goals-modal-overlay {
   position: fixed;
   inset: 0;
@@ -1262,7 +1262,7 @@
   }
 }
 
-/* Dropdown labels — desktop shows full, mobile shows short */
+/* Dropdown labels вЂ” desktop shows full, mobile shows short */
 .dropdown-label-full {
   display: inline;
 }
@@ -1740,7 +1740,7 @@
 }
 
 /* ============================================
-   TASK ITEM — modern glass cards
+   TASK ITEM вЂ” modern glass cards
    ============================================ */
 .task-item {
   display: flex;
@@ -1829,7 +1829,7 @@
   opacity: 0.5;
 }
 
-/* Status button — rounded, animated */
+/* Status button вЂ” rounded, animated */
 .task-status-btn {
   width: 22px;
   height: 22px;
@@ -2423,7 +2423,7 @@
   overscroll-behavior: contain;
 }
 
-/* РџР»Р°РІР°СЋС‰РµРµ РєРѕРЅС‚РµРєСЃС‚РЅРѕРµ РјРµРЅСЋ Р·Р°РґР°С‡ (TaskItem / body) */
+/* Р СџР В»Р В°Р Р†Р В°РЎР‹РЎвЂ°Р ВµР Вµ Р С”Р С•Р Р…РЎвЂљР ВµР С”РЎРѓРЎвЂљР Р…Р С•Р Вµ Р СР ВµР Р…РЎР‹ Р В·Р В°Р Т‘Р В°РЎвЂЎ (TaskItem / body) */
 .sch-ctx-overlay {
   position: fixed;
   inset: 0;
@@ -2577,7 +2577,7 @@ body > .task-actions-menu {
   z-index: 15;
 }
 
-/* Note: do NOT set z-index on bare .modal — it conflicts with Obsidian's own modal styles */
+/* Note: do NOT set z-index on bare .modal вЂ” it conflicts with Obsidian's own modal styles */
 
 .wf-dialog-container {
   position: relative;
@@ -2655,7 +2655,7 @@ body > .task-actions-menu {
 }
 
 /* ============================================
-   TASK MODAL — POLISHED
+   TASK MODAL вЂ” POLISHED
    ============================================ */
 .wf-task-modal {
   width: 480px;
@@ -2748,7 +2748,7 @@ h2.tm-title.tm-title {
   color: rgba(255, 255, 255, 0.25);
 }
 
-/* Date/time pickers — dark theme */
+/* Date/time pickers вЂ” dark theme */
 .tm-input[type="date"],
 .tm-input[type="time"] {
   color-scheme: dark;
@@ -2766,7 +2766,7 @@ h2.tm-title.tm-title {
   opacity: 0.8;
 }
 
-/* Select dropdown — dark theme */
+/* Select dropdown вЂ” dark theme */
 .tm-select {
   color-scheme: dark;
   appearance: none;
@@ -2855,7 +2855,7 @@ h2.tm-title.tm-title {
   background: var(--pri-dot-color, currentColor);
 }
 
-/* Task modal — static max-width helpers */
+/* Task modal вЂ” static max-width helpers */
 .tm-input-narrow-60 {
   max-width: 60px;
 }
@@ -2868,7 +2868,7 @@ h2.tm-title.tm-title {
   max-width: 120px;
 }
 
-/* Task modal — validation error states */
+/* Task modal вЂ” validation error states */
 .tm-input-error {
   border-color: var(--text-error, #ef4436);
 }
@@ -3311,7 +3311,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   PROJECT MODAL — POLISHED
+   PROJECT MODAL вЂ” POLISHED
    ============================================ */
 .wf-project-modal {
   width: 560px;
@@ -4224,7 +4224,7 @@ h2.tm-title.tm-title {
   border-color: var(--mcp-danger);
 }
 
-/* РћС‚РґРµР»СЊРЅР°СЏ РІРєР»Р°РґРєР° В«РџСЂРёРІС‹С‡РєРёВ» — Р±РµР· С„РёРєСЃРёСЂРѕРІР°РЅРЅРѕР№ РІС‹СЃРѕС‚С‹ */
+/* Р С›РЎвЂљР Т‘Р ВµР В»РЎРЉР Р…Р В°РЎРЏ Р Р†Р С”Р В»Р В°Р Т‘Р С”Р В° Р’В«Р СџРЎР‚Р С‘Р Р†РЎвЂ№РЎвЂЎР С”Р С‘Р’В» вЂ” Р В±Р ВµР В· РЎвЂћР С‘Р С”РЎРѓР С‘РЎР‚Р С•Р Р†Р В°Р Р…Р Р…Р С•Р в„– Р Р†РЎвЂ№РЎРѓР С•РЎвЂљРЎвЂ№ */
 .habit-panel-view-container {
   height: 100%;
   overflow-y: auto;
@@ -4265,7 +4265,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   SCROLLBAR — hidden plugin-wide (see bottom of file)
+   SCROLLBAR вЂ” hidden plugin-wide (see bottom of file)
    ============================================ */
 .task-tracker-panel::-webkit-scrollbar,
 .habit-tracker-panel::-webkit-scrollbar {
@@ -4302,7 +4302,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   RESPONSIVE — LARGE SCREENS
+   RESPONSIVE вЂ” LARGE SCREENS
    ============================================ */
 @media (min-width: 1400px) {
 
@@ -4315,11 +4315,11 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   RESPONSIVE — SMALL DESKTOP (в‰¤1100px)
+   RESPONSIVE вЂ” SMALL DESKTOP (РІвЂ°В¤1100px)
    ============================================ */
 @media (max-width: 1100px) {
 
-  /* Task items — tighter */
+  /* Task items вЂ” tighter */
   .task-tracker-panel .task-item {
     padding: 7px 10px;
     gap: 6px;
@@ -4386,7 +4386,7 @@ h2.tm-title.tm-title {
     font-size: 10px;
   }
 
-  /* Habit items — tighter */
+  /* Habit items вЂ” tighter */
   .habit-tracker-panel .habit-item {
     padding: 8px 10px;
     gap: 8px;
@@ -4423,7 +4423,7 @@ h2.tm-title.tm-title {
     min-height: 24px;
   }
 
-  /* Header — tighter */
+  /* Header вЂ” tighter */
   .task-tracker-panel .task-tracker-header,
   .habit-tracker-panel .habit-tracker-header {
     padding: 8px 10px;
@@ -4464,7 +4464,7 @@ h2.tm-title.tm-title {
     font-size: 13px;
   }
 
-  /* Kanban dropdown — tighter */
+  /* Kanban dropdown вЂ” tighter */
   .kanban-dropdown-trigger {
     padding: 5px 10px;
     font-size: 12px;
@@ -4488,7 +4488,7 @@ h2.tm-title.tm-title {
     font-size: 12px;
   }
 
-  /* Filter bar — tighter */
+  /* Filter bar вЂ” tighter */
   .task-tracker-panel .task-tracker-filter-bar {
     gap: 4px;
     padding: 6px 0;
@@ -4500,7 +4500,7 @@ h2.tm-title.tm-title {
     min-height: 32px;
   }
 
-  /* Search — tighter */
+  /* Search вЂ” tighter */
   .task-tracker-panel .task-tracker-search-bar {
     padding: 6px 0;
   }
@@ -4510,7 +4510,7 @@ h2.tm-title.tm-title {
     font-size: 12px;
   }
 
-  /* Task actions — tighter */
+  /* Task actions вЂ” tighter */
   .task-tracker-panel .task-actions-toggle {
     padding: 3px 6px;
     font-size: 12px;
@@ -4523,7 +4523,7 @@ h2.tm-title.tm-title {
     font-size: 12px;
   }
 
-  /* Dropdown — tighter */
+  /* Dropdown вЂ” tighter */
   .task-tracker-panel .task-tracker-dropdown-item {
     padding: 7px 12px;
     font-size: 12px;
@@ -4532,7 +4532,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   RESPONSIVE — TABLET (481–768px)
+   RESPONSIVE вЂ” TABLET (481вЂ“768px)
    ============================================ */
 @media (min-width: 481px) and (max-width: 768px) {
   #calendar-container .day[data-task-count]::after {
@@ -4549,11 +4549,11 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   RESPONSIVE — PHONE (в‰¤480px)
+   RESPONSIVE вЂ” PHONE (РІвЂ°В¤480px)
    ============================================ */
 @media (max-width: 480px) {
 
-  /* Calendar — more air between cells */
+  /* Calendar вЂ” more air between cells */
   #calendar-container .calendar {
     border-spacing: 5px;
   }
@@ -4586,7 +4586,7 @@ h2.tm-title.tm-title {
     border-radius: 6px;
   }
 
-  /* ── Panels: full scroll, bottom safe area ── */
+  /* в”Ђв”Ђ Panels: full scroll, bottom safe area в”Ђв”Ђ */
   .task-tracker-panel {
     padding: 14px 12px;
   }
@@ -4610,7 +4610,7 @@ h2.tm-title.tm-title {
     padding-bottom: 80px;
   }
 
-  /* Header — more space */
+  /* Header вЂ” more space */
   .task-tracker-header,
   .habit-tracker-header {
     padding: 8px 8px;
@@ -4642,7 +4642,7 @@ h2.tm-title.tm-title {
     padding: 3px 10px;
   }
 
-  /* Buttons — larger touch targets */
+  /* Buttons вЂ” larger touch targets */
   .task-tracker-btn,
   .habit-tracker-btn {
     padding: 7px 10px;
@@ -4654,7 +4654,7 @@ h2.tm-title.tm-title {
     justify-content: center;
   }
 
-  /* Search bar — bigger */
+  /* Search bar вЂ” bigger */
   .task-tracker-search-bar {
     gap: 8px;
     padding: 10px 0;
@@ -4673,7 +4673,7 @@ h2.tm-title.tm-title {
     font-size: 14px;
   }
 
-  /* Filter bar — horizontal scroll with more space */
+  /* Filter bar вЂ” horizontal scroll with more space */
   .task-tracker-filter-bar {
     display: flex;
     gap: 6px;
@@ -4703,7 +4703,7 @@ h2.tm-title.tm-title {
     flex-shrink: 0;
   }
 
-  /* ===== MOBILE TASK ITEM — spacious ===== */
+  /* ===== MOBILE TASK ITEM вЂ” spacious ===== */
   .task-item {
     padding: 10px 10px;
     gap: 6px;
@@ -4869,7 +4869,7 @@ h2.tm-title.tm-title {
   font-size: 10px;
 }
 
-/* Actions toggle — always visible on mobile */
+/* Actions toggle вЂ” always visible on mobile */
 .task-actions-toggle {
   opacity: 1;
   min-width: 36px;
@@ -4877,7 +4877,7 @@ h2.tm-title.tm-title {
   padding: 6px;
 }
 
-/* Checklist — larger touch targets */
+/* Checklist вЂ” larger touch targets */
 .checklist-section {
   padding: 8px 4px 8px 30px;
 }
@@ -4921,7 +4921,7 @@ h2.tm-title.tm-title {
   min-width: 36px;
 }
 
-/* ===== MOBILE HABIT ITEM — spacious ===== */
+/* ===== MOBILE HABIT ITEM вЂ” spacious ===== */
 .habit-item {
   padding: 10px 8px;
   gap: 8px;
@@ -4952,7 +4952,7 @@ h2.tm-title.tm-title {
   opacity: 1;
 }
 
-/* ===== MOBILE TASK MODAL (tm) — full width, touch-friendly, scrollable ===== */
+/* ===== MOBILE TASK MODAL (tm) вЂ” full width, touch-friendly, scrollable ===== */
 /* Class hook is .wf-task-modal on .wf-dialog-container (CustomModal). */
 .wf-dialog-overlay .wf-task-modal {
   max-height: min(92dvh, 920px);
@@ -5013,14 +5013,14 @@ h2.tm-title.tm-title {
   font-size: 16px;
 }
 
-/* Row 2 — stack vertically on mobile */
+/* Row 2 вЂ” stack vertically on mobile */
 .tm-row-2 {
   flex-direction: column;
   gap: 8px;
   padding: 0 14px 8px;
 }
 
-/* Priority buttons — wrap with larger touch targets */
+/* Priority buttons вЂ” wrap with larger touch targets */
 .tm-pri-btns {
   gap: 4px;
 }
@@ -5041,7 +5041,7 @@ h2.tm-title.tm-title {
   font-size: 14px;
 }
 
-/* Duration — larger touch targets */
+/* Duration вЂ” larger touch targets */
 .tm-dur-row {
   padding: 6px 12px;
   gap: 6px;
@@ -5076,7 +5076,7 @@ h2.tm-title.tm-title {
   font-size: 13px;
 }
 
-/* Advanced rows — stack label + input vertically on mobile */
+/* Advanced rows вЂ” stack label + input vertically on mobile */
 .tm-adv-row {
   gap: 6px;
   padding: 10px 14px;
@@ -5112,7 +5112,7 @@ h2.tm-title.tm-title {
   font-size: 16px;
 }
 
-/* Toggle switch — larger for touch */
+/* Toggle switch вЂ” larger for touch */
 .tm-toggle {
   width: 50px;
   height: 28px;
@@ -5129,7 +5129,7 @@ h2.tm-title.tm-title {
   transform: translateX(22px);
 }
 
-/* Days buttons — wrap on small screens */
+/* Days buttons вЂ” wrap on small screens */
 .tm-days-btns {
   flex-wrap: wrap;
   gap: 4px;
@@ -5142,7 +5142,7 @@ h2.tm-title.tm-title {
   border-radius: 8px;
 }
 
-/* Footer — full width buttons */
+/* Footer вЂ” full width buttons */
 .tm-footer {
   flex-direction: column;
   gap: 8px;
@@ -5162,7 +5162,7 @@ h2.tm-title.tm-title {
   border-radius: 12px;
 }
 
-/* ===== MOBILE PROJECT MODAL — full width, touch-friendly ===== */
+/* ===== MOBILE PROJECT MODAL вЂ” full width, touch-friendly ===== */
 .task-tracker-project-modal {
   padding: 14px;
   overflow-y: auto;
@@ -5189,7 +5189,7 @@ h2.tm-title.tm-title {
   margin-bottom: 14px;
 }
 
-/* New project form — compact */
+/* New project form вЂ” compact */
 .pm-new-project {
   padding: 14px;
   margin-bottom: 14px;
@@ -5220,14 +5220,14 @@ h2.tm-title.tm-title {
   border-radius: 10px;
 }
 
-/* Color + Icon row — stack vertically */
+/* Color + Icon row вЂ” stack vertically */
 .pm-row {
   flex-direction: column;
   gap: 14px;
   margin-bottom: 12px;
 }
 
-/* Color grid — larger swatches for touch */
+/* Color grid вЂ” larger swatches for touch */
 .pm-color-swatch {
   width: 40px;
   height: 40px;
@@ -5322,7 +5322,7 @@ h2.tm-title.tm-title {
   justify-content: center;
 }
 
-/* ===== MOBILE TASK ACTIONS — ultra compact ===== */
+/* ===== MOBILE TASK ACTIONS вЂ” ultra compact ===== */
 .task-actions-toggle {
   padding: 2px 4px;
   font-size: 11px;
@@ -5339,7 +5339,7 @@ h2.tm-title.tm-title {
   font-size: 12px;
 }
 
-/* Task status button — compact on mobile */
+/* Task status button вЂ” compact on mobile */
 .task-status-btn {
   width: 20px;
   height: 20px;
@@ -5347,7 +5347,7 @@ h2.tm-title.tm-title {
   flex-shrink: 0;
 }
 
-/* Note icon — compact on mobile */
+/* Note icon вЂ” compact on mobile */
 .note-icon {
   font-size: 12px;
   min-width: 20px;
@@ -5355,7 +5355,7 @@ h2.tm-title.tm-title {
   flex-shrink: 0;
 }
 
-/* Modals — full width mobile, scrollable */
+/* Modals вЂ” full width mobile, scrollable */
 .task-tracker-modal,
 .task-tracker-project-modal {
   padding: 24px 20px;
@@ -5384,7 +5384,7 @@ h2.tm-title.tm-title {
   min-height: 48px;
 }
 
-/* Color picker — bigger touch targets */
+/* Color picker вЂ” bigger touch targets */
 .task-tracker-color-swatch {
   width: 44px;
   height: 44px;
@@ -5435,7 +5435,7 @@ h2.tm-title.tm-title {
   display: flex;
 }
 
-/* Kanban dropdown — compact on mobile */
+/* Kanban dropdown вЂ” compact on mobile */
 .kanban-dropdown-trigger {
   padding: 4px 10px;
   font-size: 11px;
@@ -5469,7 +5469,7 @@ h2.tm-title.tm-title {
   font-size: 12px;
 }
 
-/* Task tracker header — compact on mobile */
+/* Task tracker header вЂ” compact on mobile */
 .task-tracker-header {
   padding: 6px 8px;
   gap: 6px;
@@ -5735,7 +5735,7 @@ h2.tm-title.tm-title {
   color: var(--mcp-accent);
 }
 
-/* Filter bar — compact on mobile */
+/* Filter bar вЂ” compact on mobile */
 .task-tracker-filter-bar {
   padding: 4px 0;
   gap: 4px;
@@ -5747,7 +5747,7 @@ h2.tm-title.tm-title {
   min-height: 26px;
 }
 
-/* Search bar — compact on mobile */
+/* Search bar вЂ” compact on mobile */
 .task-tracker-search-bar {
   padding: 4px 0;
 }
@@ -5772,11 +5772,11 @@ h2.tm-title.tm-title {
 
 
 /* ============================================
-   RESPONSIVE — SMALL PHONE (в‰¤360px) — WIDGET
+   RESPONSIVE вЂ” SMALL PHONE (РІвЂ°В¤360px) вЂ” WIDGET
    ============================================ */
 @media (max-width: 360px) {
 
-  /* ── Calendar container — no overflow ── */
+  /* в”Ђв”Ђ Calendar container вЂ” no overflow в”Ђв”Ђ */
   #calendar-container {
     overflow: hidden;
     width: 100%;
@@ -5788,7 +5788,7 @@ h2.tm-title.tm-title {
     width: 100%;
   }
 
-  /* ── Calendar grid — match reference ── */
+  /* в”Ђв”Ђ Calendar grid вЂ” match reference в”Ђв”Ђ */
   #calendar-container .day,
   #calendar-container .week-num {
     min-height: 38px;
@@ -5805,7 +5805,7 @@ h2.tm-title.tm-title {
     font-weight: 600;
   }
 
-  /* ── Nav — match reference ── */
+  /* в”Ђв”Ђ Nav вЂ” match reference в”Ђв”Ђ */
   #calendar-container .nav {
     padding: 0 4px 8px;
     align-items: center;
@@ -5850,7 +5850,7 @@ h2.tm-title.tm-title {
     height: 10px;
   }
 
-  /* ── Main view layout — match reference ── */
+  /* в”Ђв”Ђ Main view layout вЂ” match reference в”Ђв”Ђ */
   .calendar-main-view {
     padding: 0 4px;
     overflow-x: visible;
@@ -5879,7 +5879,7 @@ h2.tm-title.tm-title {
     padding: 2px 5px;
   }
 
-  /* ── Panels — match reference ── */
+  /* в”Ђв”Ђ Panels вЂ” match reference в”Ђв”Ђ */
   .task-tracker-panel,
   .habit-tracker-panel {
     padding: 10px 12px;
@@ -5917,7 +5917,7 @@ h2.tm-title.tm-title {
     padding: 2px 6px;
   }
 
-  /* ── Task items — match reference ── */
+  /* в”Ђв”Ђ Task items вЂ” match reference в”Ђв”Ђ */
   .task-item {
     padding: 6px 8px;
     gap: 4px;
@@ -5925,7 +5925,7 @@ h2.tm-title.tm-title {
     border-radius: 8px;
   }
 
-  /* ── calendar-main-view task items — compact inline ── */
+  /* в”Ђв”Ђ calendar-main-view task items вЂ” compact inline в”Ђв”Ђ */
   .calendar-main-view .task-tracker-panel .task-item {
     padding: 3px 5px;
     gap: 2px;
@@ -6033,7 +6033,7 @@ h2.tm-title.tm-title {
     font-size: 11px;
   }
 
-  /* ── Habit items — match reference ── */
+  /* в”Ђв”Ђ Habit items вЂ” match reference в”Ђв”Ђ */
   .habit-item {
     padding: 5px 8px;
     gap: 5px;
@@ -6076,7 +6076,7 @@ h2.tm-title.tm-title {
     justify-content: center;
   }
 
-  /* ── Filter & search — match reference ── */
+  /* в”Ђв”Ђ Filter & search вЂ” match reference в”Ђв”Ђ */
   .task-tracker-filter-bar {
     padding: 3px 0;
     gap: 3px;
@@ -6113,7 +6113,7 @@ h2.tm-title.tm-title {
     font-size: 11px;
   }
 
-  /* ── Kanban tabs — match reference ── */
+  /* в”Ђв”Ђ Kanban tabs вЂ” match reference в”Ђв”Ђ */
   .kanban-dropdown-trigger {
     padding: 3px 8px;
     font-size: 10px;
@@ -6144,7 +6144,7 @@ h2.tm-title.tm-title {
     font-size: 10px;
   }
 
-  /* ── Action buttons — match reference ── */
+  /* в”Ђв”Ђ Action buttons вЂ” match reference в”Ђв”Ђ */
   .task-tracker-btn,
   .habit-tracker-btn {
     min-width: 28px;
@@ -6170,7 +6170,7 @@ h2.tm-title.tm-title {
     font-size: 10px;
   }
 
-  /* ── Modals — match reference ── */
+  /* в”Ђв”Ђ Modals вЂ” match reference в”Ђв”Ђ */
   .task-tracker-modal,
   .task-tracker-project-modal {
     padding: 12px;
@@ -6208,7 +6208,7 @@ h2.tm-title.tm-title {
     padding: 10px 12px;
   }
 
-  /* ── CalendarNav — match reference ── */
+  /* в”Ђв”Ђ CalendarNav вЂ” match reference в”Ђв”Ђ */
   .calendar-nav {
     gap: 4px;
   }
@@ -6224,7 +6224,7 @@ h2.tm-title.tm-title {
     font-size: 10px;
   }
 
-  /* ── Task modal (tm) — match reference ── */
+  /* в”Ђв”Ђ Task modal (tm) вЂ” match reference в”Ђв”Ђ */
   .tm-title {
     font-size: 18px;
   }
@@ -6284,7 +6284,7 @@ h2.tm-title.tm-title {
     border-radius: 10px;
   }
 
-  /* ── Project modal — match reference ── */
+  /* в”Ђв”Ђ Project modal вЂ” match reference в”Ђв”Ђ */
   .pm-input {
     font-size: 16px;
     padding: 8px 10px;
@@ -6326,14 +6326,14 @@ h2.tm-title.tm-title {
     border-radius: 6px;
   }
 
-  /* ── Holiday modal — match reference ── */
+  /* в”Ђв”Ђ Holiday modal вЂ” match reference в”Ђв”Ђ */
   .holiday-list-modal {
     width: 98%;
   }
 }
 
 /* ============================================
-   RESPONSIVE — MOBILE LANDSCAPE (keyboard open)
+   RESPONSIVE вЂ” MOBILE LANDSCAPE (keyboard open)
    ============================================ */
 @media (max-width: 480px) and (orientation: landscape) {
   .task-tracker-panel .task-tracker-list {
@@ -6346,7 +6346,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   TASK TRACKER — Date Navigation
+   TASK TRACKER вЂ” Date Navigation
    ============================================ */
 .task-tracker-date-nav {
   display: flex;
@@ -6444,11 +6444,11 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   TOUCH DEVICES — always show action buttons
+   TOUCH DEVICES вЂ” always show action buttons
    ============================================ */
 @media (hover: none) and (pointer: coarse) {
 
-  /* Quick action buttons — always visible on touch */
+  /* Quick action buttons вЂ” always visible on touch */
   .task-tracker-panel .task-quick-actions {
     opacity: 1;
   }
@@ -6459,14 +6459,14 @@ h2.tm-title.tm-title {
     font-size: 13px;
   }
 
-  /* Task status button — touch-friendly but compact */
+  /* Task status button вЂ” touch-friendly but compact */
   .task-tracker-panel .task-status-btn {
     min-width: 32px;
     min-height: 32px;
     font-size: 12px;
   }
 
-  /* Note icon — touch-friendly but compact */
+  /* Note icon вЂ” touch-friendly but compact */
   .task-tracker-panel .note-icon {
     min-width: 24px;
     min-height: 24px;
@@ -6515,7 +6515,7 @@ h2.tm-title.tm-title {
     height: 36px;
   }
 
-  /* Filter dots — slightly larger */
+  /* Filter dots вЂ” slightly larger */
   .task-tracker-panel .filter-dot {
     width: 10px;
     height: 10px;
@@ -6530,7 +6530,7 @@ h2.tm-title.tm-title {
     transform: scale(0.98);
   }
 
-  /* Checklist — larger touch targets */
+  /* Checklist вЂ” larger touch targets */
   .checklist-item input[type="checkbox"] {
     width: 22px;
     height: 22px;
@@ -6570,7 +6570,7 @@ h2.tm-title.tm-title {
    Schedule View (FullCalendar)
    ============================ */
 
-/* FullCalendar event harnesses — pass clicks through to actual events */
+/* FullCalendar event harnesses вЂ” pass clicks through to actual events */
 .schedule-view-container .fc .fc-timegrid-event-harness {
   pointer-events: none;
 }
@@ -6748,7 +6748,7 @@ h2.tm-title.tm-title {
   opacity: 0.85;
 }
 
-/* РЎРµРіРѕРґРЅСЏ — Р±РµР· Р·Р°Р»РёРІРєРё, С‚РѕР»СЊРєРѕ Р±РѕСЂРґРµСЂ */
+/* Р РЋР ВµР С–Р С•Р Т‘Р Р…РЎРЏ вЂ” Р В±Р ВµР В· Р В·Р В°Р В»Р С‘Р Р†Р С”Р С‘, РЎвЂљР С•Р В»РЎРЉР С”Р С• Р В±Р С•РЎР‚Р Т‘Р ВµРЎР‚ */
 .schedule-view-container .fc .fc-day-today {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--mcp-accent, rgba(95, 153, 225, 0.48));
@@ -6823,7 +6823,7 @@ h2.tm-title.tm-title {
   border-bottom-color: rgba(255, 255, 255, 0.04);
 }
 
-/* Schedule view — tablet */
+/* Schedule view вЂ” tablet */
 @media (min-width: 481px) and (max-width: 768px) {
   .schedule-view-container .fc .fc-toolbar {
     flex-direction: row;
@@ -6868,7 +6868,7 @@ h2.tm-title.tm-title {
   }
 }
 
-/* Schedule view — phone */
+/* Schedule view вЂ” phone */
 @media (max-width: 480px) {
   .schedule-view-container {
     border-radius: 8px;
@@ -6950,7 +6950,7 @@ h2.tm-title.tm-title {
   }
 }
 
-/* Schedule view — touch devices */
+/* Schedule view вЂ” touch devices */
 @media (hover: none) and (pointer: coarse) {
   .schedule-view-container .fc .fc-button {
     min-height: 44px;
@@ -6986,7 +6986,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   SCHEDULED TIME — DONE BADGE
+   SCHEDULED TIME вЂ” DONE BADGE
    ============================================ */
 .task-scheduled.done {
   background: rgba(61, 214, 140, 0.1);
@@ -7236,7 +7236,7 @@ h2.tm-title.tm-title {
    ============================================ */
 @media (hover: none) and (pointer: coarse) {
 
-  /* Calendar day cells — touch feedback */
+  /* Calendar day cells вЂ” touch feedback */
   #calendar-container .day {
     -webkit-tap-highlight-color: var(--mcp-accent-faint);
     transition: transform 0.1s ease, background 0.1s ease;
@@ -7299,7 +7299,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   SCHEDULE VIEW — MONTH VIEW PROJECT COLORS
+   SCHEDULE VIEW вЂ” MONTH VIEW PROJECT COLORS
    ============================================ */
 .schedule-view-container .fc .fc-daygrid-event {
   border-left-width: 3px;
@@ -7323,7 +7323,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   HOLIDAY MODAL — РњРѕРґР°Р»РєР° РїСЂР°Р·РґРЅРёРєРѕРІ
+   HOLIDAY MODAL вЂ” Р СљР С•Р Т‘Р В°Р В»Р С”Р В° Р С—РЎР‚Р В°Р В·Р Т‘Р Р…Р С‘Р С”Р С•Р Р†
    ============================================ */
 
 .holiday-colors {
@@ -7350,7 +7350,7 @@ h2.tm-title.tm-title {
   transform: scale(1.15);
 }
 
-/* РљРЅРѕРїРєР° РїСЂР°Р·РґРЅРёРєРѕРІ РІ СЂР°СЃРїРёСЃР°РЅРёРё */
+/* Р С™Р Р…Р С•Р С—Р С”Р В° Р С—РЎР‚Р В°Р В·Р Т‘Р Р…Р С‘Р С”Р С•Р Р† Р Р† РЎР‚Р В°РЎРѓР С—Р С‘РЎРѓР В°Р Р…Р С‘Р С‘ */
 .schedule-holiday-btn {
   padding: 4px 10px;
   border-radius: var(--mcp-radius-sm);
@@ -7366,13 +7366,13 @@ h2.tm-title.tm-title {
   background: var(--mcp-surface-hover);
 }
 
-/* РЎРѕР±С‹С‚РёСЏ РїСЂР°Р·РґРЅРёРєРѕРІ РІ СЂР°СЃРїРёСЃР°РЅРёРё */
+/* Р РЋР С•Р В±РЎвЂ№РЎвЂљР С‘РЎРЏ Р С—РЎР‚Р В°Р В·Р Т‘Р Р…Р С‘Р С”Р С•Р Р† Р Р† РЎР‚Р В°РЎРѓР С—Р С‘РЎРѓР В°Р Р…Р С‘Р С‘ */
 .sch-event-holiday {
   border-left-width: 3px;
   font-weight: 600;
 }
 
-/* Completed tasks in schedule — strikethrough */
+/* Completed tasks in schedule вЂ” strikethrough */
 .sch-event-done .sch-event-title {
   text-decoration: line-through;
   opacity: 0.55;
@@ -7388,7 +7388,7 @@ h2.tm-title.tm-title {
   opacity: 0.4;
 }
 
-/* Not-done (failed) tasks in schedule — strikethrough */
+/* Not-done (failed) tasks in schedule вЂ” strikethrough */
 .sch-event-failed .sch-event-title {
   text-decoration: line-through;
   opacity: 0.55;
@@ -7409,7 +7409,7 @@ h2.tm-title.tm-title {
   opacity: 0.55;
 }
 
-/* РўСѓР»Р±Р°СЂ СЂР°СЃРїРёСЃР°РЅРёСЏ */
+/* Р СћРЎС“Р В»Р В±Р В°РЎР‚ РЎР‚Р В°РЎРѓР С—Р С‘РЎРѓР В°Р Р…Р С‘РЎРЏ */
 .schedule-toolbar {
   display: flex;
   justify-content: flex-end;
@@ -7417,7 +7417,7 @@ h2.tm-title.tm-title {
   gap: 6px;
 }
 
-/* РЎРїРёСЃРѕРє РїСЂР°Р·РґРЅРёРєРѕРІ — РјРѕРґР°Р»РєР° */
+/* Р РЋР С—Р С‘РЎРѓР С•Р С” Р С—РЎР‚Р В°Р В·Р Т‘Р Р…Р С‘Р С”Р С•Р Р† вЂ” Р СР С•Р Т‘Р В°Р В»Р С”Р В° */
 .holiday-list-overlay {
   position: fixed;
   inset: 0;
@@ -7526,7 +7526,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   DATETIME-WEATHER — GLOBAL BAR (below tabs)
+   DATETIME-WEATHER вЂ” GLOBAL BAR (below tabs)
    ============================================ */
 
 .mcp-dtw-global {
@@ -7546,7 +7546,7 @@ h2.tm-title.tm-title {
   box-sizing: border-box;
 }
 
-/* DTW tooltip — rendered in document.body via JS */
+/* DTW tooltip вЂ” rendered in document.body via JS */
 .dtw-tooltip {
   position: fixed;
   min-width: 200px;
@@ -7637,7 +7637,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   HELLO VIEW — Search Portal Dropdown
+   HELLO VIEW вЂ” Search Portal Dropdown
    ============================================ */
 
 .hello-search-portal {
@@ -7687,7 +7687,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   DASHBOARD — Velocity Style
+   DASHBOARD вЂ” Velocity Style
    ============================================ */
 
 .dashboard {
@@ -8347,7 +8347,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   TASK VIEW — tasks + projects tab
+   TASK VIEW вЂ” tasks + projects tab
    ============================================ */
 
 .task-view {
@@ -8515,7 +8515,7 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   SETTINGS — format info & helpers
+   SETTINGS вЂ” format info & helpers
    ============================================ */
 
 .mcp-format-info {
@@ -8572,7 +8572,7 @@ h2.tm-title.tm-title {
   );
 }
 
-/* No native close (×) — close via Esc / Cancel */
+/* No native close (Г—) вЂ” close via Esc / Cancel */
 .modal-container .modal.quick-add-shell .modal-close-button,
 .modal-container .modal.wf-task-modal .modal-close-button {
   display: none !important;
@@ -8661,7 +8661,7 @@ h2.tm-title.tm-title {
   backdrop-filter: blur(8px);
 }
 
-/* Date chip under the title (TaskModal) — clears the close (×) button */
+/* Date chip under the title (TaskModal) вЂ” clears the close (Г—) button */
 .qa2-date-chip--inline {
   margin-top: 6px;
   align-self: flex-start;
@@ -8702,7 +8702,7 @@ h2.tm-title.tm-title {
   text-transform: capitalize;
 }
 
-/* AI switch — modern pill toggle */
+/* AI switch вЂ” modern pill toggle */
 .qa2-ai-row {
   display: flex;
   justify-content: space-between;
@@ -8903,8 +8903,8 @@ h2.tm-title.tm-title {
   100% { transform: translateX(180%); opacity: 0.55; }
 }
 
-/* Subtasks editor — compact, collapsible */
-/* Section toggles on one row: Subtasks · Syntax · Extra */
+/* Subtasks editor вЂ” compact, collapsible */
+/* Section toggles on one row: Subtasks В· Syntax В· Extra */
 .qa2-panels-row {
   display: flex;
   align-items: center;
@@ -8981,7 +8981,7 @@ h2.tm-title.tm-title {
 }
 
 .qa2-subtasks-toggle::before {
-  content: "▸";
+  content: "\2022";
   font-size: 9px;
   transition: transform 0.15s ease;
 }
@@ -9128,7 +9128,7 @@ h2.tm-title.tm-title {
 }
 
 .qa2-extra-toggle::before {
-  content: "▾";
+  content: "\25B8";
   font-size: 10px;
   line-height: 1;
   transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
@@ -9161,7 +9161,7 @@ h2.tm-title.tm-title {
   animation: qa2-fade-in 0.22s ease;
 }
 
-/* Recurrence / work sub-fields — expand smoothly instead of display:none jump */
+/* Recurrence / work sub-fields вЂ” expand smoothly instead of display:none jump */
 .qa2-extra-rec-sub,
 .qa2-extra-work-sub {
   display: flex;
@@ -9242,7 +9242,7 @@ h2.tm-title.tm-title {
   color: var(--text-muted);
 }
 
-/* Work toggle uses Obsidian native .checkbox-container — no custom switch */
+/* Work toggle uses Obsidian native .checkbox-container вЂ” no custom switch */
 
 .qa2-work-label {
   text-transform: none !important;
@@ -9264,7 +9264,7 @@ h2.tm-title.tm-title {
   width: 100%;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  /* Opaque dark — translucent bg flickers over scrolling content */
+  /* Opaque dark вЂ” translucent bg flickers over scrolling content */
   background-color: #16161f;
   color: var(--text-normal);
   padding: 8px 10px;
@@ -9292,7 +9292,7 @@ select.qa2-extra-input {
   padding-right: 24px;
 }
 
-/* Native dropdown popup must stay dark — otherwise it flashes system light theme */
+/* Native dropdown popup must stay dark вЂ” otherwise it flashes system light theme */
 select.qa2-extra-input option {
   background-color: #16161f;
   color: var(--text-normal, #e8ecf0);
@@ -9754,7 +9754,7 @@ textarea.qa2-textarea.qa2-textarea {
 }
 
 .qa2-syntax-toggle::before {
-  content: "▾";
+  content: "\25B8";
   display: inline-block;
   font-size: 10px;
   line-height: 1;
@@ -10038,7 +10038,7 @@ textarea.qa2-textarea.qa2-textarea {
 }
 
 /* ============================================
-   SETTINGS — input width helpers
+   SETTINGS вЂ” input width helpers
    ============================================ */
 
 .mcp-input-sm {
@@ -10154,16 +10154,16 @@ textarea.qa2-textarea.qa2-textarea {
   color: var(--color-red);
 }
 
-/* в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ
-   QUICK ADD — DATE BADGE
-   в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’
+   QUICK ADD вЂ” DATE BADGE
+   РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’ */
 
 .weather-detail-container {
   height: 100%;
   overflow: hidden;
 }
 
-/* в•ђв•ђв•ђ VIEW SWITCH HEADER в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
+/* РІвЂўС’РІвЂўС’РІвЂўС’ VIEW SWITCH HEADER РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’ */
 .view-switch-header {
   display: flex;
   align-items: center;
@@ -10253,7 +10253,7 @@ textarea.qa2-textarea.qa2-textarea {
     min-height: 36px;
   }
 
-  /* 4 РІРєР»Р°РґРєРё: Р—Р°РґР°С‡Рё / РљР°РЅР±Р°РЅ / Р Р°СЃРїРёСЃР°РЅРёРµ / РџСЂРёРІС‹С‡РєРё */
+  /* 4 Р Р†Р С”Р В»Р В°Р Т‘Р С”Р С‘: Р вЂ”Р В°Р Т‘Р В°РЎвЂЎР С‘ / Р С™Р В°Р Р…Р В±Р В°Р Р… / Р В Р В°РЎРѓР С—Р С‘РЎРѓР В°Р Р…Р С‘Р Вµ / Р СџРЎР‚Р С‘Р Р†РЎвЂ№РЎвЂЎР С”Р С‘ */
   .view-switch-track {
     max-width: 100%;
     overflow-x: auto;
@@ -10270,9 +10270,9 @@ textarea.qa2-textarea.qa2-textarea {
   }
 }
 
-/* в•ђв•ђв•ђ VIEW SWITCH MOTION в•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђв•ђ */
-/* РџР»Р°РІРЅРѕ: С‚РѕР»СЊРєРѕ opacity + Р»С‘РіРєРёР№ Y, Р±РµР· scale.
-   Header РїРѕС‡С‚Рё РЅРµ РґРІРёРіР°РµС‚СЃСЏ — РїРµСЂРµРєР»СЋС‡Р°С‚РµР»СЊ РѕС‰СѓС‰Р°РµС‚СЃСЏ СЃС‚Р°Р±РёР»СЊРЅС‹Рј. */
+/* РІвЂўС’РІвЂўС’РІвЂўС’ VIEW SWITCH MOTION РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’РІвЂўС’ */
+/* Р СџР В»Р В°Р Р†Р Р…Р С•: РЎвЂљР С•Р В»РЎРЉР С”Р С• opacity + Р В»РЎвЂР С–Р С”Р С‘Р в„– Y, Р В±Р ВµР В· scale.
+   Header Р С—Р С•РЎвЂЎРЎвЂљР С‘ Р Р…Р Вµ Р Т‘Р Р†Р С‘Р С–Р В°Р ВµРЎвЂљРЎРѓРЎРЏ вЂ” Р С—Р ВµРЎР‚Р ВµР С”Р В»РЎР‹РЎвЂЎР В°РЎвЂљР ВµР В»РЎРЉ Р С•РЎвЂ°РЎС“РЎвЂ°Р В°Р ВµРЎвЂљРЎРѓРЎРЏ РЎРѓРЎвЂљР В°Р В±Р С‘Р В»РЎРЉР Р…РЎвЂ№Р С. */
 .view-switch-leave {
   animation: view-switch-leave 0.18s cubic-bezier(0.4, 0, 0.6, 1) forwards;
   pointer-events: none;
@@ -10768,7 +10768,7 @@ textarea.qa2-textarea.qa2-textarea {
   }
 }
 
-/* ===== AI Extract Modal — fully standalone, no tm-* dependency ===== */
+/* ===== AI Extract Modal вЂ” fully standalone, no tm-* dependency ===== */
 
 /* Inputs must accept typing (incl. Space) regardless of parent user-select */
 .ai-extract-modal input,
@@ -11096,7 +11096,7 @@ input.ai-task-time-input.ai-task-time-input {
   background: rgba(95, 153, 225, 0.15);
 }
 
-/* Subtasks list — sibling of ai-task-row, indented */
+/* Subtasks list вЂ” sibling of ai-task-row, indented */
 .ai-subtasks-list {
   padding: 2px 0 4px 34px;
   margin: 0 10px;
@@ -11181,7 +11181,7 @@ input.ai-task-time-input.ai-task-time-input {
   user-select: none;
 }
 
-/* Toggle checkbox — native */
+/* Toggle checkbox вЂ” native */
 .ai-toggle-cb {
   cursor: pointer;
 }
@@ -11352,7 +11352,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-analysis-stream:not(:empty)::after {
-  content: "■";
+  content: "в– ";
   display: inline-block;
   margin-left: 1px;
   color: #5f99e1;
@@ -11593,7 +11593,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 /* Prompt window locked while analysis / command is running.
-   Keep pointer-events so the textarea can hold focus — a disabled/pointer-events
+   Keep pointer-events so the textarea can hold focus вЂ” a disabled/pointer-events
    lock blurs the field and Space then scrolls the modal content. */
 .ai-ask-disabled {
   opacity: 0.5;
@@ -11769,7 +11769,7 @@ input.ai-task-time-input.ai-task-time-input {
   }
 }
 
-/* ── Cyber scanning shell ── */
+/* в”Ђв”Ђ Cyber scanning shell в”Ђв”Ђ */
 .ai-summary-modal {
   position: relative;
   overflow: hidden;
@@ -11861,7 +11861,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-summary-modal.scanning .ai-summary-status.busy::after {
-  content: "□";
+  content: "\258C";
   margin-left: 2px;
   animation: ai-blink 0.9s step-end infinite;
   color: #00f0ff;
@@ -11959,7 +11959,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 /* ============================================
-   MOBILE TASK PANEL — polish (в‰¤768px)
+   MOBILE TASK PANEL вЂ” polish (РІвЂ°В¤768px)
    ============================================ */
 @media (max-width: 768px) {
   .task-tracker-panel {
@@ -12210,7 +12210,7 @@ input.ai-task-time-input.ai-task-time-input {
   margin-top: 2px;
 }
 
-/* Controls panel — compact, no outer padding */
+/* Controls panel вЂ” compact, no outer padding */
 .ai-sch-panel {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -12358,7 +12358,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-sch-status.busy::after {
-  content: "▍";
+  content: "\258C";
   color: #5f99e1;
   animation: ai-caret 0.9s steps(1) infinite;
 }
@@ -12602,7 +12602,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-sch-out-li::before {
-  content: "▸";
+  content: "\2022";
   position: absolute;
   left: 6px;
   top: 5px;
@@ -13332,7 +13332,7 @@ input.ai-task-time-input.ai-task-time-input {
   display: none;
 }
 
-/* ── AI Summary: scan effect (same language as AI extract) ── */
+/* в”Ђв”Ђ AI Summary: scan effect (same language as AI extract) в”Ђв”Ђ */
 .ai-summary-scan {
   position: relative;
   border: 1px solid rgba(95, 153, 225, 0.28);
@@ -13413,7 +13413,7 @@ input.ai-task-time-input.ai-task-time-input {
 
 /* Status caret during stream */
 .ai-summary-modal.scanning .ai-summary-status.busy::after {
-  content: "▍";
+  content: "\258C";
   margin-left: 2px;
   color: #5f99e1;
   animation: ai-caret 0.9s steps(1) infinite;
@@ -13526,7 +13526,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 /* ============================================
-   PROJECT MODAL � v2 restyle
+   PROJECT MODAL пїЅ v2 restyle
    ============================================ */
 .wf-project-modal {
   width: 580px;
@@ -14055,4 +14055,381 @@ button.is-disabled {
 
 .ai-summary-mode-btn {
   margin-right: auto;
+}
+
+
+/* ============================================
+   WORKOUT PLAN MODAL
+   ============================================ */
+.workout-plan-modal {
+  max-width: min(560px, 94vw) !important;
+  width: min(560px, 94vw);
+  min-width: 0 !important;
+}
+.workout-plan-modal .wf-dialog-content {
+  padding: 16px 18px 18px;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+.workout-plan-modal .workout-preview {
+  min-width: 0;
+  max-width: 100%;
+}
+.workout-plan-modal .wo-header {
+  margin-bottom: 10px;
+  padding-right: 28px;
+}
+.workout-plan-modal .wo-title {
+  margin: 0 0 3px;
+  font-size: 1.08rem;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+.workout-plan-modal .wo-subtitle {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.65;
+  line-height: 1.35;
+}
+.workout-plan-modal .wo-section-label {
+  margin: 10px 0 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+}
+.workout-plan-modal .wo-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+}
+.workout-plan-modal .wo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.workout-plan-modal .wo-field:nth-child(3),
+.workout-plan-modal .wo-field:nth-child(4),
+.workout-plan-modal .wo-field:nth-child(5),
+.workout-plan-modal .wo-field:nth-child(10),
+.workout-plan-modal .wo-field:nth-child(11),
+.workout-plan-modal .wo-field:nth-child(12) {
+  grid-column: 1 / -1;
+}
+.workout-plan-modal .wo-field-label {
+  font-size: 0.68rem;
+  font-weight: 550;
+  opacity: 0.7;
+}
+.workout-plan-modal .wo-input,
+.workout-plan-modal .wo-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.08));
+  background: var(--background-secondary, var(--mcp-surface-2));
+  color: var(--text-normal);
+  font-size: 0.85rem;
+  outline: none;
+}
+.workout-plan-modal .wo-input:focus,
+.workout-plan-modal .wo-select:focus {
+  border-color: var(--mcp-accent);
+  box-shadow: 0 0 0 2px var(--mcp-accent-dim);
+}
+.workout-plan-modal .wo-seg {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.workout-plan-modal .wo-seg-btn {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.08));
+  background: var(--background-secondary, var(--mcp-surface-2));
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+}
+.workout-plan-modal .wo-seg-btn:hover {
+  color: var(--text-normal);
+  border-color: var(--mcp-accent-dim);
+}
+.workout-plan-modal .wo-seg-btn.active {
+  background: var(--mcp-accent-dim);
+  border-color: var(--mcp-accent);
+  color: var(--text-normal);
+  font-weight: 650;
+  box-shadow: 0 0 0 1px var(--mcp-accent-dim);
+}
+.workout-plan-modal .wo-days {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.workout-plan-modal .wo-day-chip {
+  flex: 1 1 0;
+  min-width: 34px;
+  padding: 5px 2px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.08));
+  background: var(--background-secondary, var(--mcp-surface-2));
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.workout-plan-modal .wo-day-chip.active {
+  background: var(--mcp-accent-dim);
+  border-color: var(--mcp-accent);
+  color: var(--text-normal);
+  font-weight: 650;
+  box-shadow: 0 0 0 1px var(--mcp-accent-dim);
+}
+.workout-plan-modal .wo-plan-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+}
+.workout-plan-modal .wo-field-mini {
+  min-width: 0;
+}
+.workout-plan-modal .workout-actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+.workout-plan-modal .workout-actions .ai-btn {
+  flex: 1;
+}
+.workout-plan-modal .workout-status {
+  min-height: 1.15rem;
+  margin: 2px 0 6px;
+  font-size: 0.8rem;
+}
+.workout-plan-modal .workout-status-busy { color: var(--mcp-amber); }
+.workout-plan-modal .workout-status-error { color: var(--mcp-danger); }
+.workout-plan-modal .workout-status-ok { color: var(--mcp-success); }
+.workout-plan-modal .workout-status.is-busy .workout-status-busy::before {
+  content: "";
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+  border: 2px solid var(--mcp-amber);
+  border-top-color: transparent;
+  vertical-align: -1px;
+  animation: wo-spin 0.7s linear infinite;
+}
+@keyframes wo-spin {
+  to { transform: rotate(360deg); }
+}
+.workout-plan-modal .wo-gen-anim {
+  position: relative;
+  height: 88px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--background-secondary, var(--mcp-surface-2));
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.06));
+}
+.workout-plan-modal .wo-gen-anim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--mcp-accent-dim) 45%,
+    var(--mcp-accent-glow) 55%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: wo-shimmer 1.2s ease-in-out infinite;
+}
+.workout-plan-modal .wo-gen-anim::after {
+  content: "AI";
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--mcp-accent);
+  opacity: 0.85;
+  animation: wo-pulse 1.2s ease-in-out infinite;
+}
+@keyframes wo-shimmer {
+  100% { transform: translateX(100%); }
+}
+@keyframes wo-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+.workout-plan-modal.wo-generating .workout-preview {
+  animation: wo-fade-in 0.25s ease;
+}
+@keyframes wo-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.workout-plan-modal .wo-gen-btn.is-loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+.workout-plan-modal .wo-gen-btn.is-loading::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: wo-spin 0.7s linear infinite;
+}
+.workout-plan-modal .workout-plan-meta {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.workout-plan-modal .workout-plan-notes {
+  margin: 0 0 8px;
+  opacity: 0.75;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+.workout-plan-modal .workout-day-card {
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.07));
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin: 6px 0;
+  background: var(--background-secondary, var(--mcp-surface-2));
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.workout-plan-modal .workout-day-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.workout-plan-modal .wo-series-badge {
+  flex-shrink: 0;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--mcp-accent-dim);
+  color: var(--mcp-accent);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+.workout-plan-modal .workout-day-title-input {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  padding: 4px 7px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.workout-plan-modal .workout-day-title-input:hover,
+.workout-plan-modal .workout-day-title-input:focus {
+  border-color: var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  background: var(--background-primary, rgba(0, 0, 0, 0.15));
+  outline: none;
+}
+.workout-plan-modal .workout-day-meta {
+  font-size: 0.72rem;
+  opacity: 0.55;
+  margin: 0 0 4px 2px;
+}
+.workout-plan-modal .workout-ex-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 4px 0 2px;
+}
+.workout-plan-modal .workout-ex-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.workout-plan-modal .workout-ex-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 7px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-normal);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+.workout-plan-modal .workout-ex-input:hover,
+.workout-plan-modal .workout-ex-input:focus {
+  border-color: var(--background-modifier-border, rgba(255,255,255,0.1));
+  background: var(--background-primary, rgba(0,0,0,0.15));
+  outline: none;
+}
+.workout-plan-modal .workout-ex-del {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+.workout-plan-modal .workout-ex-del:hover {
+  background: rgba(255, 80, 80, 0.15);
+  color: var(--mcp-danger, #e5534b);
+}
+.workout-plan-modal .workout-ex-add {
+  align-self: flex-start;
+  margin: 3px 0 2px 2px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px dashed var(--background-modifier-border, rgba(255,255,255,0.12));
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+}
+.workout-plan-modal .workout-ex-add:hover {
+  color: var(--text-normal);
+  border-color: var(--mcp-accent);
+}
+@media (max-width: 480px) {
+  .workout-plan-modal .wo-form,
+  .workout-plan-modal .wo-plan-row {
+    grid-template-columns: 1fr;
+  }
+  .workout-plan-modal .wo-field:nth-child(n) {
+    grid-column: auto;
+  }
 }

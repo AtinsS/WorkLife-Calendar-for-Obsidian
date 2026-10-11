@@ -189,6 +189,12 @@ export interface ISettings {
   aiSummaryStyle?: "brief" | "detailed" | "bullets" | "executive";
   /** Доп. инструкции к промпту саммари */
   aiSummaryPrompt?: string;
+  /** AI workout plan generator */
+  aiWorkoutEnabled: boolean;
+  /** Answers to the workout questionnaire (reused across plans). */
+  workoutProfile?: import("./workout/types").WorkoutProfile;
+  /** Habit id used for workout streaks. */
+  workoutHabitId?: string;
 }
 
 export const defaultSettings = Object.freeze({
@@ -316,6 +322,7 @@ export const defaultSettings = Object.freeze({
   aiConfirmBeforeAdd: true,
   aiSummaryStyle: "detailed" as const,
   aiSummaryPrompt: "", // 0 = unlimited
+  aiWorkoutEnabled: true,
 });
 
 export function applyAccentColor(hex: string): void {
@@ -2356,6 +2363,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
     this.addCompactToggle(container, "aiExtractEnabled", "extractEnabled", "extractEnabledDesc");
     this.addCompactToggle(container, "aiSubtasksEnabled", "subtasksEnabled", "subtasksEnabledDesc");
+    this.addCompactToggle(container, "aiWorkoutEnabled", "workoutEnabled", "workoutEnabledDesc");
     this.addCompactToggle(container, "aiQuickAddEnabled", "quickAddEnabled", "quickAddEnabledDesc", {
       onAfter: () => this.render(),
     });
@@ -2458,6 +2466,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     key:
       | "aiExtractEnabled"
       | "aiSubtasksEnabled"
+      | "aiWorkoutEnabled"
       | "aiQuickAddEnabled"
       | "aiConfirmBeforeAdd"
       | "aiScheduleActionsEnabled"
@@ -2506,7 +2515,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
       for (const name of models) {
         select.createEl("option", { value: name, text: name });
       }
-      if (!models.includes(selected)) {
+      // Keep a non-empty saved value visible even if it's not in the fetched list.
+      if (selected && !models.includes(selected)) {
         select.createEl("option", { value: selected, text: selected });
       }
       select.value = selected;

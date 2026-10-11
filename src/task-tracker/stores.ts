@@ -10,6 +10,7 @@ import { loadTaskData, saveTaskData, generateId } from "./storage";
 import { startTimer, resumeTimer, stopTimer, addTimeLog } from "./TimerManager";
 import { settings } from "../ui/stores";
 import { tRaw } from "../i18n";
+import { setHabitProgress } from "../habit-tracker/stores";
 
 let pluginInstance: CalendarPlugin | null = null;
 let saveTimeout: number | null = null;
@@ -241,20 +242,31 @@ export function addTask(
 }
 
 export function updateTask(id: string, changes: Partial<ITask>): void {
+  const before = get(tasks).find((t) => t.id === id);
+  const wasDone = before?.completed === true;
+  // Keep completed in sync when only status flips to/from done.
+  const patch: Partial<ITask> = { ...changes };
+  if (patch.status !== undefined && patch.completed === undefined) {
+    patch.completed = patch.status === "done";
+  }
   tasks.update((current) =>
     current.map((t) =>
-      t.id === id ? { ...t, ...changes, updatedAt: Date.now() } : t
+      t.id === id ? { ...t, ...patch, updatedAt: Date.now() } : t
     )
   );
   debouncedSave();
 
   // Only run cleanup check if we're approaching the threshold
-  if (changes.completed !== undefined) {
+  if (patch.completed !== undefined || changes.status !== undefined) {
     const allTasks = get(tasks);
     const completedCount = allTasks.filter((t) => t.completed).length;
     const threshold = get(settings).autoCleanupThreshold || DEFAULT_AUTO_CLEANUP_THRESHOLD;
     if (completedCount > threshold - 20) {
       autoCleanupCompleted();
+    }
+    const after = allTasks.find((t) => t.id === id);
+    if (after && after.kind === "workout" && after.completed && !wasDone) {
+      syncWorkoutStreak(after);
     }
   }
 }
@@ -343,6 +355,7 @@ function startTaskTimer(id: string): void {
 function stopTaskTimerAndLog(id: string, status: TaskStatus): void {
   const allTasks = get(tasks);
   const task = allTasks.find((t) => t.id === id);
+  const wasDone = task?.completed === true;
   const log = stopTimer(id);
   if (log && task) {
     log.taskTitle = task.title;
@@ -371,6 +384,10 @@ function stopTaskTimerAndLog(id: string, status: TaskStatus): void {
           : t
       )
     );
+  }
+  const after = get(tasks).find((t) => t.id === id);
+  if (after && after.kind === "workout" && after.completed && !wasDone) {
+    syncWorkoutStreak(after);
   }
 }
 
@@ -422,6 +439,8 @@ function pauseTaskTimer(id: string): void {
 }
 
 function setTaskStatus(id: string, status: TaskStatus): void {
+  const before = get(tasks).find((t) => t.id === id);
+  const wasDone = before?.completed === true;
   tasks.update((current) =>
     current.map((t) =>
       t.id === id
@@ -435,6 +454,21 @@ function setTaskStatus(id: string, status: TaskStatus): void {
         : t
     )
   );
+  const after = get(tasks).find((t) => t.id === id);
+  if (after && after.kind === "workout" && after.completed && !wasDone) {
+    syncWorkoutStreak(after);
+  }
+}
+
+/** Tick the linked streak habit when a workout session is completed. */
+function syncWorkoutStreak(task: ITask): void {
+  const habitId = get(settings).workoutHabitId;
+  if (!habitId) return;
+  const m = /^day-(\d{4}-\d{2}-\d{2})/.exec(task.dateUID);
+  const dateKey = m
+    ? m[1]
+    : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
+  setHabitProgress(habitId, dateKey, 2);
 }
 
 export function updateTaskStatus(id: string, status: TaskStatus): void {
@@ -557,7 +591,7 @@ export function createNextRecurringInstance(taskId: string): void {
   );
   if (existingTask) return;
 
-  addTask({
+  const created = addTask({
     title: task.title,
     description: task.description,
     completed: false,
@@ -581,7 +615,16 @@ export function createNextRecurringInstance(taskId: string): void {
     overtimeMultiplier: task.overtimeMultiplier,
     deadline: task.deadline,
     deadlineTime: task.deadlineTime,
+    kind: task.kind,
+    workoutLocation: task.workoutLocation,
+    workoutDayKey: task.workoutDayKey,
   });
+
+  // Carry exercise checklist onto the new session.
+  const parentChecklist = getChecklistForTask(task.id);
+  if (parentChecklist.length) {
+    setChecklistForTask(created.id, parentChecklist.map((c) => c.title));
+  }
 }
 
 /**
@@ -681,6 +724,9 @@ export function generateMonthlyRecurringTasks(taskId: string): void {
         overtimeMultiplier: task.overtimeMultiplier,
         deadline: task.deadline,
         deadlineTime: task.deadlineTime,
+        kind: task.kind,
+        workoutLocation: task.workoutLocation,
+        workoutDayKey: task.workoutDayKey,
       });
       created++;
     }

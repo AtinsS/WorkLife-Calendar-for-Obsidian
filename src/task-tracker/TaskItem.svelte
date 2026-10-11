@@ -143,6 +143,12 @@
     return opts.ollamaEnabled === true && opts.aiSubtasksEnabled !== false;
   }
 
+  function optsAiWorkoutEnabled(): boolean {
+    if (typeof window !== "undefined" && window.innerWidth <= 768) return false;
+    const opts = get(settings) as { ollamaEnabled?: boolean; aiWorkoutEnabled?: boolean };
+    return opts.ollamaEnabled === true && opts.aiWorkoutEnabled !== false;
+  }
+
   async function handleAiSubtasks() {
     if (splittingSubtasks) return;
     splittingSubtasks = true;
@@ -153,6 +159,22 @@
       alert(get(t)("ai.summaryError", { error: errorMessage(e) }));
     } finally {
       splittingSubtasks = false;
+    }
+  }
+
+  async function handleCreateTasksAi() {
+    try {
+      const { openWorkoutPlanModal } = await import("../workout/WorkoutPlanModal");
+      const plugin = (
+        appInstance as unknown as {
+          plugins?: { getPlugin?: (id: string) => { writeOptions?: (c: Record<string, unknown>) => Promise<void> } | undefined };
+        }
+      ).plugins?.getPlugin?.("worklife-calendar");
+      await openWorkoutPlanModal(appInstance, async (changes) => {
+        if (plugin?.writeOptions) await plugin.writeOptions(changes);
+      });
+    } catch (e) {
+      alert(get(t)("ai.summaryError", { error: errorMessage(e) }));
     }
   }
 
@@ -226,6 +248,11 @@
       items.push({ divider: true });
       if (optsAiSubtasksEnabled()) {
         items.push({ label: translate("ai.contextMenuSubtasks"), action: () => { void handleAiSubtasks(); } });
+      }
+      if (optsAiWorkoutEnabled()) {
+        items.push({ label: translate("workout.menuCreateTasksAi"), action: () => { void handleCreateTasksAi(); } });
+      }
+      if (optsAiSubtasksEnabled() || optsAiWorkoutEnabled()) {
         items.push({ divider: true });
       }
       pushDetailActions();

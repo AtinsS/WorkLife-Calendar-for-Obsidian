@@ -375,6 +375,21 @@ export default class CalendarPlugin extends Plugin {
       callback: () => this.activateHabitPanelView(),
     });
 
+    this.addCommand({
+      id: "create-workout-plan",
+      name: tRaw("main.commands.createWorkoutPlan"),
+      checkCallback: (checking: boolean) => {
+        if (checking) {
+          return this.options.aiWorkoutEnabled !== false && this.options.ollamaEnabled === true;
+        }
+        void import("./workout/WorkoutPlanModal").then(({ WorkoutPlanModal }) => {
+          new WorkoutPlanModal(this.app, {
+            saveOptions: (changes) => this.writeOptions(changes),
+          }).open();
+        });
+      },
+    });
+
     // Remove orphaned ribbon icons from previous instance (hot-reload safety)
     document.querySelectorAll("[data-mcp-ribbon]").forEach(el => el.remove());
 

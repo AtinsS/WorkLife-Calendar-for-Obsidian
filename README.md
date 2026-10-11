@@ -14,7 +14,7 @@
 
 ---
 
-[**Русский README**](README.ru.md)
+[**Русский README**](README.RU.md)
 
 ## 💡 Why this plugin exists
 
@@ -122,6 +122,7 @@ Runs entirely on your computer — no data leaves it.
 - **Notes** — summarize a folder or selected notes.
 - **Schedule** — summary for a period and workload assessment.
 - **Finance** — parse expenses from text, budget forecast, distribution rules, tips in the MD summary.
+- **Training plan** — generation of a training plan based on the data provided in the questionnaire
 
 ### Summary styles
 
