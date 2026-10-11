@@ -39,7 +39,15 @@ Many workflows share the same problem: tasks live in one place, the calendar in 
 
 ## 📦 Installation
 
-### Via BRAT (Recommended)
+Via Community Plugins (Recommended)
+
+1. Open Settings in Obsidian.
+2. Go to the "Community Plugins" section.
+3. Click "Browse" — a search window will open.
+4. Type WorkLife Calendar in the search.
+5. Find the plugin in the list and click "Install", then "Enable".
+
+### Via BRAT
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin.
 2. Open BRAT settings → **Add Beta Plugin**.
 3. Paste the link: `https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian`
