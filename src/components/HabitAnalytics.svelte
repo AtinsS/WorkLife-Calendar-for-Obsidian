@@ -491,24 +491,24 @@
         <!-- Status distribution by project -->
         <div class="task-by-project">
           <h4>{$t("habitAnalytics.byProject")}</h4>
-          <div class="project-table">
-            <div class="project-table-header">
-              <span class="pt-col-name">{$t("projectAnalytics.project")}</span>
-              <span class="pt-col-status">{$t("habitAnalytics.taskDone")}</span>
-              <span class="pt-col-status">{$t("habitAnalytics.taskInProgress")}</span>
-              <span class="pt-col-status">{$t("habitAnalytics.taskFailed")}</span>
-              <span class="pt-col-share">{$t("habitAnalytics.completionRate")}</span>
+          <div class="task-by-project-table">
+            <div class="tbp-header">
+              <span class="tbp-col-name">{$t("projectAnalytics.project")}</span>
+              <span class="tbp-col-num">{$t("habitAnalytics.colDone")}</span>
+              <span class="tbp-col-num">{$t("habitAnalytics.colInProgress")}</span>
+              <span class="tbp-col-num">{$t("habitAnalytics.colFailed")}</span>
+              <span class="tbp-col-num">{$t("habitAnalytics.colRate")}</span>
             </div>
             {#each projectStatusStats as p (p.key)}
-              <div class="project-table-row">
-                <span class="pt-col-name">
-                  <span class="pt-dot" style="background: {p.color}"></span>
-                  {p.name}
+              <div class="tbp-row">
+                <span class="tbp-col-name">
+                  <span class="tbp-dot" style="background: {p.color}"></span>
+                  <span class="tbp-name-text">{p.name}</span>
                 </span>
-                <span class="pt-col-status pt-done">{p.done}</span>
-                <span class="pt-col-status pt-progress">{p.progress}</span>
-                <span class="pt-col-status pt-failed">{p.failed}</span>
-                <span class="pt-col-share">
+                <span class="tbp-col-num tbp-done">{p.done}</span>
+                <span class="tbp-col-num tbp-progress">{p.progress}</span>
+                <span class="tbp-col-num tbp-failed">{p.failed}</span>
+                <span class="tbp-col-num tbp-rate">
                   {p.total > 0 ? Math.round((p.done / p.total) * 100) : 0}%
                 </span>
               </div>
@@ -1072,80 +1072,92 @@
     letter-spacing: 0.05em;
   }
 
-  .task-by-project .project-table-header,
-  .task-by-project .project-table-row {
-    grid-template-columns: 1fr 64px 72px 64px 72px;
+  .task-by-project-table {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
   }
 
-  .pt-col-status {
-    text-align: right;
-    font-weight: 600;
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-muted);
-  }
-
-  .pt-done {
-    color: #3d9a6c;
-  }
-
-  .pt-progress {
-    color: #5b8def;
-  }
-
-  .pt-failed {
-    color: #c45c5c;
-  }
-
-  .task-by-project .project-table-header {
+  .tbp-header,
+  .tbp-row {
     display: grid;
-    gap: 8px;
-    padding: 6px 0;
+    grid-template-columns: minmax(0, 1fr) 56px 56px 56px 48px;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .tbp-header {
+    padding: 6px 0 8px;
     font-size: 10px;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
     border-bottom: 1px solid var(--background-modifier-border);
+    white-space: nowrap;
   }
 
-  .task-by-project .project-table-row {
-    display: grid;
-    gap: 8px;
+  .tbp-row {
     padding: 8px 0;
-    align-items: center;
     font-size: 12px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   }
 
-  .task-by-project .project-table-row:last-child {
+  .tbp-row:last-child {
     border-bottom: none;
   }
 
-  .task-by-project .pt-col-name {
+  .tbp-col-name {
     display: flex;
     align-items: center;
     gap: 8px;
+    min-width: 0;
     color: var(--text-muted);
     font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
-  .task-by-project .pt-dot {
+  .tbp-name-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tbp-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
   }
 
-  .task-by-project .pt-col-share {
+  .tbp-col-num {
     text-align: right;
     font-weight: 600;
-    color: var(--text-muted);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .tbp-header .tbp-col-num {
+    font-size: 10px;
+    font-weight: 650;
+  }
+
+  .tbp-done {
+    color: #3d9a6c;
+  }
+
+  .tbp-progress {
+    color: #5b8def;
+  }
+
+  .tbp-failed {
+    color: #c45c5c;
+  }
+
+  .tbp-rate {
+    color: var(--text-normal);
   }
 
   .section-header-row {
@@ -1639,17 +1651,15 @@
       grid-template-columns: repeat(2, 1fr);
     }
 
-    .task-by-project .project-table-header,
-    .task-by-project .project-table-row {
-      grid-template-columns: 1fr 48px 56px 48px 56px;
-      gap: 4px;
-      font-size: 11px;
+    .task-by-project .tbp-header,
+    .task-by-project .tbp-row {
+      grid-template-columns: minmax(0, 1fr) 44px 44px 44px 40px;
+      gap: 6px;
     }
 
-    .task-by-project .pt-col-name {
-      white-space: normal;
-      overflow: visible;
-      text-overflow: unset;
+    .task-by-project .tbp-header {
+      font-size: 9px;
+      letter-spacing: 0;
     }
 
     .time-project-bottom {
