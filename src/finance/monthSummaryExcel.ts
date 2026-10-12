@@ -12,7 +12,7 @@ import { get } from "svelte/store";
 import { tRaw, getCurrencySymbol } from "../i18n";
 import { resolveMonthIncome, type MonthIncomeBreakdown } from "./income";
 import { getMonthData, financeData } from "./storage";
-import { getExportFolder, generateInsightsWithNotice } from "./monthSummaryExport";
+import { getExcelExportFolder, generateInsightsWithNotice } from "./monthSummaryExport";
 import type { ExpenseEntry, FinanceMonthData, MonthGoal } from "./types";
 import { getGoalMonthContribution, sumGoalMonthContributions, isGoalComplete } from "./types";
 import { tasks, calculateTaskEarnings } from "../task-tracker/stores";
@@ -518,7 +518,7 @@ export function buildMonthSummarySheets(
 /** Full path for the .xls export. */
 export function monthSummaryExcelPath(fileKey: string): string {
   const title = `${tRaw("finance.exportTitle")} ${fileKey}`;
-  const folder = getExportFolder();
+  const folder = getExcelExportFolder();
   return folder ? `${folder}/${title}.xls` : `${title}.xls`;
 }
 
@@ -830,7 +830,7 @@ export async function exportWorkbookXml(
 ): Promise<string> {
   const path = normalizePath(monthSummaryExcelPath(fileKey));
 
-  const folder = getExportFolder();
+  const folder = getExcelExportFolder();
   if (folder) {
     const existing = app.vault.getAbstractFileByPath(normalizePath(folder));
     if (!existing) {

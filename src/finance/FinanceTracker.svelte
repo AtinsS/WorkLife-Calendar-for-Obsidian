@@ -28,7 +28,8 @@
   import { get } from "svelte/store";
   import { financeTabRequest, type FinanceTab } from "./financeUiStore";
   import { exportMonthSummary } from "./monthSummaryExport";
-  import { exportPeriodExcelFile, type ExportPeriod } from "./monthSummaryExcel";
+  import { exportPeriodExcelFile } from "./monthSummaryExcel";
+  import { ExportSummaryModal } from "./ExportSummaryModal";
   import FinancialAnalytics from "./FinancialAnalytics.svelte";
   import { t, tArray, locale } from "../i18n";
   import { clampAmount } from "../utils/sanitize";
@@ -583,9 +584,6 @@
     }).open();
   }
 
-  let exportFormat: "md" | "xlsx" = "md";
-  let exportPeriod: ExportPeriod = "month";
-
   function weekStartsOn(): number {
     const sow: string = $settings.startOfWeek || "system";
     if (sow === "monday") return 1;
@@ -595,12 +593,13 @@
 
   function runExport(): void {
     const app = window.app as never;
-    if (exportFormat === "xlsx") {
-      // Excel: period (week / month / year), saved to vault — no new tab.
-      void exportPeriodExcelFile(app, exportPeriod, new Date(), weekStartsOn());
-    } else {
-      void exportMonthSummary(app, monthKey, displayMonthName);
-    }
+    new ExportSummaryModal(app, ({ format, period }) => {
+      if (format === "xlsx") {
+        void exportPeriodExcelFile(app, period, new Date(), weekStartsOn());
+      } else {
+        void exportMonthSummary(app, monthKey, displayMonthName);
+      }
+    }).open();
   }
 </script>
 
@@ -650,26 +649,6 @@
       >{$t("finance.tabExpenses")}</button>
     </div>
     <div class="fin-export">
-      <select
-        class="fin-export-select"
-        bind:value={exportFormat}
-        aria-label={$t("finance.exportMenu")}
-        title={$t("finance.exportMenu")}
-      >
-        <option value="md">Markdown</option>
-        <option value="xlsx">Excel</option>
-      </select>
-      {#if exportFormat === "xlsx"}
-        <select
-          class="fin-export-select"
-          bind:value={exportPeriod}
-          aria-label={$t("finance.exportPeriodLabel")}
-          title={$t("finance.exportPeriodLabel")}
-        >
-          <option value="month">{$t("finance.exportPeriodMonth")}</option>
-          <option value="year">{$t("finance.exportPeriodYear")}</option>
-        </select>
-      {/if}
       <button
         class="fin-export-btn"
         on:click={runExport}
@@ -1194,17 +1173,6 @@
     display: flex;
     align-items: center;
     gap: 6px;
-  }
-
-  .fin-export-select {
-    padding: 7px 10px;
-    border: 1px solid var(--fi-border);
-    border-radius: 9px;
-    background: var(--fi-surface);
-    color: var(--fi-text);
-    font-size: 12.5px;
-    font-family: inherit;
-    cursor: pointer;
   }
 
   .fin-export-btn {
@@ -2330,6 +2298,10 @@
     font-size: 11px;
     font-weight: 700;
     flex-shrink: 0;
+    box-shadow:
+      0 1px 3px color-mix(in srgb, var(--fi-accent) 25%, transparent),
+      0 4px 12px color-mix(in srgb, var(--fi-accent) 22%, transparent),
+      0 0 18px color-mix(in srgb, var(--fi-accent) 16%, transparent);
   }
 
   .rule-text {

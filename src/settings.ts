@@ -101,6 +101,8 @@ export interface ISettings {
   financeCurrency?: string;
   /** Folder for month-summary MD export. Empty = vault root. */
   financeExportFolder?: string;
+  /** Folder for month-summary Excel export. Empty = falls back to financeExportFolder, then vault root. */
+  financeExcelExportFolder?: string;
   /** AI tips section inside the month summary (requires Ollama). */
   aiFinanceInsightsEnabled?: boolean;
 
@@ -255,6 +257,7 @@ export const defaultSettings = Object.freeze({
 
   financeCurrency: "",
   financeExportFolder: "",
+  financeExcelExportFolder: "",
   aiFinanceInsightsEnabled: true,
 
   accentColor: "#5f99e1",
@@ -1589,8 +1592,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .setHeading();
 
     new Setting(container)
-      .setName(tRaw("settings.finance.exportFolder"))
-      .setDesc(tRaw("settings.finance.exportFolderDesc"))
+      .setName(tRaw("settings.finance.exportFolderMd"))
+      .setDesc(tRaw("settings.finance.exportFolderMdDesc"))
       .addText((text) => {
         text
           .setPlaceholder(tRaw("settings.finance.exportFolderPlaceholder"))
@@ -1608,6 +1611,32 @@ export class CalendarSettingsTab extends PluginSettingTab {
             void import("./modals/FolderSuggestModal").then(({ FolderSuggestModal }) => {
               new FolderSuggestModal(this.app, (folder) => {
                 void this.plugin.writeOptions({ financeExportFolder: folder });
+                this.render();
+              }).open();
+            });
+          });
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.finance.exportFolderExcel"))
+      .setDesc(tRaw("settings.finance.exportFolderExcelDesc"))
+      .addText((text) => {
+        text
+          .setPlaceholder(tRaw("settings.finance.exportFolderPlaceholder"))
+          .setValue(this.plugin.options.financeExcelExportFolder ?? "")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ financeExcelExportFolder: value.trim() });
+          });
+        text.inputEl.addClass("mcp-input-md");
+      })
+      .addExtraButton((btn) => {
+        btn
+          .setIcon("folder")
+          .setTooltip(tRaw("settings.finance.exportFolderPick"))
+          .onClick(() => {
+            void import("./modals/FolderSuggestModal").then(({ FolderSuggestModal }) => {
+              new FolderSuggestModal(this.app, (folder) => {
+                void this.plugin.writeOptions({ financeExcelExportFolder: folder });
                 this.render();
               }).open();
             });

@@ -89,6 +89,92 @@
     return "wd-clear";
   }
 
+  // ── Stable particle fields ──
+  type Particle = {
+    left: number;
+    delay: number;
+    duration: number;
+    opacity: number;
+    size: number;
+    drift: number;
+  };
+
+  function mulberry32(seed: number) {
+    return () => {
+      let t = (seed += 0x6d2b79f5);
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function makeRain(count: number, heavy = false): Particle[] {
+    const rnd = mulberry32(heavy ? 0x51fa : 0x2c81);
+    return Array.from({ length: count }, () => ({
+      left: rnd() * 100,
+      delay: rnd() * (heavy ? 1.4 : 2.4),
+      duration: heavy ? 0.32 + rnd() * 0.38 : 0.55 + rnd() * 0.65,
+      opacity: 0.3 + rnd() * 0.55,
+      size: heavy ? 2.1 + rnd() * 1.3 : 1.1 + rnd() * 1.2,
+      drift: 6 + rnd() * 16,
+    }));
+  }
+
+  function makeSnow(count: number): Particle[] {
+    const rnd = mulberry32(0x7e11);
+    return Array.from({ length: count }, () => ({
+      left: rnd() * 100,
+      delay: rnd() * 5.5,
+      duration: 3.2 + rnd() * 4.2,
+      opacity: 0.35 + rnd() * 0.5,
+      size: 3.5 + rnd() * 7,
+      drift: (rnd() - 0.5) * 48,
+    }));
+  }
+
+  function makeClouds(count: number): Particle[] {
+    const rnd = mulberry32(0x3a09);
+    return Array.from({ length: count }, () => ({
+      left: rnd() * 70,
+      delay: rnd() * 18,
+      duration: 28 + rnd() * 22,
+      opacity: 0.16 + rnd() * 0.2,
+      size: 160 + rnd() * 160,
+      drift: 0,
+    }));
+  }
+
+  function makeFog(count: number): Particle[] {
+    const rnd = mulberry32(0x1f55);
+    return Array.from({ length: count }, () => ({
+      left: rnd() * 60,
+      delay: rnd() * 10,
+      duration: 16 + rnd() * 14,
+      opacity: 0.12 + rnd() * 0.16,
+      size: 200 + rnd() * 180,
+      drift: 0,
+    }));
+  }
+
+  $: rainDrops =
+    weatherClass === "wd-storm"
+      ? makeRain(52, true)
+      : weatherClass === "wd-rain"
+        ? makeRain(38, false)
+        : weatherClass === "wd-drizzle"
+          ? makeRain(22, false)
+          : [];
+  $: snowflakes = weatherClass === "wd-snow" ? makeSnow(40) : [];
+  $: cloudPuffs =
+    weatherClass === "wd-partly-cloudy"
+      ? makeClouds(3)
+      : weatherClass === "wd-cloudy"
+        ? makeClouds(5)
+        : weatherClass === "wd-overcast"
+          ? makeClouds(4)
+          : [];
+  $: fogPuffs = weatherClass === "wd-fog" ? makeFog(5) : [];
+
   // Temp bar scaling
   $: maxTemp = detail?.hourly?.length ? Math.max(...detail.hourly.map(h => h.temp)) : 0;
   $: minTemp = detail?.hourly?.length ? Math.min(...detail.hourly.map(h => h.temp)) : 0;
@@ -106,39 +192,53 @@
     <!-- ═══════ HERO ═══════ -->
     <div class="wd-hero {weatherClass}">
       <!-- Animated weather layer -->
-      <div class="wd-hero-anim {weatherClass}">
-        {#if weatherClass === "wd-rain"}
-          {#each Array(40) as _, __}
-            <div class="raindrop" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 2}s; animation-duration: {0.5 + Math.random() * 0.5}s"></div>
+      <div class="wd-hero-anim {weatherClass}" aria-hidden="true">
+        {#if weatherClass === "wd-rain" || weatherClass === "wd-drizzle" || weatherClass === "wd-storm"}
+          {#each rainDrops as d, i (i)}
+            <i
+              class="wx-drop"
+              class:is-heavy={weatherClass === "wd-storm"}
+              style="left:{d.left}%;--fall-dur:{d.duration}s;--fall-delay:-{d.delay}s;--fall-op:{d.opacity};--drop-w:{d.size}px;--drift:{d.drift}px"
+            ></i>
           {/each}
-        {:else if weatherClass === "wd-drizzle"}
-          {#each Array(25) as _, __}
-            <div class="raindrop" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 3}s; animation-duration: {0.8 + Math.random() * 0.5}s"></div>
+          {#if weatherClass === "wd-storm"}
+            <div class="wx-lightning"></div>
+            <div class="wx-lightning wx-lightning--delayed"></div>
+          {/if}
+        {:else if weatherClass === "wd-cloudy" || weatherClass === "wd-partly-cloudy" || weatherClass === "wd-overcast"}
+          {#each cloudPuffs as c, i (i)}
+            <div
+              class="wx-cloud"
+              style="top:{8 + i * 18}%;left:{c.left}%;width:{c.size}px;opacity:{c.opacity};--cloud-dur:{c.duration}s;--cloud-delay:-{c.delay}s"
+            ></div>
           {/each}
-        {:else if weatherClass === "wd-cloudy" || weatherClass === "wd-partly-cloudy"}
-          {#each Array(4) as _, i}
-            <div class="cloud" style="top: {10 + i * 18}%; animation-delay: {i * 4}s; opacity: {0.15 + Math.random() * 0.15}"></div>
-          {/each}
+          {#if weatherClass === "wd-partly-cloudy"}
+            <div class="sun">
+              <div class="sun-glow"></div>
+              <div class="sun-disc"></div>
+            </div>
+          {/if}
+          {#if weatherClass === "wd-overcast"}
+            <div class="gloom-overlay"></div>
+          {/if}
         {:else if weatherClass === "wd-fog"}
-          {#each Array(5) as _, i}
-            <div class="fog-layer" style="top: {10 + i * 15}%; animation-delay: {i * 2.5}s; animation-duration: {18 + i * 4}s; opacity: {0.08 + i * 0.03}"></div>
-          {/each}
-        {:else if weatherClass === "wd-overcast"}
-          <div class="gloom-overlay"></div>
-        {:else if weatherClass === "wd-storm"}
-          {#each Array(55) as _, __}
-            <div class="raindrop heavy" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 1.5}s; animation-duration: {0.3 + Math.random() * 0.4}s"></div>
+          {#each fogPuffs as f, i (i)}
+            <div
+              class="wx-fog"
+              style="top:{8 + i * 15}%;left:{f.left}%;width:{f.size}px;opacity:{f.opacity};--fog-dur:{f.duration}s;--fog-delay:-{f.delay}s"
+            ></div>
           {/each}
         {:else if weatherClass === "wd-snow"}
-          {#each Array(40) as _, __}
-            <div class="snowflake" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 5}s; animation-duration: {3 + Math.random() * 4}s; font-size: {8 + Math.random() * 10}px; opacity: {0.4 + Math.random() * 0.4}">*</div>
+          {#each snowflakes as s, i (i)}
+            <i
+              class="wx-flake"
+              style="left:{s.left}%;width:{s.size}px;height:{s.size}px;--fall-dur:{s.duration}s;--fall-delay:-{s.delay}s;--fall-op:{s.opacity};--drift:{s.drift}px"
+            ></i>
           {/each}
         {:else if weatherClass === "wd-clear"}
-          <div class="sun">
-            <div class="sun-core"></div>
-            {#each Array(8) as _, i}
-              <div class="sun-ray" style="transform: rotate({i * 45}deg)"></div>
-            {/each}
+          <div class="sun sun--hero">
+            <div class="sun-glow"></div>
+            <div class="sun-disc"></div>
           </div>
         {/if}
       </div>
@@ -305,6 +405,7 @@
     min-height: 200px;
     display: flex;
     align-items: flex-end;
+    isolation: isolate;
   }
 
   .wd-hero::after {
@@ -313,38 +414,59 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 48px;
+    height: 72px;
     background: linear-gradient(to bottom, transparent, var(--background-primary, #1a1a2e));
     pointer-events: none;
     z-index: 4;
   }
 
+  /* Soft ambient light so hero never looks like a flat gradient slab */
+  .wd-hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 70% at 18% 0%, rgba(255, 255, 255, 0.1) 0%, transparent 58%),
+      radial-gradient(ellipse 55% 50% at 88% 12%, rgba(255, 255, 255, 0.06) 0%, transparent 62%);
+    pointer-events: none;
+    z-index: 1;
+    mix-blend-mode: soft-light;
+  }
+
   .wd-clear {
-    background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 40%, #4a90c4 100%);
+    background:
+      radial-gradient(ellipse 70% 80% at 80% 15%, rgba(255, 210, 120, 0.08) 0%, transparent 55%),
+      linear-gradient(145deg, #1a3a62 0%, #2d5f92 42%, #4a93c9 100%);
   }
   .wd-partly-cloudy {
-    background: linear-gradient(135deg, #2c3e50 0%, #4a6785 40%, #7f8c8d 100%);
+    background:
+      radial-gradient(ellipse 60% 70% at 75% 12%, rgba(255, 220, 150, 0.06) 0%, transparent 58%),
+      linear-gradient(145deg, #2a3f55 0%, #4a6788 42%, #7d93a4 100%);
   }
   .wd-cloudy {
-    background: linear-gradient(135deg, #2c3e50 0%, #434e58 50%, #5a6970 100%);
+    background: linear-gradient(145deg, #2a3846 0%, #425260 48%, #5d6f78 100%);
   }
   .wd-overcast {
-    background: linear-gradient(135deg, #1c2833 0%, #2c3e50 50%, #3d4f5f 100%);
+    background: linear-gradient(145deg, #1a2430 0%, #2a3c4e 48%, #3d5162 100%);
   }
   .wd-fog {
-    background: linear-gradient(135deg, #3a4a5c 0%, #5a6a7c 50%, #7a8a9c 100%);
+    background: linear-gradient(145deg, #3a4c5e 0%, #5a6e80 48%, #7e92a4 100%);
   }
   .wd-drizzle {
-    background: linear-gradient(135deg, #1c2833 0%, #2e4057 40%, #3d5a73 100%);
+    background: linear-gradient(145deg, #1a2a38 0%, #2c4458 42%, #3d5e78 100%);
   }
   .wd-rain {
-    background: linear-gradient(135deg, #0f1923 0%, #1a3040 40%, #2a4a60 100%);
+    background: linear-gradient(145deg, #0e1a26 0%, #1a3244 42%, #2a5068 100%);
   }
   .wd-snow {
-    background: linear-gradient(135deg, #2c3e50 0%, #4a6070 40%, #6a8090 100%);
+    background:
+      radial-gradient(ellipse 70% 60% at 30% 20%, rgba(220, 235, 255, 0.12) 0%, transparent 60%),
+      linear-gradient(145deg, #2c3e52 0%, #4a6478 42%, #6a8498 100%);
   }
   .wd-storm {
-    background: linear-gradient(135deg, #0a0f14 0%, #1a2530 40%, #2a3a4a 100%);
+    background:
+      radial-gradient(ellipse 60% 50% at 70% 10%, rgba(140, 170, 220, 0.1) 0%, transparent 55%),
+      linear-gradient(145deg, #080e16 0%, #1a2836 42%, #2a3e52 100%);
   }
 
   .wd-hero-content {
@@ -364,20 +486,22 @@
   .wd-hero-emoji {
     font-size: 80px;
     line-height: 1;
-    filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+    filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.28)) drop-shadow(0 0 28px rgba(255, 255, 255, 0.12));
   }
 
   .wd-hero-date {
     font-size: 13px;
-    color: rgba(255,255,255,0.6);
+    color: rgba(255,255,255,0.65);
     margin-bottom: 4px;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.2);
   }
 
   .wd-hero-label {
     font-size: 16px;
     font-weight: 600;
-    color: rgba(255,255,255,0.9);
+    color: rgba(255,255,255,0.92);
     margin-bottom: 4px;
+    text-shadow: 0 1px 10px rgba(0, 0, 0, 0.22);
   }
 
   .wd-hero-temp {
@@ -392,18 +516,23 @@
     font-weight: 700;
     color: #fff;
     line-height: 1.1;
+    text-shadow:
+      0 2px 16px rgba(0, 0, 0, 0.22),
+      0 0 36px rgba(255, 255, 255, 0.12);
   }
 
   .wd-hero-temp-sep {
     font-size: 28px;
     font-weight: 300;
     color: rgba(255,255,255,0.5);
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.18);
   }
 
   .wd-hero-feels {
     font-size: 13px;
-    color: rgba(255,255,255,0.5);
+    color: rgba(255,255,255,0.55);
     margin-bottom: 12px;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.18);
   }
 
   .wd-hero-badges {
@@ -417,14 +546,21 @@
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: rgba(255,255,255,0.7);
+    color: rgba(255,255,255,0.75);
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 
   .wd-badge-icon {
     font-size: 14px;
   }
 
-  /* ── WEATHER ANIMATIONS (from HelloView) ── */
+  /* ── WEATHER ANIMATIONS ── */
   .wd-hero-anim {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
@@ -433,129 +569,203 @@
     z-index: 1;
   }
 
-  /* Rain */
-  .raindrop {
+  /* Rain — container-relative fall via top% */
+  .wx-drop {
     position: absolute;
-    top: -20px;
-    width: 2px;
-    height: 18px;
-    background: linear-gradient(180deg, transparent, rgba(120, 180, 255, 0.3));
-    border-radius: 0 0 2px 2px;
-    animation: rain-fall linear infinite;
+    top: -6%;
+    width: var(--drop-w, 1.6px);
+    height: 22px;
+    border-radius: 999px;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(160, 200, 255, 0.18) 35%,
+      rgba(175, 210, 255, 0.6) 100%
+    );
+    box-shadow: 0 0 6px rgba(150, 195, 255, 0.2);
+    opacity: var(--fall-op, 0.7);
+    animation: wx-fall var(--fall-dur, 1s) linear var(--fall-delay, 0s) infinite;
+    will-change: top, transform, opacity;
   }
-  .raindrop.heavy {
-    width: 2.5px;
-    height: 24px;
-    background: linear-gradient(180deg, transparent, rgba(120, 180, 255, 0.45));
+  .wx-drop.is-heavy {
+    height: 32px;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(140, 185, 255, 0.22) 30%,
+      rgba(155, 195, 255, 0.75) 100%
+    );
+    box-shadow: 0 0 8px rgba(140, 185, 255, 0.3);
   }
 
-  @keyframes rain-fall {
-    0% { transform: translateY(-20px); opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { transform: translateY(calc(100% + 20px)); opacity: 0; }
+  @keyframes wx-fall {
+    0%   { top: -8%; transform: translateX(0) scaleY(0.85); opacity: 0; }
+    8%   { opacity: var(--fall-op, 0.7); }
+    88%  { opacity: calc(var(--fall-op, 0.7) * 0.85); }
+    100% { top: 108%; transform: translateX(var(--drift, 10px)) scaleY(1.15); opacity: 0; }
   }
 
   /* Clouds */
-  .cloud {
+  .wx-cloud {
     position: absolute;
-    left: -200px;
-    width: 200px;
-    height: 60px;
-    background: radial-gradient(ellipse at center, rgba(200, 210, 220, 0.25) 0%, transparent 70%);
+    height: 64px;
     border-radius: 50%;
-    animation: cloud-drift 30s linear infinite;
+    background:
+      radial-gradient(ellipse 58% 62% at 28% 55%, rgba(230, 238, 248, 0.34) 0%, transparent 72%),
+      radial-gradient(ellipse 52% 58% at 54% 42%, rgba(220, 232, 245, 0.28) 0%, transparent 74%),
+      radial-gradient(ellipse 48% 52% at 78% 58%, rgba(210, 224, 240, 0.22) 0%, transparent 76%);
+    filter: blur(16px);
+    animation: wx-cloud-drift var(--cloud-dur, 32s) linear var(--cloud-delay, 0s) infinite;
+    will-change: left;
   }
 
-  @keyframes cloud-drift {
-    0% { transform: translateX(-200px); }
-    100% { transform: translateX(calc(100% + 200px)); }
+  @keyframes wx-cloud-drift {
+    0%   { left: -32%; }
+    100% { left: 112%; }
   }
 
   /* Fog */
-  .fog-layer {
+  .wx-fog {
     position: absolute;
-    left: -300px;
-    width: 300px;
-    height: 80px;
-    background: radial-gradient(ellipse at center, rgba(180, 190, 200, 0.3) 0%, rgba(180, 190, 200, 0.08) 50%, transparent 80%);
+    height: 100px;
     border-radius: 50%;
-    animation: fog-drift linear infinite;
-    filter: blur(8px);
+    background: radial-gradient(
+      ellipse 70% 55% at 50% 50%,
+      rgba(210, 222, 235, 0.38) 0%,
+      rgba(195, 208, 222, 0.14) 48%,
+      transparent 78%
+    );
+    filter: blur(24px);
+    animation: wx-fog-drift var(--fog-dur, 22s) linear var(--fog-delay, 0s) infinite;
+    will-change: left;
   }
 
-  @keyframes fog-drift {
-    0% { transform: translateX(-300px); }
-    100% { transform: translateX(calc(100% + 300px)); }
+  @keyframes wx-fog-drift {
+    0%   { left: -38%; }
+    100% { left: 118%; }
   }
 
   /* Gloom */
   .gloom-overlay {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: linear-gradient(180deg, rgba(40, 40, 50, 0.1) 0%, rgba(50, 50, 60, 0.06) 100%);
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(20, 28, 40, 0.22) 0%, transparent 68%),
+      linear-gradient(180deg, rgba(18, 26, 38, 0.14) 0%, rgba(30, 40, 55, 0.06) 100%);
+    z-index: 1;
   }
 
   /* Snow */
-  .snowflake {
+  .wx-flake {
     position: absolute;
-    top: -20px;
-    color: rgba(255, 255, 255, 0.6);
-    font-family: serif;
-    animation: snow-fall linear infinite;
-    pointer-events: none;
-    text-shadow: 0 0 3px rgba(200, 220, 255, 0.3);
+    top: -4%;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 35% 32%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(235, 245, 255, 0.7) 45%,
+      rgba(210, 228, 255, 0.28) 100%
+    );
+    box-shadow:
+      0 0 8px rgba(220, 235, 255, 0.4),
+      0 0 18px rgba(190, 215, 255, 0.2);
+    animation: wx-snow var(--fall-dur, 5s) linear var(--fall-delay, 0s) infinite;
+    will-change: top, transform;
   }
 
-  @keyframes snow-fall {
-    0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 0.8; }
-    100% { transform: translateY(calc(100% + 20px)) rotate(360deg); opacity: 0; }
+  @keyframes wx-snow {
+    0%   { top: -4%; transform: translateX(0) rotate(0deg); opacity: 0; }
+    10%  { opacity: var(--fall-op, 0.7); }
+    88%  { opacity: calc(var(--fall-op, 0.7) * 0.8); }
+    100% { top: 108%; transform: translateX(var(--drift, 18px)) rotate(320deg); opacity: 0; }
   }
 
-  /* Storm flicker */
-  .wd-storm {
-    animation: storm-flicker 4s ease-in-out infinite;
+  /* Storm lightning */
+  .wx-lightning {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      185deg,
+      rgba(220, 232, 255, 0.55) 0%,
+      rgba(190, 210, 255, 0.14) 38%,
+      transparent 72%
+    );
+    opacity: 0;
+    animation: wx-flash 6.5s ease-out infinite;
+    mix-blend-mode: screen;
+  }
+  .wx-lightning--delayed {
+    animation-delay: -3.2s;
+    animation-duration: 8.4s;
   }
 
-  @keyframes storm-flicker {
-    0%, 95%, 100% { opacity: 1; }
-    96% { opacity: 0.85; }
+  @keyframes wx-flash {
+    0%, 84%, 100% { opacity: 0; }
+    85% { opacity: 0.7; }
+    86% { opacity: 0.08; }
+    87.5% { opacity: 0.95; }
+    89% { opacity: 0.05; }
+    90% { opacity: 0.5; }
+    92% { opacity: 0; }
   }
 
-  /* Sun */
+  /* Sun — quiet, minimal: soft glow + matte disc (no rays / spin) */
   .sun {
     position: absolute;
-    top: -30px;
-    right: -30px;
-    width: 120px;
-    height: 120px;
-    animation: sun-pulse 4s ease-in-out infinite;
+    top: -18px;
+    right: 8px;
+    width: 180px;
+    height: 180px;
+    pointer-events: none;
+    --sun-size: 48px;
   }
 
-  .sun-core {
+  .sun--hero {
+    --sun-size: 56px;
+    top: -14px;
+    right: 12px;
+  }
+
+  .sun-glow {
     position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 50px; height: 50px;
+    inset: 16%;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(255, 214, 0, 0.3) 0%, rgba(255, 183, 77, 0.1) 60%, transparent 100%);
-    box-shadow: 0 0 40px rgba(255, 214, 0, 0.15), 0 0 80px rgba(255, 183, 77, 0.08);
+    background: radial-gradient(
+      circle,
+      rgba(255, 200, 120, 0.16) 0%,
+      rgba(255, 185, 100, 0.07) 40%,
+      transparent 70%
+    );
+    filter: blur(16px);
   }
 
-  .sun-ray {
+  .sun-disc {
     position: absolute;
-    top: 50%; left: 50%;
-    width: 2px; height: 40px;
-    background: linear-gradient(180deg, rgba(255, 214, 0, 0.2), transparent);
-    transform-origin: center top;
-    border-radius: 1px;
+    top: 50%;
+    left: 50%;
+    width: var(--sun-size);
+    height: var(--sun-size);
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 40% 36%,
+      rgba(255, 236, 190, 0.72) 0%,
+      rgba(255, 214, 140, 0.58) 45%,
+      rgba(255, 190, 110, 0.42) 100%
+    );
+    box-shadow: 0 0 28px rgba(255, 195, 115, 0.14);
+    animation: sun-breathe 12s ease-in-out infinite;
   }
 
-  @keyframes sun-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.8; }
-    50% { transform: scale(1.05); opacity: 1; }
+  @keyframes sun-breathe {
+    0%, 100% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0.88;
+    }
+    50% {
+      transform: translate(-50%, -50%) scale(1.02);
+      opacity: 1;
+    }
   }
 
   /* ── INFO CARDS ── */
@@ -576,6 +786,17 @@
     border: 1px solid var(--background-modifier-border, rgba(255,255,255,0.06));
     border-radius: 12px;
     text-align: center;
+    transition: border-color 0.2s ease, box-shadow 0.28s ease, transform 0.18s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .wd-card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-1px);
+    box-shadow:
+      0 2px 8px rgba(0, 0, 0, 0.06),
+      0 8px 24px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 10%, transparent),
+      0 0 40px color-mix(in srgb, var(--interactive-accent, #7c5cfc) 7%, transparent);
   }
 
   .wd-card-top {
@@ -705,6 +926,7 @@
     border-radius: 3px;
     min-width: 3px;
     transition: width 0.3s;
+    box-shadow: 0 0 8px color-mix(in srgb, var(--interactive-accent, #7c5cbf) 35%, transparent);
   }
 
   .wd-td-feels {

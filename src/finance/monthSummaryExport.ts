@@ -54,10 +54,20 @@ export function monthSummaryLabels(): MonthSummaryLabels {
   };
 }
 
-/** Resolve the export folder from settings ("" → vault root). */
+/** Resolve the MD export folder from settings ("" → vault root). */
 export function getExportFolder(): string {
   const folder = (get(settings).financeExportFolder || "").trim().replace(/^\/+|\/+$/g, "");
   return folder;
+}
+
+/**
+ * Resolve the Excel export folder.
+ * Falls back to the MD folder, then vault root — so one setting still works for both.
+ */
+export function getExcelExportFolder(): string {
+  const s = get(settings);
+  const excel = (s.financeExcelExportFolder || "").trim().replace(/^\/+|\/+$/g, "");
+  return excel || getExportFolder();
 }
 
 /** Full note path for a month summary, including the configured folder. */

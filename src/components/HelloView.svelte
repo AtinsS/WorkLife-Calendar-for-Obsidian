@@ -271,44 +271,147 @@
     return "";
   })();
 
+  // ── Stable particle fields (seeded once per scene, not on every re-render) ──
+  type Particle = {
+    left: number;
+    delay: number;
+    duration: number;
+    opacity: number;
+    size: number;
+    drift: number;
+  };
+
+  function mulberry32(seed: number) {
+    return () => {
+      let t = (seed += 0x6d2b79f5);
+      t = Math.imul(t ^ (t >>> 15), t | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function makeRain(count: number, heavy = false): Particle[] {
+    const rnd = mulberry32(heavy ? 0x51fa : 0x2c81);
+    return Array.from({ length: count }, () => ({
+      left: rnd() * 100,
+      delay: rnd() * (heavy ? 1.4 : 2.4),
+      duration: heavy ? 0.32 + rnd() * 0.38 : 0.55 + rnd() * 0.65,
+      opacity: 0.3 + rnd() * 0.55,
+      size: heavy ? 2.1 + rnd() * 1.3 : 1.1 + rnd() * 1.2,
+      drift: 6 + rnd() * 16,
+    }));
+  }
+
+  function makeSnow(count: number): Particle[] {
+    const rnd = mulberry32(0x7e11);
+    return Array.from({ length: count }, () => ({
+      left: rnd() * 100,
+      delay: rnd() * 5.5,
+      duration: 3.2 + rnd() * 4.2,
+      opacity: 0.35 + rnd() * 0.5,
+      size: 3.5 + rnd() * 7,
+      drift: (rnd() - 0.5) * 48,
+    }));
+  }
+
+  function makeClouds(count: number): Particle[] {
+    const rnd = mulberry32(0x3a09);
+    return Array.from({ length: count }, () => ({
+      left: rnd() * 70,
+      delay: rnd() * 18,
+      duration: 28 + rnd() * 22,
+      opacity: 0.14 + rnd() * 0.18,
+      size: 140 + rnd() * 140,
+      drift: 0,
+    }));
+  }
+
+  function makeFog(count: number): Particle[] {
+    const rnd = mulberry32(0x1f55);
+    return Array.from({ length: count }, () => ({
+      left: rnd() * 60,
+      delay: rnd() * 10,
+      duration: 16 + rnd() * 14,
+      opacity: 0.1 + rnd() * 0.14,
+      size: 180 + rnd() * 160,
+      drift: 0,
+    }));
+  }
+
+  $: rainDrops = weatherAnim === "weather-storm" ? makeRain(56, true) : makeRain(36, false);
+  $: snowflakes = makeSnow(44);
+  $: cloudPuffs =
+    weatherAnim === "weather-partly"
+      ? makeClouds(3)
+      : weatherAnim === "weather-clouds"
+        ? makeClouds(5)
+        : weatherAnim === "weather-gloom"
+          ? makeClouds(4)
+          : [];
+  $: fogPuffs = weatherAnim === "weather-fog" ? makeFog(6) : [];
+
 </script>
 
 <div class="hello hello--{timeTheme}">
   <!-- Weather animation layer -->
   {#if weatherAnim}
-    <div class="hello-weather {weatherAnim}">
-      {#if weatherAnim === "weather-rain"}
-        {#each Array(40) as _, __}
-          <div class="raindrop" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 2}s; animation-duration: {0.5 + Math.random() * 0.5}s"></div>
+    <div class="hello-weather {weatherAnim}" aria-hidden="true">
+      {#if weatherAnim === "weather-rain" || weatherAnim === "weather-storm"}
+        {#each rainDrops as d, i (i)}
+          <i
+            class="wx-drop"
+            class:is-heavy={weatherAnim === "weather-storm"}
+            style="left:{d.left}%;--fall-dur:{d.duration}s;--fall-delay:-{d.delay}s;--fall-op:{d.opacity};--drop-w:{d.size}px;--drift:{d.drift}px"
+          ></i>
         {/each}
+        {#if weatherAnim === "weather-storm"}
+          <div class="wx-lightning"></div>
+          <div class="wx-lightning wx-lightning--delayed"></div>
+        {/if}
       {:else if weatherAnim === "weather-partly"}
         <div class="sun sun--minimal">
-          <div class="sun-core"></div>
+          <div class="sun-glow"></div>
+          <div class="sun-disc"></div>
         </div>
-        {#each Array(3) as _, i}
-          <div class="cloud" style="top: {18 + i * 22}%; animation-delay: {i * 4}s; opacity: {0.12 + Math.random() * 0.12}"></div>
+        {#each cloudPuffs as c, i (i)}
+          <div
+            class="wx-cloud"
+            style="top:{12 + i * 22}%;left:{c.left}%;width:{c.size}px;opacity:{c.opacity};--cloud-dur:{c.duration}s;--cloud-delay:-{c.delay}s"
+          ></div>
         {/each}
       {:else if weatherAnim === "weather-clouds"}
-        {#each Array(5) as _, i}
-          <div class="cloud" style="top: {10 + i * 15}%; animation-delay: {i * 3}s; opacity: {0.15 + Math.random() * 0.2}"></div>
+        {#each cloudPuffs as c, i (i)}
+          <div
+            class="wx-cloud"
+            style="top:{8 + i * 14}%;left:{c.left}%;width:{c.size}px;opacity:{c.opacity};--cloud-dur:{c.duration}s;--cloud-delay:-{c.delay}s"
+          ></div>
         {/each}
       {:else if weatherAnim === "weather-fog"}
-        {#each Array(6) as _, i}
-          <div class="fog-layer" style="top: {15 + i * 12}%; animation-delay: {i * 2.5}s; animation-duration: {18 + i * 4}s; opacity: {0.08 + i * 0.03}"></div>
+        {#each fogPuffs as f, i (i)}
+          <div
+            class="wx-fog"
+            style="top:{10 + i * 13}%;left:{f.left}%;width:{f.size}px;opacity:{f.opacity};--fog-dur:{f.duration}s;--fog-delay:-{f.delay}s"
+          ></div>
         {/each}
       {:else if weatherAnim === "weather-gloom"}
         <div class="gloom-overlay"></div>
-      {:else if weatherAnim === "weather-storm"}
-        {#each Array(60) as _, __}
-          <div class="raindrop heavy" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 1.5}s; animation-duration: {0.3 + Math.random() * 0.4}s"></div>
+        {#each cloudPuffs as c, i (i)}
+          <div
+            class="wx-cloud"
+            style="top:{8 + i * 16}%;left:{c.left}%;width:{c.size}px;opacity:{c.opacity};--cloud-dur:{c.duration}s;--cloud-delay:-{c.delay}s"
+          ></div>
         {/each}
       {:else if weatherAnim === "weather-snow"}
-        {#each Array(50) as _, __}
-          <div class="snowflake" style="left: {Math.random() * 100}%; animation-delay: {Math.random() * 5}s; animation-duration: {3 + Math.random() * 4}s; font-size: {8 + Math.random() * 10}px; opacity: {0.4 + Math.random() * 0.4}">*</div>
+        {#each snowflakes as s, i (i)}
+          <i
+            class="wx-flake"
+            style="left:{s.left}%;width:{s.size}px;height:{s.size}px;--fall-dur:{s.duration}s;--fall-delay:-{s.delay}s;--fall-op:{s.opacity};--drift:{s.drift}px"
+          ></i>
         {/each}
       {:else if weatherAnim === "weather-sun"}
         <div class="sun sun--minimal">
-          <div class="sun-core"></div>
+          <div class="sun-glow"></div>
+          <div class="sun-disc"></div>
         </div>
       {/if}
     </div>
@@ -390,20 +493,24 @@
 
   /* ═══ TIME-OF-DAY THEMES ═════════════════ */
   .hello--morning {
-    background: radial-gradient(ellipse at 30% 20%, rgba(255, 183, 77, 0.07) 0%, transparent 60%),
-                radial-gradient(ellipse at 70% 80%, rgba(255, 138, 101, 0.04) 0%, transparent 50%);
+    background:
+      radial-gradient(ellipse 90% 70% at 28% 12%, rgba(255, 186, 92, 0.1) 0%, rgba(255, 186, 92, 0.03) 42%, transparent 72%),
+      radial-gradient(ellipse 80% 65% at 72% 88%, rgba(255, 140, 105, 0.06) 0%, transparent 68%);
   }
   .hello--day {
-    background: radial-gradient(ellipse at 50% 30%, rgba(100, 181, 246, 0.06) 0%, transparent 55%),
-                radial-gradient(ellipse at 40% 70%, rgba(129, 212, 250, 0.03) 0%, transparent 50%);
+    background:
+      radial-gradient(ellipse 95% 75% at 50% 22%, rgba(105, 185, 250, 0.09) 0%, rgba(105, 185, 250, 0.025) 45%, transparent 72%),
+      radial-gradient(ellipse 75% 60% at 38% 78%, rgba(135, 215, 255, 0.045) 0%, transparent 68%);
   }
   .hello--evening {
-    background: radial-gradient(ellipse at 60% 20%, rgba(149, 117, 205, 0.08) 0%, transparent 55%),
-                radial-gradient(ellipse at 30% 80%, rgba(100, 80, 160, 0.04) 0%, transparent 50%);
+    background:
+      radial-gradient(ellipse 90% 70% at 62% 14%, rgba(155, 120, 220, 0.1) 0%, rgba(155, 120, 220, 0.03) 44%, transparent 72%),
+      radial-gradient(ellipse 80% 65% at 28% 86%, rgba(105, 85, 175, 0.055) 0%, transparent 68%);
   }
   .hello--night {
-    background: radial-gradient(ellipse at 40% 30%, rgba(30, 30, 60, 0.12) 0%, transparent 50%),
-                radial-gradient(ellipse at 70% 70%, rgba(15, 15, 40, 0.06) 0%, transparent 45%);
+    background:
+      radial-gradient(ellipse 90% 70% at 38% 24%, rgba(40, 48, 95, 0.16) 0%, rgba(30, 34, 70, 0.05) 46%, transparent 72%),
+      radial-gradient(ellipse 75% 60% at 72% 78%, rgba(18, 22, 55, 0.1) 0%, transparent 68%);
   }
 
   /* ═══ WEATHER ANIMATIONS ════════════════ */
@@ -417,146 +524,211 @@
 
   .hello > *:not(.hello-weather) { position: relative; z-index: 1; }
 
-  /* Rain */
-  .raindrop {
+  /* Rain — container-relative fall via top% (transform % is self-relative and breaks) */
+  .wx-drop {
     position: absolute;
-    top: -20px;
-    width: 2px;
-    height: 18px;
-    background: linear-gradient(180deg, transparent, rgba(120, 180, 255, 0.3));
-    border-radius: 0 0 2px 2px;
-    animation: rain-fall linear infinite;
+    top: -6%;
+    width: var(--drop-w, 1.6px);
+    height: 22px;
+    border-radius: 999px;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(150, 195, 255, 0.15) 35%,
+      rgba(160, 200, 255, 0.55) 100%
+    );
+    box-shadow: 0 0 6px rgba(140, 185, 255, 0.18);
+    opacity: var(--fall-op, 0.7);
+    animation: wx-fall var(--fall-dur, 1s) linear var(--fall-delay, 0s) infinite;
+    will-change: top, transform, opacity;
   }
-  .raindrop.heavy {
-    width: 2.5px;
-    height: 24px;
-    background: linear-gradient(180deg, transparent, rgba(120, 180, 255, 0.45));
+  .wx-drop.is-heavy {
+    height: 30px;
+    background: linear-gradient(
+      180deg,
+      transparent 0%,
+      rgba(130, 175, 255, 0.2) 30%,
+      rgba(145, 190, 255, 0.7) 100%
+    );
+    box-shadow: 0 0 8px rgba(130, 180, 255, 0.28);
   }
 
-  @keyframes rain-fall {
-    0% { transform: translateY(-20px); opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 1; }
-    100% { transform: translateY(calc(100vh + 20px)); opacity: 0; }
+  @keyframes wx-fall {
+    0%   { top: -8%; transform: translateX(0) scaleY(0.85); opacity: 0; }
+    8%   { opacity: var(--fall-op, 0.7); }
+    88%  { opacity: calc(var(--fall-op, 0.7) * 0.85); }
+    100% { top: 108%; transform: translateX(var(--drift, 10px)) scaleY(1.15); opacity: 0; }
   }
 
-  /* Clouds */
-  .cloud {
+  /* Clouds — multi-blob soft mass */
+  .wx-cloud {
     position: absolute;
-    left: -200px;
-    width: 200px;
-    height: 60px;
-    background: radial-gradient(ellipse at center, rgba(200, 210, 220, 0.25) 0%, transparent 70%);
+    height: 56px;
     border-radius: 50%;
-    animation: cloud-drift 30s linear infinite;
+    background:
+      radial-gradient(ellipse 58% 62% at 28% 55%, rgba(220, 232, 245, 0.32) 0%, transparent 72%),
+      radial-gradient(ellipse 52% 58% at 54% 42%, rgba(210, 224, 240, 0.26) 0%, transparent 74%),
+      radial-gradient(ellipse 48% 52% at 78% 58%, rgba(200, 216, 235, 0.2) 0%, transparent 76%);
+    filter: blur(14px);
+    animation: wx-cloud-drift var(--cloud-dur, 32s) linear var(--cloud-delay, 0s) infinite;
+    will-change: left;
   }
 
-  @keyframes cloud-drift {
-    0% { transform: translateX(-200px); }
-    100% { transform: translateX(calc(100vw + 200px)); }
+  @keyframes wx-cloud-drift {
+    0%   { left: -32%; }
+    100% { left: 112%; }
   }
 
-  /* Fog */
-  .fog-layer {
+  /* Fog — wide soft banks */
+  .wx-fog {
     position: absolute;
-    left: -300px;
-    width: 300px;
-    height: 80px;
-    background: radial-gradient(ellipse at center, rgba(180, 190, 200, 0.3) 0%, rgba(180, 190, 200, 0.08) 50%, transparent 80%);
+    height: 90px;
     border-radius: 50%;
-    animation: fog-drift linear infinite;
-    filter: blur(8px);
+    background: radial-gradient(
+      ellipse 70% 55% at 50% 50%,
+      rgba(195, 210, 225, 0.34) 0%,
+      rgba(180, 195, 215, 0.12) 48%,
+      transparent 78%
+    );
+    filter: blur(22px);
+    animation: wx-fog-drift var(--fog-dur, 22s) linear var(--fog-delay, 0s) infinite;
+    will-change: left;
   }
 
-  @keyframes fog-drift {
-    0% { transform: translateX(-300px); }
-    100% { transform: translateX(calc(100vw + 300px)); }
+  @keyframes wx-fog-drift {
+    0%   { left: -38%; }
+    100% { left: 118%; }
   }
 
   .weather-fog {
-    background: linear-gradient(180deg, rgba(160, 170, 180, 0.06) 0%, rgba(140, 150, 160, 0.03) 100%);
+    background: linear-gradient(180deg, rgba(160, 175, 190, 0.07) 0%, rgba(145, 160, 175, 0.03) 100%);
   }
 
   /* Gloom */
   .gloom-overlay {
     position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: linear-gradient(180deg, rgba(40, 40, 50, 0.1) 0%, rgba(50, 50, 60, 0.06) 100%);
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 0%, rgba(35, 40, 55, 0.16) 0%, transparent 70%),
+      linear-gradient(180deg, rgba(40, 42, 55, 0.1) 0%, rgba(50, 52, 65, 0.05) 100%);
   }
 
-  /* Snow */
-  .snowflake {
+  /* Snow — soft glowing flakes */
+  .wx-flake {
     position: absolute;
-    top: -20px;
-    color: rgba(255, 255, 255, 0.6);
-    font-family: serif;
-    animation: snow-fall linear infinite;
-    pointer-events: none;
-    text-shadow: 0 0 3px rgba(200, 220, 255, 0.3);
+    top: -4%;
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 35% 32%,
+      rgba(255, 255, 255, 0.95) 0%,
+      rgba(230, 240, 255, 0.65) 45%,
+      rgba(200, 220, 250, 0.25) 100%
+    );
+    box-shadow:
+      0 0 6px rgba(210, 230, 255, 0.35),
+      0 0 16px rgba(180, 210, 255, 0.16);
+    animation: wx-snow var(--fall-dur, 5s) linear var(--fall-delay, 0s) infinite;
+    will-change: top, transform;
   }
 
-  @keyframes snow-fall {
-    0% { transform: translateY(-20px) rotate(0deg); opacity: 0; }
-    10% { opacity: 1; }
-    90% { opacity: 0.8; }
-    100% { transform: translateY(calc(100vh + 20px)) rotate(360deg); opacity: 0; }
+  @keyframes wx-snow {
+    0%   { top: -4%; transform: translateX(0) rotate(0deg); opacity: 0; }
+    10%  { opacity: var(--fall-op, 0.7); }
+    88%  { opacity: calc(var(--fall-op, 0.7) * 0.8); }
+    100% { top: 108%; transform: translateX(var(--drift, 18px)) rotate(320deg); opacity: 0; }
   }
 
   .weather-snow {
-    background: linear-gradient(180deg, rgba(180, 200, 230, 0.04) 0%, rgba(200, 215, 240, 0.02) 100%);
+    background: linear-gradient(180deg, rgba(185, 205, 235, 0.05) 0%, rgba(205, 220, 245, 0.02) 100%);
   }
 
-  /* Storm = heavy rain + slight flicker */
+  /* Storm — ambient flicker + lightning */
   .weather-storm {
-    animation: storm-flicker 4s ease-in-out infinite;
+    background: linear-gradient(180deg, rgba(15, 22, 35, 0.12) 0%, rgba(25, 35, 50, 0.06) 100%);
   }
 
-  @keyframes storm-flicker {
-    0%, 95%, 100% { opacity: 1; }
-    96% { opacity: 0.85; }
+  .wx-lightning {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      185deg,
+      rgba(210, 225, 255, 0.5) 0%,
+      rgba(180, 205, 255, 0.12) 38%,
+      transparent 72%
+    );
+    opacity: 0;
+    animation: wx-flash 6.5s ease-out infinite;
+    mix-blend-mode: screen;
+  }
+  .wx-lightning--delayed {
+    animation-delay: -3.2s;
+    animation-duration: 8.4s;
+    opacity: 0;
   }
 
-  /* Sun — minimal soft disc */
+  @keyframes wx-flash {
+    0%, 84%, 100% { opacity: 0; }
+    85% { opacity: 0.65; }
+    86% { opacity: 0.08; }
+    87.5% { opacity: 0.9; }
+    89% { opacity: 0.05; }
+    90% { opacity: 0.45; }
+    92% { opacity: 0; }
+  }
+
+  /* Sun — quiet, minimal: soft glow + matte disc (no rays / spin) */
   .sun {
     position: absolute;
-    top: -28px;
-    right: 8%;
+    top: -12px;
+    right: 6%;
     width: 200px;
     height: 200px;
     pointer-events: none;
+    --sun-size: 40px;
   }
 
-  .sun-core {
+  .sun--minimal {
+    --sun-size: 36px;
+  }
+
+  .sun-glow {
     position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    width: 56px;
-    height: 56px;
+    inset: 18%;
     border-radius: 50%;
     background: radial-gradient(
-      circle at 45% 40%,
-      rgba(255, 236, 180, 0.55) 0%,
-      rgba(255, 210, 120, 0.28) 45%,
-      rgba(255, 190, 80, 0.08) 75%,
-      transparent 100%
+      circle,
+      rgba(255, 200, 120, 0.14) 0%,
+      rgba(255, 185, 100, 0.06) 40%,
+      transparent 70%
     );
-    box-shadow: 0 0 40px rgba(255, 200, 100, 0.18);
-    animation: sun-breathe 8s ease-in-out infinite;
+    filter: blur(16px);
   }
 
-  .sun--minimal .sun-core {
-    width: 48px;
-    height: 48px;
-    box-shadow: 0 0 28px rgba(255, 200, 100, 0.14);
+  .sun-disc {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: var(--sun-size);
+    height: var(--sun-size);
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(
+      circle at 40% 36%,
+      rgba(255, 236, 190, 0.72) 0%,
+      rgba(255, 214, 140, 0.58) 45%,
+      rgba(255, 190, 110, 0.42) 100%
+    );
+    box-shadow: 0 0 24px rgba(255, 195, 115, 0.12);
+    animation: sun-breathe 12s ease-in-out infinite;
   }
 
   @keyframes sun-breathe {
     0%, 100% {
       transform: translate(-50%, -50%) scale(1);
-      opacity: 0.85;
+      opacity: 0.88;
     }
     50% {
-      transform: translate(-50%, -50%) scale(1.04);
+      transform: translate(-50%, -50%) scale(1.02);
       opacity: 1;
     }
   }
@@ -587,9 +759,25 @@
     margin-top: 12px;
     padding: 5px 12px 5px 8px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.06),
+      0 4px 16px rgba(0, 0, 0, 0.08),
+      0 0 28px rgba(160, 190, 255, 0.06),
+      0 0 56px rgba(160, 190, 255, 0.04);
+    backdrop-filter: blur(10px) saturate(1.15);
+    -webkit-backdrop-filter: blur(10px) saturate(1.15);
+    transition: border-color 0.2s ease, box-shadow 0.25s ease;
+  }
+
+  .hello-weather-card:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow:
+      0 2px 6px rgba(0, 0, 0, 0.08),
+      0 8px 28px rgba(0, 0, 0, 0.1),
+      0 0 36px rgba(160, 190, 255, 0.1),
+      0 0 72px rgba(160, 190, 255, 0.06);
   }
 
   .hello-weather-card__icon {
@@ -656,13 +844,20 @@
   }
 
   .hello-nav-btn:hover {
-    border-color: var(--interactive-accent, #7C5CFC);
+    border-color: color-mix(in srgb, var(--interactive-accent, #7C5CFC) 55%, transparent);
     color: var(--text-normal, #e8ecf0);
     transform: translateY(-1px);
-    box-shadow: 0 4px 16px rgba(124, 92, 252, 0.12);
+    box-shadow:
+      0 1px 2px rgba(124, 92, 252, 0.06),
+      0 6px 18px rgba(124, 92, 252, 0.1),
+      0 14px 40px rgba(124, 92, 252, 0.12),
+      0 0 60px rgba(124, 92, 252, 0.08);
   }
 
-  .hello-nav-btn:active { transform: translateY(0); box-shadow: none; }
+  .hello-nav-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
 
   /* Drag & drop reorder */
   .hello-nav-btn { user-select: none; cursor: pointer; }
@@ -672,8 +867,12 @@
     transform: scale(0.97);
   }
   .hello-nav-btn.drag-over {
-    border-color: var(--interactive-accent, #7C5CFC);
-    box-shadow: 0 0 0 2px var(--interactive-accent, #7C5CFC);
+    border-color: color-mix(in srgb, var(--interactive-accent, #7C5CFC) 65%, transparent);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--interactive-accent, #7C5CFC) 35%, transparent),
+      0 4px 16px color-mix(in srgb, var(--interactive-accent, #7C5CFC) 18%, transparent),
+      0 12px 36px color-mix(in srgb, var(--interactive-accent, #7C5CFC) 16%, transparent),
+      0 0 56px color-mix(in srgb, var(--interactive-accent, #7C5CFC) 12%, transparent);
     transform: translateY(-2px) scale(1.02);
   }
 
@@ -732,8 +931,8 @@
   }
   .hello-search__input {
     width: 100%;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.035);
     color: var(--text-normal, #e8ecf0);
     font-size: 13px;
     padding: 10px 14px 10px 38px;
@@ -741,11 +940,20 @@
     outline: none;
     font-family: inherit;
     box-sizing: border-box;
-    transition: border-color 0.2s, background 0.2s;
+    transition:
+      border-color 0.22s ease,
+      background 0.22s ease,
+      box-shadow 0.28s ease;
+    box-shadow: 0 0 0 0 transparent;
   }
   .hello-search__input:focus {
-    border-color: rgba(255, 255, 255, 0.12);
-    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.055);
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.06),
+      0 2px 10px rgba(0, 0, 0, 0.08),
+      0 8px 28px rgba(124, 92, 252, 0.1),
+      0 0 48px rgba(124, 92, 252, 0.08);
   }
   .hello-search__input::placeholder {
     color: var(--text-faint, #4b5563);
@@ -774,10 +982,15 @@
     border-color: rgba(255, 255, 255, 0.18);
     background: rgba(255, 255, 255, 0.1);
     transform: translateY(-1px);
+    box-shadow:
+      0 4px 14px rgba(0, 0, 0, 0.08),
+      0 10px 32px rgba(124, 92, 252, 0.1),
+      0 0 48px rgba(124, 92, 252, 0.07);
   }
 
   .hello-weight-btn:active {
     transform: scale(0.97);
+    box-shadow: none;
   }
 
   .hello-weight-btn__icon {

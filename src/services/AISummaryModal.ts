@@ -201,6 +201,9 @@ export class AISummaryModal extends CustomModal {
       text: tRaw("ai.summaryPreview"),
       cls: "ai-summary-mode-btn",
     });
+    // Preview stays locked until the summary body exists (generated or typed).
+    this.modeBtn.disabled = true;
+    this.modeBtn.setAttribute("aria-disabled", "true");
     this.modeBtn.addEventListener("click", () => this.toggleViewMode());
 
     this.generateBtn = footer.createEl("button", {
@@ -237,6 +240,8 @@ export class AISummaryModal extends CustomModal {
   }
 
   private toggleViewMode(): void {
+    // Locked until generation produces (or user types) a body.
+    if (!this.summaryText.trim() || this.isGenerating) return;
     this.viewMode = this.viewMode === "preview" ? "edit" : "preview";
     this.applyViewMode();
   }
@@ -253,12 +258,23 @@ export class AISummaryModal extends CustomModal {
     if (preview && this.previewEl) {
       renderMarkdown(this.previewEl, this.summaryText);
     }
+    this.syncModeBtn();
+  }
+
+  /** Preview/edit toggle unlocks only when there is a summary body and generation is idle. */
+  private syncModeBtn(): void {
+    if (!this.modeBtn) return;
+    const locked = !this.summaryText.trim() || this.isGenerating;
+    this.modeBtn.disabled = locked;
+    this.modeBtn.setAttribute("aria-disabled", locked ? "true" : "false");
+    this.modeBtn.classList.toggle("is-locked", locked);
   }
 
   private syncCreateBtn(): void {
     if (!this.createBtn) return;
     this.createBtn.disabled =
       !this.summaryText.trim() || !this.noteTitle.trim() || this.isGenerating;
+    this.syncModeBtn();
   }
 
   private setStatus(text: string, isError = false, busy = false): void {
