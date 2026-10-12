@@ -75,11 +75,21 @@ export class HabitModal extends CustomModal {
           })
       );
 
-    // Color picker
-    const colorSetting = new Setting(this.contentEl);
+    // Color picker: preset swatches + native picker
+    const colorSetting = new Setting(this.contentEl)
+      .setName(tRaw("habits.modal.color"))
+      .setDesc(tRaw("habits.modal.colorDesc"));
     const colorGrid = colorSetting.settingEl.createDiv({
       cls: "task-tracker-color-grid",
     });
+
+    const nativeWrap = colorSetting.settingEl.createDiv({ cls: "habit-color-native" });
+    const nativePicker = nativeWrap.createEl("input", {
+      type: "color",
+      cls: "habit-color-picker",
+      attr: { "aria-label": tRaw("habits.modal.color") },
+    });
+    nativePicker.value = this.colorInput;
 
     for (const color of DEFAULT_HABIT_COLORS) {
       const swatch = colorGrid.createDiv({
@@ -92,8 +102,16 @@ export class HabitModal extends CustomModal {
           .querySelectorAll(".task-tracker-color-swatch")
           .forEach((s) => s.removeClass("active"));
         swatch.addClass("active");
+        nativePicker.value = color;
       });
     }
+
+    nativePicker.addEventListener("input", () => {
+      this.colorInput = nativePicker.value;
+      colorGrid
+        .querySelectorAll(".task-tracker-color-swatch")
+        .forEach((s) => s.removeClass("active"));
+    });
 
     new Setting(this.contentEl)
       .setName(tRaw("habits.modal.frequency"))

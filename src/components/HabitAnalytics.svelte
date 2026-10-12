@@ -17,17 +17,21 @@
     getEarningsForMonth,
     getEarningsForYear,
     getMonthlyEarningsForYear,
-    getExpectedEarningsForMonth,
   } from "../task-tracker/stores";
   import { app } from "../stores/appStore";
   import {
     financialAnalyticsData,
-    getTotalManualIncome,
     getManualIncomeForMonth,
+    getManualIncomeForYear,
   } from "../finance/financialAnalyticsStorage";
-  import { resolveStoredIncome } from "../finance/income";
-  import { financeData, getCurrentMonthKey, getMonthData, getCustomExpenseCategories } from "../finance/storage";
-  import { getGoalMonthContribution } from "../finance/types";
+  import { financeData, getCustomExpenseCategories } from "../finance/storage";
+  import {
+    computeAnalyticsFinance,
+    collectExpenseLogs,
+    filterExpensesByPeriod,
+    type AnalyticsFinanceTotals,
+  } from "../finance/analyticsFinance";
+  import type { ExpenseEntry } from "../finance/types";
   import { mergeCategories, categoryByName, type ExpenseCategoryDef } from "../finance/expenseCategories";
   import { VIEW_TYPE_FINANCE } from "../constants";
   import { requestFinanceTab } from "../finance/financeUiStore";
@@ -216,21 +220,56 @@
       .map((s) => ({ label: s.name, value: s.ms, color: s.color }));
   })();
 
-  // Earnings stats
+  // Earnings stats (income = work tasks + «Доходы», never budget plan)
+  let financePeriod: "month" | "year" = "month";
+  let financeFigures: AnalyticsFinanceTotals = {
+    income: 0,
+    expenses: 0,
+    balance: 0,
+    expenseList: [],
+    goalDeposits: 0,
+  };
+  let monthlyChart: { month: number; amount: number }[] = [];
+  let maxMonthly = 1;
+  let monthlyDelta = 0;
+  let yearlyDelta = 0;
+
   $: {
     $tasks; // re-compute when tasks change
     $financialAnalyticsData; // re-compute when manual income changes
+    $financeData; // re-compute when expense log changes
+    financePeriod;
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
+    const useYear = financePeriod === "year";
 
-    const taskMonthly = getEarningsForMonth(currentYear, currentMonth);
-    const taskYearly = getEarningsForYear(currentYear);
-    const manualIncomeMonth = getManualIncomeForMonth(currentYear, currentMonth);
-    const manualIncomeYear = getTotalManualIncome();
-    monthlyEarnings = taskMonthly + manualIncomeMonth;
-    yearlyEarnings = taskYearly + manualIncomeYear;
-    expectedMonthlyEarnings = getExpectedEarningsForMonth(currentYear, currentMonth);
+    const taskIncome = useYear
+      ? getEarningsForYear(currentYear)
+      : getEarningsForMonth(currentYear, currentMonth);
+    const manualIncome = useYear
+      ? getManualIncomeForYear(currentYear)
+      : getManualIncomeForMonth(currentYear, currentMonth);
+    const expenseList = filterExpensesByPeriod(
+      collectExpenseLogs(get(financeData) as Record<string, { expenses?: ExpenseEntry[] }>),
+      currentYear,
+      useYear ? undefined : currentMonth,
+    );
+    const goalDeposits = Object.entries(get(financeData) || {}).reduce((sum, [key, data]) => {
+      if (key.startsWith("_") || !data) return sum;
+      const [y, m] = key.split("-").map(Number);
+      if (y !== currentYear) return sum;
+      if (!useYear && m !== currentMonth) return sum;
+      const goals = (data as { monthGoals?: { currentAmount?: number; broughtForward?: number }[] }).monthGoals || [];
+      return sum + goals.reduce((s, g) => s + Math.max(0, (g.currentAmount || 0) - (g.broughtForward ?? 0)), 0);
+    }, 0);
+    financeFigures = computeAnalyticsFinance({
+      taskEarnings: taskIncome,
+      manualIncome,
+      expenses: expenseList,
+      goalDeposits,
+    });
+
     monthlyChart = getMonthlyEarningsForYear(currentYear).map((m) => ({
       month: m.month,
       amount: m.amount + getManualIncomeForMonth(currentYear, m.month),
@@ -242,47 +281,18 @@
     const prevMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
     const prevMonthManualIncome = getManualIncomeForMonth(prevMonthYear, prevMonth);
     const prevMonthEarnings = getEarningsForMonth(prevMonthYear, prevMonth) + prevMonthManualIncome;
-    monthlyDelta = monthlyEarnings - prevMonthEarnings;
+    monthlyDelta = getEarningsForMonth(currentYear, currentMonth) + getManualIncomeForMonth(currentYear, currentMonth) - prevMonthEarnings;
 
     // Real deltas: previous year vs current
-    const prevYearEarnings = getEarningsForYear(currentYear - 1) + manualIncomeYear;
-    yearlyDelta = yearlyEarnings - prevYearEarnings;
+    const currentYearIncome = getEarningsForYear(currentYear) + getManualIncomeForYear(currentYear);
+    const prevYearEarnings = getEarningsForYear(currentYear - 1) + getManualIncomeForYear(currentYear - 1);
+    yearlyDelta = currentYearIncome - prevYearEarnings;
   }
-  let monthlyEarnings = 0;
-  let expectedMonthlyEarnings = 0;
-  let yearlyEarnings = 0;
-  let monthlyChart: { month: number; amount: number }[] = [];
-  let maxMonthly = 1;
-  let monthlyDelta = 0;
-  let yearlyDelta = 0;
-
-  // ── Finance: income vs expense ──
-  $: financeMonth = (() => {
-    void $financeData;
-    void $financialAnalyticsData;
-    void $tasks;
-    const key = getCurrentMonthKey();
-    const data = getMonthData(key);
-    const expenseList = data.expenses || [];
-    const expensesFromLog = expenseList.reduce((s, e) => s + (e.amount || 0), 0);
-    const goalContrib = (data.monthGoals || []).reduce((s, g) => s + getGoalMonthContribution(g), 0);
-    // If no expense log yet, fall back to budget plan main categories
-    const planExpenses = (data.mainAccountCategories || []).reduce((s, c) => s + (c.amount || 0), 0);
-    const totalExpenses = expensesFromLog > 0 ? expensesFromLog + goalContrib : planExpenses + goalContrib;
-    const [y, m] = key.split("-").map(Number);
-    const income = resolveStoredIncome(data, y, m).total;
-    return {
-      income,
-      expenses: totalExpenses,
-      balance: income - totalExpenses,
-      expenseList,
-    };
-  })();
 
   $: expenseByCategory = (() => {
     const cats: ExpenseCategoryDef[] = mergeCategories(getCustomExpenseCategories());
     const map = new Map<string, { name: string; icon: string; amount: number }>();
-    for (const e of financeMonth.expenseList) {
+    for (const e of financeFigures.expenseList) {
       const key = e.categoryName || "other";
       const def = categoryByName(cats, key);
       const name = def?.name || key;
@@ -295,9 +305,9 @@
   })();
 
   $: expenseCatMax = Math.max(...expenseByCategory.map((c) => c.amount), 1);
-  $: financeFlowTotal = Math.max(financeMonth.income + financeMonth.expenses, 1);
-  $: financeIncomePct = Math.round((financeMonth.income / financeFlowTotal) * 100);
-  $: financeExpensePct = Math.round((financeMonth.expenses / financeFlowTotal) * 100);
+  $: financeFlowTotal = Math.max(financeFigures.income + financeFigures.expenses, 1);
+  $: financeIncomePct = Math.round((financeFigures.income / financeFlowTotal) * 100);
+  $: financeExpensePct = Math.round((financeFigures.expenses / financeFlowTotal) * 100);
 
   $: monthNames = $tArray("common.months.short");
 
@@ -577,11 +587,27 @@
     </div>
   {/if}
 
-  <!-- Finance Section (income / expense analytics) -->
+  <!-- Finance Section (income / expense analytics — fact only, no budget plan) -->
   {#if activeTab === "earnings"}
     <div class="habit-analytics-section">
     <div class="earnings-header">
       <h3>{$t("habitAnalytics.earnings")}</h3>
+      <div class="finance-period-toggle" role="tablist" aria-label={$t("habitAnalytics.periodLabel")}>
+        <button
+          class="finance-period-btn"
+          class:active={financePeriod === "month"}
+          role="tab"
+          aria-selected={financePeriod === "month"}
+          on:click={() => (financePeriod = "month")}
+        >{$t("habitAnalytics.periodMonth")}</button>
+        <button
+          class="finance-period-btn"
+          class:active={financePeriod === "year"}
+          role="tab"
+          aria-selected={financePeriod === "year"}
+          on:click={() => (financePeriod = "year")}
+        >{$t("habitAnalytics.periodYear")}</button>
+      </div>
       <button class="earnings-detail-btn" on:click={openFinancialAnalytics}>
         {$t("financeAnalytics.details")}
       </button>
@@ -590,70 +616,35 @@
     <!-- Income vs expense overview -->
     <div class="finance-overview">
       <div class="finance-overview-card income">
-        <span class="finance-overview-label">{$t("habitAnalytics.income")}</span>
+        <span class="finance-overview-label" title={$t("habitAnalytics.incomeHint")}>{$t("habitAnalytics.income")}</span>
         <span class="finance-overview-value income">
-          <span use:countUp={{ value: financeMonth.income, duration: 700, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽
+          <span use:countUp={{ value: financeFigures.income, duration: 700, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽
         </span>
+        {#if financePeriod === "month" && monthlyDelta !== 0}
+          <span class="earnings-delta {monthlyDelta > 0 ? 'delta-up' : 'delta-down'}"
+            >{monthlyDelta > 0 ? '+' : ''}{$t("finance.deltaFromLastMonth", { amount: monthlyDelta.toLocaleString($numberLocale), currency: "₽" })}</span
+          >
+        {:else if financePeriod === "year" && yearlyDelta !== 0}
+          <span class="earnings-delta {yearlyDelta > 0 ? 'delta-up' : 'delta-down'}"
+            >{yearlyDelta > 0 ? '+' : ''}{yearlyDelta.toLocaleString($numberLocale)} ₽ {$t("habitAnalytics.vsLastYear")}</span
+          >
+        {/if}
       </div>
       <div class="finance-overview-card expense">
-        <span class="finance-overview-label">{$t("habitAnalytics.expenses")}</span>
+        <span class="finance-overview-label" title={$t("habitAnalytics.expensesHint")}>{$t("habitAnalytics.expenses")}</span>
         <span class="finance-overview-value expense">
-          <span use:countUp={{ value: financeMonth.expenses, duration: 700, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽
+          <span use:countUp={{ value: financeFigures.expenses, duration: 700, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽
         </span>
       </div>
       <div class="finance-overview-card balance">
         <span class="finance-overview-label">{$t("habitAnalytics.balance")}</span>
-        <span class="finance-overview-value" class:income={financeMonth.balance >= 0} class:expense={financeMonth.balance < 0}>
-          <span use:countUp={{ value: financeMonth.balance, duration: 700, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽
+        <span class="finance-overview-value" class:income={financeFigures.balance >= 0} class:expense={financeFigures.balance < 0}>
+          <span use:countUp={{ value: financeFigures.balance, duration: 700, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽
         </span>
         <div class="finance-balance-bar">
           <div class="finance-balance-bar__income" style="width:{financeIncomePct}%"></div>
           <div class="finance-balance-bar__expense" style="width:{financeExpensePct}%"></div>
         </div>
-      </div>
-    </div>
-
-    <div class="earnings-summary">
-      <div class="earnings-card earnings-card-main" style="animation-delay: 0ms">
-        <span class="earnings-value"
-          ><span use:countUp={{ value: monthlyEarnings, duration: 800, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽</span
-        >
-        <span class="earnings-label">{$t("habitAnalytics.monthFact")}</span>
-        {#if monthlyDelta !== 0}
-          <span class="earnings-delta {monthlyDelta > 0 ? 'delta-up' : 'delta-down'}"
-            >{monthlyDelta > 0 ? '+' : ''}{$t("finance.deltaFromLastMonth", { amount: monthlyDelta.toLocaleString($numberLocale), currency: "₽" })}</span
-          >
-        {/if}
-      </div>
-      <div class="earnings-card earnings-card-expected" style="animation-delay: 80ms">
-        <span class="earnings-value earnings-value-expected"
-          ><span use:countUp={{ value: expectedMonthlyEarnings, duration: 800, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽</span
-        >
-        <span class="earnings-label">{$t("habitAnalytics.monthPlan")}</span>
-        {#if expectedMonthlyEarnings > 0}
-          {@const progress = Math.round((monthlyEarnings / expectedMonthlyEarnings) * 100)}
-          <div class="earnings-progress-bar">
-            <div
-              class="earnings-progress-fill"
-              style="width: {Math.min(progress, 100)}%"
-              class:over={progress >= 100}
-            ></div>
-          </div>
-          <span class="earnings-progress-text" class:done={progress >= 100}>
-            {progress}% {$t("habitAnalytics.completedLabel")}
-          </span>
-        {/if}
-      </div>
-      <div class="earnings-card" style="animation-delay: 160ms">
-        <span class="earnings-value"
-          ><span use:countUp={{ value: yearlyEarnings, duration: 900, format: (n) => n.toLocaleString($numberLocale) }}></span> ₽</span
-        >
-        <span class="earnings-label">{$t("habitAnalytics.yearTotal")}</span>
-        {#if yearlyDelta !== 0}
-          <span class="earnings-delta {yearlyDelta > 0 ? 'delta-up' : 'delta-down'}"
-            >{yearlyDelta > 0 ? '+' : ''}{yearlyDelta.toLocaleString($numberLocale)} ₽ {$t("habitAnalytics.vsLastYear")}</span
-          >
-        {/if}
       </div>
     </div>
 
@@ -672,7 +663,7 @@
           </div>
         {/each}
       </div>
-    {:else if activeTab === "earnings"}
+    {:else}
       <div class="earnings-empty">{$t("habitAnalytics.noExpenseData")}</div>
     {/if}
 
@@ -1407,100 +1398,6 @@
     flex-shrink: 0;
   }
 
-  .earnings-summary {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 14px;
-    margin-bottom: 18px;
-  }
-
-  .earnings-card {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 18px 14px;
-    background: var(--mcp-glass-highlight);
-    border: 1px solid var(--mcp-glass-border);
-    border-radius: 14px;
-    overflow: hidden;
-    transition: all 0.2s ease;
-    animation: analytics-pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) backwards;
-  }
-
-  .earnings-card:hover {
-    border-color: var(--mcp-success, rgba(34, 197, 94, 0.5));
-    transform: translateY(-2px);
-  }
-
-  .earnings-card-expected {
-    border-color: var(--mcp-accent-dim);
-  }
-
-  .earnings-card-expected:hover {
-    border-color: var(--mcp-accent);
-  }
-
-  .earnings-value {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--mcp-success, rgba(34, 197, 94, 0.9));
-    letter-spacing: -0.02em;
-  }
-
-  .earnings-value-expected {
-    color: var(--mcp-accent);
-  }
-
-  .earnings-progress-bar {
-    width: 100%;
-    height: 6px;
-    background: var(--mcp-surface);
-    border-radius: 3px;
-    margin-top: 8px;
-    overflow: hidden;
-  }
-
-  .earnings-progress-fill {
-    height: 100%;
-    background: linear-gradient(
-      90deg,
-      var(--mcp-accent),
-      color-mix(in srgb, var(--mcp-accent) 70%, white)
-    );
-    border-radius: 3px;
-    transition: width 0.8s cubic-bezier(0.22, 1, 0.36, 1);
-    box-shadow: 0 0 8px var(--mcp-accent-dim);
-  }
-
-  .earnings-progress-fill.over {
-    background: linear-gradient(
-      90deg,
-      var(--mcp-success, rgba(34, 197, 94, 0.9)),
-      color-mix(in srgb, var(--mcp-success, rgba(34, 197, 94, 0.9)) 70%, white)
-    );
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.35);
-  }
-
-  .earnings-progress-text {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--mcp-text-muted);
-    margin-top: 4px;
-  }
-
-  .earnings-progress-text.done {
-    color: var(--mcp-success, rgba(34, 197, 94, 0.9));
-  }
-
-  .earnings-label {
-    font-size: 10px;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    margin-top: 6px;
-    font-weight: 500;
-  }
-
   .earnings-delta {
     font-size: 10px;
     font-weight: 600;
@@ -1604,10 +1501,44 @@
     font-size: 13px;
   }
 
+  .finance-period-toggle {
+    display: inline-flex;
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid var(--mcp-glass-border);
+    border-radius: var(--mcp-radius-sm);
+    background: var(--mcp-glass-bg);
+  }
+
+  .finance-period-btn {
+    padding: 6px 12px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    transition: all 0.15s ease;
+  }
+
+  .finance-period-btn.active {
+    background: var(--mcp-glass-highlight);
+    color: var(--text-accent);
+    font-weight: 600;
+  }
+
+  .finance-period-btn:hover:not(.active) {
+    color: var(--text-normal);
+  }
+
   .earnings-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
     margin-bottom: 14px;
   }
 
@@ -1639,6 +1570,30 @@
   }
 
   @media (max-width: 768px) {
+    .habit-analytics {
+      padding: 12px 10px;
+    }
+
+    .analytics-tabs {
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .analytics-tab {
+      padding: 7px 11px;
+      font-size: 11px;
+      border-radius: 10px;
+    }
+
+    .habit-analytics-header h1 {
+      font-size: 17px;
+    }
+
+    .habits-module {
+      padding: 12px;
+      border-radius: 12px;
+    }
+
     .habits-module__grid {
       grid-template-columns: 1fr;
     }
@@ -1668,14 +1623,80 @@
 
     .finance-overview {
       grid-template-columns: 1fr;
+      gap: 8px;
     }
 
-    .earnings-summary {
-      grid-template-columns: 1fr;
+    .finance-overview-card {
+      padding: 12px 14px;
+    }
+
+    .finance-overview-value {
+      font-size: 18px;
+    }
+
+    .finance-period-toggle {
+      order: 3;
+    }
+
+    .earnings-header {
+      gap: 8px;
+    }
+
+    .expense-by-cat {
+      padding: 12px;
+    }
+
+    .expense-by-cat__name {
+      width: auto;
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .expense-by-cat__bar {
+      flex: 1 1 48px;
+      min-width: 40px;
+    }
+
+    .expense-by-cat__amt {
+      font-size: 11px;
     }
 
     .earnings-chart {
       height: 90px;
+    }
+
+    .earnings-empty {
+      padding: 24px 12px;
+    }
+
+    .period-input {
+      min-width: 0;
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .time-logs-stats--4 {
+      grid-template-columns: 1fr;
+    }
+
+    .task-by-project .tbp-header,
+    .task-by-project .tbp-row {
+      grid-template-columns: minmax(0, 1fr) 36px 36px 36px 32px;
+      gap: 4px;
+      font-size: 10px;
+    }
+
+    .finance-overview-value {
+      font-size: 16px;
+    }
+
+    .expense-by-cat__icon {
+      width: 18px;
+      font-size: 13px;
     }
   }
 
@@ -1717,13 +1738,8 @@
     .habits-module,
     .habit-analytics-section,
     .time-stat,
-    .earnings-card,
     .earnings-bar {
       animation: none !important;
-    }
-
-    .earnings-progress-fill {
-      transition: none !important;
     }
   }
 </style>

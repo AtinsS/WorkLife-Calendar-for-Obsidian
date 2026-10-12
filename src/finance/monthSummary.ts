@@ -1,9 +1,16 @@
 /**
  * Builds a Markdown month summary for the Finance block.
  * Pure string builder — no Obsidian deps, easy to test.
+ *
+ * Fact-only: income, expense log, goal deposits (piggy-bank outflows).
+ * The Budget plan (approximate allocation) never appears here.
  */
-import type { ExpenseEntry, FinanceMonthData, MonthGoal, SavingsCategory } from "./types";
-import { getGoalMonthContribution, isGoalComplete } from "./types";
+import type { ExpenseEntry, FinanceMonthData, MonthGoal } from "./types";
+import {
+  computeMonthRemainder,
+  getGoalMonthContribution,
+  sumGoalMonthContributions,
+} from "./types";
 import type { MonthIncomeBreakdown } from "./income";
 
 export interface MonthSummaryLabels {
@@ -40,6 +47,8 @@ export interface MonthSummaryLabels {
   share?: string;
   /** "Generated …" footer. */
   generated?: string;
+  /** Section heading for piggy-bank deposits (optional). */
+  goalDeposits?: string;
 }
 
 export interface MonthSummaryInput {
@@ -105,12 +114,10 @@ export function buildMonthSummaryMarkdown(input: MonthSummaryInput): string {
 
   const expenses = monthData.expenses || [];
   const expensesTotal = expenses.reduce((s, e) => s + (e.amount || 0), 0);
-  const mainTotal = (monthData.mainAccountCategories || []).reduce((s, c) => s + (c.amount || 0), 0);
-  const goalsContrib = (monthData.monthGoals || []).reduce((s, g) => s + getGoalMonthContribution(g), 0);
-  const savingsTotal = (monthData.savingsCategories || []).reduce((s, c) => s + (c.amount || 0), 0);
-  const balance = income.total - mainTotal - goalsContrib;
-  // Expenses shown in the totals card: actual log if present, else budget plan
-  const shownExpenses = expensesTotal > 0 ? expensesTotal : mainTotal;
+  const goalsContrib = sumGoalMonthContributions(monthData.monthGoals);
+  // Fact-only remainder: income − expense log − this month's piggy-bank deposits.
+  // Budget plan is ignored here on purpose.
+  const balance = computeMonthRemainder(income.total, expensesTotal, goalsContrib);
 
   const lines: string[] = [];
 
@@ -124,7 +131,10 @@ export function buildMonthSummaryMarkdown(input: MonthSummaryInput): string {
   lines.push(`## 📊 ${labels.balance}`);
   lines.push("");
   lines.push(`- 📥 **${labels.income}:** ${money(income.total)}`);
-  lines.push(`- 📤 **${labels.expenses}:** ${money(shownExpenses)}`);
+  lines.push(`- 📤 **${labels.expenses}:** ${money(expensesTotal)}`);
+  if (goalsContrib !== 0) {
+    lines.push(`- 🏆 **${labels.monthGoals}:** ${money(goalsContrib)}`);
+  }
   lines.push(
     `- ${balance >= 0 ? "💎" : "⚠️"} **${labels.remainder}:** ${money(balance)}`,
   );
@@ -151,121 +161,58 @@ export function buildMonthSummaryMarkdown(input: MonthSummaryInput): string {
   lines.push("---");
   lines.push("");
 
-  // ── Expenses ──
+  // ── Expenses (fact) ──
   lines.push(`## 📤 ${labels.expenses}`);
   lines.push("");
-  if (expenses.length === 0) {
+  if (expenses.length === 0 && goalsContrib === 0) {
     lines.push(`*${labels.empty}*`);
     lines.push("");
   } else {
-    lines.push(`### 🏷️ ${labels.expenseByCategory}`);
-    lines.push("");
-    const byCat = expenseByCategory(expenses);
-    lines.push(
-      mdTable(
-        [labels.category, labels.amount, shareCol],
-        byCat.map((c) => [c.name, money(c.amount), shareLabel(c.amount, expensesTotal)]),
-      ),
-    );
-    lines.push("");
-    lines.push(`### 🧾 ${labels.expenseList}`);
-    lines.push("");
-    const sorted = [...expenses].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
-    lines.push(
-      mdTable(
-        [labels.date, labels.name, labels.category, labels.amount],
-        sorted.map((e) => [e.date || "—", e.name || "—", e.categoryName || "—", money(e.amount || 0)]),
-      ),
-    );
-    lines.push("");
+    if (expenses.length > 0) {
+      lines.push(`### 🏷️ ${labels.expenseByCategory}`);
+      lines.push("");
+      const byCat = expenseByCategory(expenses);
+      lines.push(
+        mdTable(
+          [labels.category, labels.amount, shareCol],
+          byCat.map((c) => [c.name, money(c.amount), shareLabel(c.amount, expensesTotal)]),
+        ),
+      );
+      lines.push("");
+      lines.push(`### 🧾 ${labels.expenseList}`);
+      lines.push("");
+      const sorted = [...expenses].sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+      lines.push(
+        mdTable(
+          [labels.date, labels.name, labels.category, labels.amount],
+          sorted.map((e) => [e.date || "—", e.name || "—", e.categoryName || "—", money(e.amount || 0)]),
+        ),
+      );
+      lines.push("");
+    }
+
+    // Piggy-bank deposits are real outflows — show them beside the expense log.
+    const goals: MonthGoal[] = monthData.monthGoals || [];
+    const deposited = goals.filter((g) => getGoalMonthContribution(g) > 0);
+    if (deposited.length > 0) {
+      lines.push(`### 🏆 ${labels.goalDeposits || labels.monthGoals}`);
+      lines.push("");
+      lines.push(
+        mdTable(
+          [labels.name, labels.amount],
+          deposited.map((g) => [
+            `${g.icon || ""} ${g.name}`.trim(),
+            money(getGoalMonthContribution(g)),
+          ]),
+        ),
+      );
+      lines.push("");
+      lines.push(`**${labels.total}:** ${money(goalsContrib)}`);
+      lines.push("");
+    }
   }
   lines.push("---");
   lines.push("");
-
-  // ── Budget ──
-  lines.push(`## 🎯 ${labels.budget}`);
-  lines.push("");
-
-  lines.push(`### 💳 ${labels.mainAccount}`);
-  lines.push("");
-  const mainCats = monthData.mainAccountCategories || [];
-  if (mainCats.length === 0) {
-    lines.push(`*${labels.empty}*`);
-    lines.push("");
-  } else {
-    lines.push(
-      mdTable(
-        [labels.name, labels.amount, shareCol],
-        [...mainCats]
-          .sort((a, b) => (b.amount || 0) - (a.amount || 0))
-          .map((c) => [
-            `${c.icon || ""} ${c.name}`.trim(),
-            money(c.amount || 0),
-            shareLabel(c.amount || 0, mainTotal),
-          ]),
-      ),
-    );
-    lines.push("");
-    lines.push(`**${labels.total}:** ${money(mainTotal)}`);
-    lines.push("");
-  }
-
-  lines.push(`### 🏆 ${labels.monthGoals}`);
-  lines.push("");
-  const goals: MonthGoal[] = monthData.monthGoals || [];
-  if (goals.length === 0) {
-    lines.push(`*${labels.empty}*`);
-    lines.push("");
-  } else {
-    lines.push(
-      mdTable(
-        [labels.name, labels.progress, labels.amount],
-        goals.map((g) => {
-          const contrib = getGoalMonthContribution(g);
-          const done = isGoalComplete(g);
-          const pct = g.targetAmount > 0
-            ? Math.min(100, Math.round(((g.currentAmount || 0) / g.targetAmount) * 100))
-            : 0;
-          return [
-            `${done ? "✅ " : ""}${g.icon || ""} ${g.name}`.trim(),
-            `\`${progressBar(pct)}\` ${pct}% · ${money(g.currentAmount || 0)} / ${money(g.targetAmount || 0)}`,
-            money(contrib),
-          ];
-        }),
-      ),
-    );
-    lines.push("");
-  }
-
-  lines.push(`### 🛟 ${labels.savings}`);
-  lines.push("");
-  const savings: SavingsCategory[] = monthData.savingsCategories || [];
-  if (savings.length === 0) {
-    lines.push(`*${labels.empty}*`);
-    lines.push("");
-  } else {
-    lines.push(
-      mdTable(
-        [labels.name, labels.amount],
-        [...savings]
-          .sort((a, b) => (b.amount || 0) - (a.amount || 0))
-          .map((c) => [`${c.icon || ""} ${c.name}`.trim(), money(c.amount || 0)]),
-      ),
-    );
-    lines.push("");
-    lines.push(`**${labels.total}:** ${money(savingsTotal)}`);
-    lines.push("");
-  }
-
-  const rules = monthData.distributionRules || [];
-  if (rules.length > 0) {
-    lines.push(`### 📜 ${labels.rules}`);
-    lines.push("");
-    for (const r of rules) {
-      lines.push(`- ${r}`);
-    }
-    lines.push("");
-  }
 
   // ── AI tips ──
   const insights = (input.insights || "").trim();

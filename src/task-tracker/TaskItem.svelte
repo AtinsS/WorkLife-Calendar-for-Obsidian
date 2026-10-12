@@ -2,7 +2,7 @@
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import type { App } from "obsidian";
   import type { ITask, TaskStatus } from "./types";
-  import { updateTask, updateTaskStatus, removeTask, resetTaskTimer, projects, activeTab, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem } from "./stores";
+  import { updateTask, updateTaskStatus, removeTask, resetTaskTimer, projects, activeTab, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem, updateChecklistItem } from "./stores";
   import { get } from "svelte/store";
   import { getActiveTimer, formatDuration, formatEstimate } from "./TimerManager";
   import { TaskModal } from "./TaskModal";
@@ -54,6 +54,21 @@
     newChecklistTitle = "";
   }
   function handleRemoveChecklistItem(id: string) { removeChecklistItem(id); }
+  function handleChecklistTitleChange(id: string, value: string) {
+    const title = value.trim();
+    if (!title) return;
+    updateChecklistItem(id, { title });
+  }
+  function onChecklistKeydown(e: Event) {
+    const ke = e as KeyboardEvent;
+    if (ke.key !== "Enter") return;
+    ke.preventDefault();
+    (ke.currentTarget as HTMLInputElement | null)?.blur();
+  }
+  function onChecklistTitleInput(e: Event, id: string) {
+    const el = e.currentTarget as HTMLInputElement | null;
+    if (el) handleChecklistTitleChange(id, el.value);
+  }
 
   function openNote(e: MouseEvent) {
     e.preventDefault();
@@ -432,7 +447,15 @@
       {#each taskChecklistItems as item (item.id)}
         <div class="checklist-item" class:checked={item.checked}>
           <input type="checkbox" checked={item.checked} on:change={() => handleToggleChecklist(item.id)} on:click|stopPropagation />
-          <span class="checklist-title">{item.title}</span>
+          <input
+            type="text"
+            class="checklist-title checklist-title-input"
+            class:strike={item.checked}
+            value={item.title}
+            on:click|stopPropagation
+            on:keydown|stopPropagation={onChecklistKeydown}
+            on:change={(e) => onChecklistTitleInput(e, item.id)}
+          />
           <button class="checklist-remove" on:click|stopPropagation={() => handleRemoveChecklistItem(item.id)} title={$t("common.delete")}>✕</button>
         </div>
       {/each}

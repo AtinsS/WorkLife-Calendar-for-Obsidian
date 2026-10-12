@@ -64,7 +64,7 @@ Via Community Plugins (Recommended)
 ## 🧭 Quick start
 
 1. **Tasks** — open *Tasks* or click "Quick add task" and write it as is: *"submit report on Friday @Work !urgent"*.
-2. **Finance** — open the *Finance* section: **Income / Expenses / Budget** tabs. Add your first expense on the "Expenses" tab.
+2. **Finance** — open the *Finance* section: **Budget / Piggy bank / Income / Expenses** tabs. Add your first expense on the "Expenses" tab.
 3. **Summary** — at the end of the month, click "📄 Summary to MD" — get a ready-made note with the results.
 
 > [!TIP]
@@ -102,18 +102,21 @@ If the plugin saves you time and helps in your work, you can support the develop
 
 # 💰 Finance
 
-A single **Finance** block with three tabs — everything about money in one place:
+A single **Finance** block with four tabs — plan and fact are kept separate:
 
 | Tab | What's inside |
 | :--- | :--- |
+| **Budget** | Monthly plan (approximate figures only): planned income, how to allocate, "where to set aside", rules. **Does not affect** actuals |
+| **Piggy bank** | Savings goals; deposits are actual outflows |
 | **Income** | Earnings from tasks (hours × rate or daily rate), additional income sources, categories |
-| **Expenses** | Actual spending, expense categories, parsing a text list of expenses (manually or via AI) |
-| **Budget** | Monthly plan: main account, savings goals, "where to set aside", distribution rules |
+| **Expenses** | Actual spending, expense categories, parsing a text list of expenses (manually or via AI), goal deposits |
 
 **What else it can do:**
 
 - **Automatic income calculation** — time from the timer × your hourly or daily rate.
-- **Monthly summary** — the "📄 Summary to MD" button creates a beautiful note: results, expenses by category with shares, goal progress, rules. Where to save it — configurable.
+- **Monthly summary** — dropdown **Markdown / Excel** + the "Summary" button:
+  - **Markdown** — a note with totals, expenses by category, goal deposits;
+  - **Excel (.xls)** — 7 sheets: overview, income, expenses, by category, by day, piggy bank, budget plan; with AI tips on — a "Tips" sheet.
 - **Currency** — the symbol is chosen in settings: ₽, $, €, £, ₸, ₴, ₺, ¥, ₮, ₾, ₿, or your own text.
 - **Analytics dashboard** — charts for projects, income, and habits.
 
@@ -129,8 +132,8 @@ Runs entirely on your computer — no data leaves it.
 - **Tasks** — extract tasks from a note (right-click on `.md`), break a task into subtasks, generate a description, smart input ("Create several tasks named 'Call', repeat every Thursday, project 'Work'").
 - **Notes** — summarize a folder or selected notes.
 - **Schedule** — summary for a period and workload assessment.
-- **Finance** — parse expenses from text, budget forecast, distribution rules, tips in the MD summary.
-- **Training plan** — generation of a training plan based on the data provided in the questionnaire
+- **Finance** — parse expenses from text, budget forecast, distribution rules, tips in MD/Excel summary.
+- **Training plan** — generation of a training plan based on the data provided in the questionnaire; bodyweight-only when no equipment; static holds always use hold time.
 
 ### Summary styles
 

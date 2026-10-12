@@ -1,6 +1,6 @@
 import { writable } from "svelte/store";
 
-export type FinanceTab = "income" | "expenses" | "budget";
+export type FinanceTab = "budget" | "savings" | "income" | "expenses";
 
 /** Set by external views to open the finance block on a specific tab. */
 export const financeTabRequest = writable<FinanceTab | null>(null);

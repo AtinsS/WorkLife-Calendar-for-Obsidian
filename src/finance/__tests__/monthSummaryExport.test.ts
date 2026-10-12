@@ -90,4 +90,15 @@ describe("isFinanceInsightsEnabled", () => {
     settings.set(s as never);
     expect(isFinanceInsightsEnabled()).toBe(true);
   });
+
+  it("is off on mobile even when ollama is on (AI is desktop-only)", () => {
+    const original = window.innerWidth;
+    try {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: 400 });
+      settings.set({ ...defaultSettings, ollamaEnabled: true, aiFinanceInsightsEnabled: true });
+      expect(isFinanceInsightsEnabled()).toBe(false);
+    } finally {
+      Object.defineProperty(window, "innerWidth", { configurable: true, value: original });
+    }
+  });
 });

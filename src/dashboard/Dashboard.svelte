@@ -22,7 +22,6 @@
   import { getDateUID } from "obsidian-daily-notes-interface";
   import { getCurrentMonthKey, financeData, ensureGoalsRollover, getArchivedGoals, deleteArchivedGoal, updateMonthData } from "../finance/storage";
   import { generateGoalId, isGoalComplete, resolveGoalAdjustment, type GoalAdjustMode, type MonthGoal } from "../finance/types";
-  import { resolveStoredIncome } from "../finance/income";
   import { settings } from "../ui/stores";
   import { t } from "../i18n";
 
@@ -52,7 +51,6 @@
   // Widget settings
   $: showTasksWidget = $settings.dashboardShowTasks !== false;
   $: showHabitsWidget = $settings.dashboardShowHabits !== false && $settings.habitTrackerMode !== "hidden";
-  $: showGoalsWidget = $settings.dashboardShowGoals !== false;
 
   // Widget expand state
   let tasksExpanded = false;
@@ -147,6 +145,8 @@
     return allData[monthKey];
   })();
   $: monthGoals = monthData?.monthGoals || [];
+  // Hide the savings-goals widget entirely when there are no goals (user rule)
+  $: showGoalsWidget = $settings.dashboardShowGoals !== false && monthGoals.length > 0;
   $: goalsTotalTarget = monthGoals.reduce((s, g) => s + (g.targetAmount || 0), 0);
   $: goalsTotalCurrent = monthGoals.reduce((s, g) => s + (g.currentAmount || 0), 0);
   $: goalsProgress = goalsTotalTarget > 0 ? Math.min(100, Math.round((goalsTotalCurrent / goalsTotalTarget) * 100)) : 0;
@@ -203,7 +203,7 @@
   let goalAdjustMode: GoalAdjustMode = "amount";
   let goalAdjustInput = "";
 
-  // Remainder available for % deposits: income − main expenses − this month's goal deposits
+  // Remainder available for % deposits: planned income − main plan − this month's goal deposits
   $: goalAdjustBalance = (() => {
     const d = monthData;
     if (!d) return 0;
@@ -212,9 +212,7 @@
       const brought = g.broughtForward ?? 0;
       return s + Math.max(0, (g.currentAmount || 0) - brought);
     }, 0);
-    const key = getCurrentMonthKey();
-    const [y, m] = key.split("-").map(Number);
-    return resolveStoredIncome(d, y, m).total - main - contributed;
+    return Math.max(0, d.monthlyIncome ?? 0) - main - contributed;
   })();
 
   function openEditGoal(goal: MonthGoal) {
@@ -430,22 +428,33 @@
                 class="dash-task"
                 class:done={task.status === "done"}
                 class:progress={task.status === "progress"}
+                class:paused={task.status === "paused"}
+                class:failed={task.status === "failed"}
                 data-status={task.status}
                 role="button"
                 tabindex="0"
                 on:click={() => cycleTaskStatus(task)}
                 on:keydown={(e) => e.key === "Enter" && cycleTaskStatus(task)}
               >
-                <button class="dash-task-check" class:checked={task.status === "done"} class:in-progress={task.status === "progress"} on:click|stopPropagation={() => cycleTaskStatus(task)} aria-label={$t("tasks.item.markDone")}>
+                <button class="dash-task-check" class:checked={task.status === "done"} class:in-progress={task.status === "progress"} class:is-paused={task.status === "paused"} on:click|stopPropagation={() => cycleTaskStatus(task)} aria-label={$t("tasks.item.markDone")}>
                   {#if task.status === "done"}
                     <svg class="dash-check-svg" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6l3 3 5-5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   {:else if task.status === "progress"}
                     <span class="dash-check-icon">◐</span>
+                  {:else if task.status === "paused"}
+                    <span class="dash-check-icon">⏸</span>
                   {/if}
                 </button>
                 <div class="dash-task-main">
-                  <span class="dash-task-title" class:strike={task.status === "done"}>{task.title}</span>
+                  <span class="dash-task-title" class:strike={task.status === "done" || task.status === "failed"}>{task.title}</span>
                   <div class="dash-task-meta">
+                    <span class="dash-task-status" data-status={task.status}>
+                      {#if task.status === "progress"}{$t("schedule.statusInProgress")}
+                      {:else if task.status === "paused"}{$t("schedule.statusPaused")}
+                      {:else if task.status === "done"}{$t("schedule.statusDone")}
+                      {:else if task.status === "failed"}{$t("schedule.statusFailed")}
+                      {:else}{$t("schedule.statusTodo")}{/if}
+                    </span>
                     {#if task.scheduledTime}<span class="dash-task-time">🕐 {task.scheduledTime}</span>{/if}
                     {#if project}<span class="dash-task-project" style="--pc:{project.color}"><span class="dash-task-project-dot"></span>{project.icon || "📁"} {project.name}</span>{/if}
                   </div>
@@ -970,6 +979,15 @@
     border-left: 2px solid color-mix(in srgb, var(--interactive-accent, #7c5cfc) 70%, transparent);
     padding-left: 8px;
   }
+  .dash-task.paused {
+    border-left: 2px solid color-mix(in srgb, var(--text-muted, #8a9199) 70%, transparent);
+    padding-left: 8px;
+  }
+  .dash-task.failed {
+    border-left: 2px solid color-mix(in srgb, var(--text-faint, #6b7280) 50%, transparent);
+    padding-left: 8px;
+    opacity: 0.75;
+  }
 
   .dash-task-check {
     box-sizing: border-box;
@@ -1007,6 +1025,11 @@
     color: var(--interactive-accent, #7c5cfc);
     background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 12%, transparent);
   }
+  .dash-task-check.is-paused {
+    border-color: color-mix(in srgb, var(--text-muted, #8a9199) 70%, transparent);
+    color: var(--text-muted, #8a9199);
+    background: color-mix(in srgb, var(--text-muted, #8a9199) 12%, transparent);
+  }
 
   .dash-task-main {
     flex: 1; min-width: 0;
@@ -1020,6 +1043,37 @@
   .dash-task-meta {
     display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
     min-width: 0;
+  }
+  .dash-task-status {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 1px 6px;
+    border-radius: 999px;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-muted);
+  }
+  .dash-task-status[data-status="todo"] {
+    background: color-mix(in srgb, var(--text-muted, #8a9199) 16%, transparent);
+    color: var(--text-muted);
+  }
+  .dash-task-status[data-status="progress"] {
+    background: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 18%, transparent);
+    color: var(--interactive-accent, #7c5cfc);
+  }
+  .dash-task-status[data-status="paused"] {
+    background: color-mix(in srgb, var(--text-muted, #8a9199) 18%, transparent);
+    color: var(--text-muted);
+  }
+  .dash-task-status[data-status="done"] {
+    background: color-mix(in srgb, var(--color-green, #3dd68c) 18%, transparent);
+    color: var(--color-green, #3dd68c);
+  }
+  .dash-task-status[data-status="failed"] {
+    background: color-mix(in srgb, var(--text-faint, #6b7280) 18%, transparent);
+    color: var(--text-faint);
   }
   .dash-task-time {
     font-size: 10px; font-weight: 600; color: var(--text-muted);

@@ -2,6 +2,8 @@ import {
   parseWorkoutPlan,
   parseWorkoutExercise,
   parseWorkoutDay,
+  normalizeStaticExercise,
+  sanitizeBodyweightExercise,
 } from "../workoutAI";
 import {
   firstDateOnOrAfter,
@@ -29,6 +31,30 @@ describe("parseWorkoutExercise", () => {
   it("rejects empty title", () => {
     expect(parseWorkoutExercise({ sets: 3 })).toBeNull();
     expect(parseWorkoutExercise(null)).toBeNull();
+  });
+
+  it("forces static holds onto hold time, not rep counts", () => {
+    const e = parseWorkoutExercise({ title: "Планка", sets: 3, reps: "8-12" });
+    expect(e?.reps).toBe("30-45s");
+    expect(e?.sets).toBe(3);
+  });
+
+  it("keeps hold duration on static exercises", () => {
+    const e = parseWorkoutExercise({ title: "Side plank", sets: 2, reps: "40s" });
+    expect(e?.reps).toBe("40s");
+    expect(e?.sets).toBe(2);
+  });
+
+  it("repairs missing set count on isometrics", () => {
+    const e = parseWorkoutExercise({ title: "Wall sit", reps: "12" });
+    expect(e?.sets).toBe(3);
+    expect(e?.reps).toBe("30-45s");
+  });
+
+  it("clamps absurd set counts on isometrics", () => {
+    const e = parseWorkoutExercise({ title: "Plank", sets: 12, reps: "45s" });
+    expect(e?.sets).toBe(3);
+    expect(e?.reps).toBe("45s");
   });
 });
 
@@ -121,6 +147,48 @@ describe("parseWorkoutPlan", () => {
     expect(plan.days).toHaveLength(1);
     expect(plan.days[0].title).toBe("A1");
   });
+
+  it("strips equipment wording when bodyweightOnly", () => {
+    const raw = JSON.stringify({
+      title: "BW",
+      days: [
+        {
+          key: "A",
+          title: "A",
+          dayOfWeek: 1,
+          exercises: [
+            { title: "Goblet squat", sets: 3, reps: "10" },
+            { title: "Barbell squat", sets: 3, reps: "8" },
+            { title: "Plank", sets: 3, reps: "8-12" },
+          ],
+        },
+      ],
+    });
+    const plan = parseWorkoutPlan(raw, "home", 4, [1], "en", { bodyweightOnly: true });
+    const titles = plan.days[0].exercises.map((e) => e.title);
+    expect(titles[0]).toBe("squat");
+    expect(titles[1]).toBe("squat");
+    expect(plan.days[0].exercises[2].reps).toBe("30-45s");
+  });
+});
+
+describe("normalizeStaticExercise", () => {
+  it("rewrites rep counts on isometrics", () => {
+    const e = normalizeStaticExercise({ title: "Hollow hold", sets: 3, reps: "10" });
+    expect(e.reps).toBe("30-45s");
+  });
+
+  it("leaves dynamic exercises alone", () => {
+    const e = normalizeStaticExercise({ title: "Squat", sets: 3, reps: "8-12" });
+    expect(e.reps).toBe("8-12");
+  });
+});
+
+describe("sanitizeBodyweightExercise", () => {
+  it("removes equipment words from the title", () => {
+    expect(sanitizeBodyweightExercise({ title: "Dumbbell lunge" }).title).toBe("lunge");
+    expect(sanitizeBodyweightExercise({ title: "со штангой тяга" }).title).toBe("тяга");
+  });
 });
 
 describe("planBuilder helpers", () => {
@@ -153,11 +221,26 @@ describe("formatExercise / profile defaults", () => {
 
   it("uses localized seconds unit", () => {
     expect(formatExercise({ title: "Jump squat", sets: 4, reps: "45s", rest: "15s" }, "ru")).toBe(
-      "Jump squat \u2014 4\u00D745\u0441 \u2014 15\u0441",
+      "Jump squat \u2014 4\u00D745\u0441 \u2014 \u043e\u0442\u0434\u044b\u0445 15\u0441",
     );
     expect(formatExercise({ title: "Jump squat", sets: 4, reps: "45s", rest: "15s" }, "en")).toBe(
-      "Jump squat \u2014 4\u00D745s \u2014 15s",
+      "Jump squat \u2014 4\u00D745s \u2014 rest 15s",
     );
+  });
+
+  it("formats static holds as duration × holds, not sets×reps", () => {
+    expect(
+      formatExercise(
+        { title: "Супермен удержание", sets: 3, reps: "30-45\u0441", rest: "30\u0441" },
+        "ru",
+      ),
+    ).toBe("Супермен \u2014 30-45\u0441 \u00D7 3 \u2014 отдых 30\u0441");
+  });
+
+  it("strips redundant hold wording from the title", () => {
+    expect(
+      formatExercise({ title: "Plank hold", sets: 3, reps: "45s" }, "en"),
+    ).toBe("Plank \u2014 45s \u00D7 3");
   });
 
   it("default profile is valid", () => {

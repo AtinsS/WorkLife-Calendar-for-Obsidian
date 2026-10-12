@@ -2,7 +2,6 @@ import { writable, get } from "svelte/store";
 import type CalendarPlugin from "../main";
 import type { IFinanceData, FinanceMonthData, MonthGoal } from "./types";
 import { createEmptyMonthData, generateGoalId, getGoalMonthContribution, isGoalComplete } from "./types";
-import { resolveStoredIncome } from "./income";
 import { loadModuleData, saveModuleData } from "../io/vaultStorage";
 
 export const financeData = writable<IFinanceData>({});
@@ -165,10 +164,12 @@ export function getSavingsTotal(monthKey: string): number {
 
 export function getCurrentBalance(monthKey: string): number {
   const data = getMonthData(monthKey);
+  // Budget-tab remainder (allocation base): planned income − budget plan − this month's goal deposits.
+  // Intentionally plan-based — % deposits of savings use the free money after the plan.
+  // Fact-based remainder lives in monthSummary / analyticsFinance.
   const mainTotal = data.mainAccountCategories.reduce((sum, c) => sum + c.amount, 0);
-  const [year, month] = monthKey.split("-").map(Number);
-  const income = resolveStoredIncome(data, year, month).total;
-  return income - mainTotal - getMonthGoalContributions(monthKey);
+  const plannedIncome = Math.max(0, data.monthlyIncome ?? 0);
+  return plannedIncome - mainTotal - getMonthGoalContributions(monthKey);
 }
 
 /** Sum of goal deposits made THIS month (excludes money carried over from previous months). */

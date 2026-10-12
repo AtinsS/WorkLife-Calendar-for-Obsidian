@@ -81,15 +81,50 @@ function normalizeTimeUnit(value: string, lang: "ru" | "en"): string {
   return value.replace(/(\d)\s*s\b/i, "$1\u0441").replace(/(\d)\s*с\b/i, "$1\u0441");
 }
 
+/** Isometric / hold-style movements — format as duration, never as rep counts. */
+export const STATIC_TITLE_RE =
+  /планк|plank|wall\s*sit|у\s*стены|сидя\s*у\s*стены|hollow|vacuum|вакуум|l[\s-]?sit|вис|dead\s*hang|изометр|isometr|static\s*hold|удержан|hold\s*bridge|супермен|superman|glute\s*bridge\s*hold|мостик.*удерж|side\s*plank|боковая\s*планк|лодочк/i;
+
+export function isStaticTitle(title: string): boolean {
+  return STATIC_TITLE_RE.test(title);
+}
+
+/** "30-45s" / "45с" — a hold duration, not a rep count. */
+export function isHoldReps(reps: string): boolean {
+  return /[сs]\b|sec|сек/i.test(reps);
+}
+
+/** Drop redundant «удержание» / «hold» from the title (the format already shows time). */
+export function stripHoldSuffix(title: string): string {
+  return title
+    .replace(/\s*[—–-]?\s*(удержание|удержи|hold|isometric\s*hold)\s*$/i, "")
+    .trim();
+}
+
 export function formatExercise(e: WorkoutExercise, lang: "ru" | "en" = "en"): string {
-  const parts: string[] = [e.title.trim()];
+  const title = stripHoldSuffix(e.title).trim();
+  const parts: string[] = [title || e.title.trim()];
   const reps = e.reps ? normalizeTimeUnit(e.reps, lang) : undefined;
   const rest = e.rest ? normalizeTimeUnit(e.rest, lang) : undefined;
-  if (e.sets != null && reps) parts.push(`${e.sets}\u00D7${reps}`);
-  else if (e.sets != null) parts.push(String(e.sets));
-  else if (reps) parts.push(reps);
-  if (rest) parts.push(rest);
-  // Coaching tips are intentionally omitted from the compact line.
+  const isStatic = isStaticTitle(e.title);
+
+  if (isStatic && reps) {
+    // «30-45с × 3» — duration first so it never reads as 3 reps of 45 seconds.
+    if (e.sets != null) parts.push(`${reps} \u00D7 ${e.sets}`);
+    else parts.push(reps);
+  } else if (e.sets != null && reps) {
+    parts.push(`${e.sets}\u00D7${reps}`);
+  } else if (e.sets != null) {
+    parts.push(String(e.sets));
+  } else if (reps) {
+    parts.push(reps);
+  }
+
+  // Label rest so «30-45с — 30с» is never two bare times.
+  if (rest) {
+    const restLabel = lang === "ru" ? "отдых" : "rest";
+    parts.push(`${restLabel} ${rest}`);
+  }
   return parts.join(" \u2014 ");
 }
 
@@ -102,10 +137,24 @@ export function parseExerciseLine(line: string): WorkoutExercise {
   const title = parts.shift() || line.trim();
   const out: WorkoutExercise = { title };
   for (const p of parts) {
+    // «отдых 30с» / «rest 30s»
+    const restM = /^(?:отдых|rest|pause)\s+(.+)$/i.exec(p);
+    if (restM) {
+      out.rest = restM[1].trim();
+      continue;
+    }
+    // Dynamic: «3×10»
     const m = /^(\d+)\s*[x\u00D7*]\s*(.+)$/i.exec(p);
     if (m) {
       out.sets = parseInt(m[1], 10);
       out.reps = m[2];
+      continue;
+    }
+    // Static: «30-45с × 3» (duration first)
+    const holdM = /^(\d[\d\s\u2013\u2014\-.]*(?:\s*[сs]|sec|сек)[^×x\u00D7*]*)\s*[×x\u00D7*]\s*(\d+)$/i.exec(p);
+    if (holdM) {
+      out.reps = holdM[1].trim();
+      out.sets = parseInt(holdM[2], 10);
       continue;
     }
     if (/^\d+$/.test(p) && out.sets == null) {

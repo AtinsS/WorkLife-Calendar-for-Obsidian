@@ -114,12 +114,11 @@ export function createWorkoutPlanTasks(input: CreateWorkoutPlanInput): CreateWor
     const first = firstDateOnOrAfter(startDate, day.dayOfWeek);
     const dateUID = getDateUID(momentFn(toDateKey(first), "YYYY-MM-DD"), "day");
     const titles = exerciseTitles(day, input.lang || "en");
-    const description = titles.map((t) => `- ${t}`).join("\n");
+    // Exercises go to the checklist (subtasks) only — not into description.
     const estimated = day.estimatedMinutes || input.estimatedMinutes || plan.days[0]?.estimatedMinutes;
 
     const parent = addTask({
       title: `${plan.title}: ${day.title}`,
-      description: description || undefined,
       completed: false,
       status: "todo",
       dateUID,

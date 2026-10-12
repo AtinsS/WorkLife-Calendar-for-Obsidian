@@ -22,6 +22,7 @@ import {
   VIEW_TYPE_WEATHER_DETAIL,
 } from "./constants";
 import { settings } from "./ui/stores";
+import { installKeyboardOpenWatcher } from "./ui/keyboardViewport";
 import { app as appStore } from "./stores/appStore";
 import {
   CalendarSettingsTab,
@@ -49,7 +50,6 @@ import { initFinanceStores, reloadFinanceStores, immediateFinanceSave } from "./
 import { initFinancialAnalyticsStores, reloadFinancialAnalyticsStores, immediateAnalyticsSave } from "./finance/financialAnalyticsStorage";
 import { initWeightStores, reloadWeightStores, immediateWeightSave } from "./weight/stores";
 import { initLocale, locale, tRaw, currencyOverride } from "./i18n";
-import CalendarNav from "./components/CalendarNav.svelte";
 import DateTimeWeather from "./components/DateTimeWeather.svelte";
 import Dashboard from "./dashboard/Dashboard.svelte";
 import HelloView from "./components/HelloView.svelte";
@@ -208,6 +208,9 @@ export default class CalendarPlugin extends Plugin {
     // Initialize locale from settings
     initLocale(this.options?.language || "system");
     currencyOverride.set(this.options?.financeCurrency || null);
+
+    // Soft-keyboard open state → html.wl-keyboard-open (drops modal scrims on mobile)
+    this.register(installKeyboardOpenWatcher());
 
     // Set moment locale based on i18n locale
     const currentLocale = get(locale) || "ru";
@@ -397,69 +400,6 @@ export default class CalendarPlugin extends Plugin {
       this.registerRibbonIcons();
     }
 
-    // Register calendar-nav code block processor
-    safeRegisterMarkdownCodeBlockProcessor("calendar-nav", (source, el) => {
-      const lines = source.split("\n").filter((l) => l.trim());
-      const items = lines.map((line) => {
-        const [key, ...rest] = line.split(":");
-        return {
-          key: key.trim(),
-          label: rest.length > 0 ? rest.join(":").trim() : key.trim(),
-        };
-      });
-      if (items.length === 0) return;
-
-      // Defaults from plugin settings
-      const opts = this.options;
-      let btnColor = opts.navBtnColor || "";
-      let btnBg = opts.navBtnBg || "";
-      let btnRadius = opts.navBtnRadius || "";
-      let btnSize = opts.navBtnSize || "";
-      let accentColor = opts.navAccentColor || "";
-
-      // Override with inline % style line
-      const styleLine = lines[0]?.trim();
-      if (styleLine?.startsWith("%")) {
-        const styleParts = styleLine.slice(1).split(";");
-        for (const part of styleParts) {
-          const [k, v] = part.split(":").map((s) => s.trim());
-          if (k === "color") btnColor = v;
-          if (k === "bg") btnBg = v;
-          if (k === "radius") btnRadius = v;
-          if (k === "size") btnSize = v;
-          if (k === "accent") accentColor = v;
-        }
-        items.shift();
-      }
-
-      new CalendarNav({
-        target: el,
-        props: {
-          items,
-          btnColor,
-          btnBg,
-          btnRadius,
-          btnSize,
-          accentColor,
-          onNavigate: (viewKey: string) => {
-            const viewMap: Record<string, () => Promise<void> | void> = {
-              schedule: () => this.activateScheduleView(),
-              tasks: () => this.activateTaskView(),
-              finance: () => this.activateFinanceView(),
-              analytics: () => this.activateHabitAnalyticsView(),
-            };
-            const action = viewMap[viewKey];
-            if (action) void action();
-          },
-        },
-      });
-    });
-
-    // Register datetime-weather code block processor
-    safeRegisterMarkdownCodeBlockProcessor("datetime-weather", (_source, el) => {
-      new DateTimeWeather({ target: el });
-    });
-
     // Register dashboard code block processor
     safeRegisterMarkdownCodeBlockProcessor("dashboard", (_source, el) => {
       const activeFile = this.app.workspace.getActiveFile();
@@ -487,15 +427,6 @@ export default class CalendarPlugin extends Plugin {
     // Right-click menu: insert blocks
     this.registerEvent(
       this.app.workspace.on("editor-menu", (menu, editor) => {
-        menu.addItem((item) => {
-          item.setTitle(tRaw("main.contextMenu.insertDateTimeWeather"))
-            .setIcon("calendar-range")
-            .onClick(() => {
-              const cursor = editor.getCursor();
-              editor.replaceRange("```datetime-weather\n```", cursor);
-              editor.setCursor({ line: cursor.line + 1, ch: 0 });
-            });
-        });
         menu.addItem((item) => {
           item.setTitle(tRaw("main.contextMenu.insertDashboard"))
             .setIcon("layout-grid")

@@ -37,6 +37,7 @@ const labels: MonthSummaryLabels = {
   insights: "Советы",
   share: "Доля",
   generated: "Сгенерировано плагином WorkLife Calendar",
+  goalDeposits: "Взносы в копилку",
 };
 
 function money(n: number): string {
@@ -105,15 +106,12 @@ describe("buildMonthSummaryMarkdown", () => {
     expect(md).toContain("| 2026-07-10 | Метро | Транспорт | 200 ₽ |");
   });
 
-  it("renders budget sections with progress bars for goals", () => {
+  it("does not render budget plan in the summary", () => {
     const monthData: FinanceMonthData = {
       ...createEmptyMonthData(),
       mainAccountCategories: [
         { id: "c1", name: "Аренда", icon: "🏠", amount: 30000, order: 0 },
         { id: "c2", name: "Продукты", icon: "🛒", amount: 15000, order: 1 },
-      ],
-      monthGoals: [
-        { id: "g1", icon: "🎯", name: "Отпуск", currentAmount: 25000, targetAmount: 80000, broughtForward: 0 },
       ],
       savingsCategories: [
         { id: "s1", name: "Подушка", icon: "🛡️", amount: 10000, percent: 20, order: 0, completed: false },
@@ -122,33 +120,29 @@ describe("buildMonthSummaryMarkdown", () => {
     };
     const md = buildMonthSummaryMarkdown(baseInput({ monthData }));
 
-    expect(md).toContain("## 🎯 Бюджет");
-    expect(md).toContain("### 💳 Основной счёт");
-    expect(md).toContain("| 🏠 Аренда | 30000 ₽ | 67% |");
-    expect(md).toContain("**Итого:** 45000 ₽");
-    expect(md).toContain("### 🏆 Цели");
-    expect(md).toContain("🎯 Отпуск");
-    expect(md).toContain("███░░░░░░░");
-    expect(md).toContain("31%");
-    expect(md).toContain("### 🛟 Куда отложить");
-    expect(md).toContain("🛡️ Подушка");
-    expect(md).toContain("### 📜 Правила");
-    expect(md).toContain("- 50% обязательные");
-    expect(md).toContain("- 30% накопления");
+    expect(md).not.toContain("## 🎯 Бюджет");
+    expect(md).not.toContain("Основной счёт");
+    expect(md).not.toContain("Аренда");
+    expect(md).not.toContain("Куда отложить");
+    expect(md).not.toContain("Правила распределения");
+    expect(md).not.toContain("50% обязательные");
   });
 
-  it("marks completed goals with a checkmark", () => {
+  it("shows goal deposits under expenses as fact outflows", () => {
     const monthData: FinanceMonthData = {
       ...createEmptyMonthData(),
       monthGoals: [
-        { id: "g1", icon: "🎯", name: "Ноутбук", currentAmount: 100000, targetAmount: 100000, broughtForward: 0 },
+        { id: "g1", icon: "🎯", name: "Отпуск", currentAmount: 25000, targetAmount: 80000, broughtForward: 0 },
       ],
     };
     const md = buildMonthSummaryMarkdown(baseInput({ monthData }));
-    expect(md).toContain("✅ 🎯 Ноутбук");
+
+    expect(md).toContain("### 🏆 Взносы в копилку");
+    expect(md).toContain("| 🎯 Отпуск | 25000 ₽ |");
+    expect(md).toContain("🏆 **Цели:** 25000 ₽");
   });
 
-  it("computes balance as income minus main expenses minus goal deposits", () => {
+  it("computes balance as income minus expense log minus goal deposits", () => {
     const monthData: FinanceMonthData = {
       ...createEmptyMonthData(),
       mainAccountCategories: [
@@ -159,8 +153,36 @@ describe("buildMonthSummaryMarkdown", () => {
       ],
     };
     const md = buildMonthSummaryMarkdown(baseInput({ monthData }));
-    // 15000 - 8000 - 2000 = 5000
-    expect(md).toContain("💎 **Остаток:** 5000 ₽");
+    // Plan is ignored: 15000 - 0 (no expense log) - 2000 = 13000
+    expect(md).toContain("💎 **Остаток:** 13000 ₽");
+  });
+
+  it("uses expense log for balance and ignores the budget plan", () => {
+    const monthData: FinanceMonthData = {
+      ...createEmptyMonthData(),
+      mainAccountCategories: [
+        { id: "c1", name: "Аренда", icon: "🏠", amount: 37300, order: 0 },
+      ],
+      expenses: [
+        { id: "e1", name: "Еда", icon: "🥕", amount: 29877, categoryName: "Еда", date: "2026-10-03", createdAt: "" },
+      ],
+      monthGoals: [
+        { id: "g1", icon: "🛫", name: "Переезд", currentAmount: 25000, targetAmount: 500000, broughtForward: 0 },
+      ],
+    };
+    const md = buildMonthSummaryMarkdown(
+      baseInput({
+        monthData,
+        income: { mode: "fact", fromTasks: 0, fromManualSources: 60000, total: 60000 },
+      }),
+    );
+    // Card shows actual spend 29877, not plan 37300
+    expect(md).toContain("📥 **Поступления:** 60000 ₽");
+    expect(md).toContain("📤 **Расходы:** 29877 ₽");
+    expect(md).toContain("🏆 **Цели:** 25000 ₽");
+    // 60000 − 29877 − 25000 = 5123
+    expect(md).toContain("💎 **Остаток:** 5123 ₽");
+    expect(md).not.toContain("⚠️ **Остаток:** -2300 ₽");
   });
 
   it("renders manual mode label", () => {

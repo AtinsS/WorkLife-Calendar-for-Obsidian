@@ -2603,6 +2603,17 @@ body > .task-actions-menu {
   z-index: 15;
 }
 
+/* Soft keyboard open: drop the dark scrim so it does not paint under the keyboard */
+html.wl-keyboard-open .wf-dialog-overlay,
+html.wl-keyboard-open .dash-popup-overlay,
+html.wl-keyboard-open .goals-modal-overlay,
+html.wl-keyboard-open .time-logs-overlay,
+html.wl-keyboard-open .holiday-list-overlay {
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 /* Note: do NOT set z-index on bare .modal вЂ” it conflicts with Obsidian's own modal styles */
 
 .wf-dialog-container {
@@ -3203,7 +3214,7 @@ h2.tm-title.tm-title {
   }
 }
 
-.time-logs-modal {
+.time-logs-popup {
   background: var(--mcp-glass-bg);
   backdrop-filter: var(--mcp-blur);
   -webkit-backdrop-filter: var(--mcp-blur);
@@ -4931,6 +4942,52 @@ h2.tm-title.tm-title {
   font-size: 14px;
 }
 
+.checklist-title-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.checklist-title-input:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.checklist-title-input:focus {
+  border-color: color-mix(in srgb, var(--interactive-accent, #7c5cfc) 50%, transparent);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.checklist-title-input.strike {
+  text-decoration: line-through;
+  color: var(--mcp-text-muted);
+  opacity: 0.5;
+}
+
+.habit-color-native {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.habit-color-picker {
+  width: 42px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
 .checklist-remove {
   opacity: 0.5;
   min-width: 32px;
@@ -5425,7 +5482,7 @@ h2.tm-title.tm-title {
 }
 
 /* Time logs modal */
-.time-logs-modal {
+.time-logs-popup {
   max-height: 55vh;
 }
 
@@ -6209,7 +6266,7 @@ h2.tm-title.tm-title {
     margin-bottom: 12px;
   }
 
-  .time-logs-modal {
+  .time-logs-popup {
     width: 98%;
     max-height: 70vh;
   }
@@ -8713,6 +8770,11 @@ h2.tm-title.tm-title {
 /* Multi-line AI how-to text in settings */
 .ai-howto-text {
   white-space: pre-line;
+}
+
+.ai-cloud-models-desc {
+  white-space: pre-line;
+  margin: 6px 0 0;
   line-height: 1.55;
   max-width: 52em;
 }

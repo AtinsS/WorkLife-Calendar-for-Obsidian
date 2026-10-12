@@ -7,7 +7,7 @@ import {
   getMonthGoalContributions,
   getCurrentBalance,
 } from "../storage";
-import { getGoalMonthContribution, isGoalComplete, resolveGoalAdjustment, type MonthGoal } from "../types";
+import { getGoalMonthContribution, isGoalComplete, resolveGoalAdjustment, computeMonthRemainder, resolveSpentForRemainder, sumGoalMonthContributions, type MonthGoal } from "../types";
 
 function goal(partial: Partial<MonthGoal> = {}): MonthGoal {
   return {
@@ -225,5 +225,27 @@ describe("balance uses only this month's goal deposits", () => {
     const data = getMonthData("2026-08");
     expect(data.monthGoals[0].broughtForward).toBe(30000);
     expect(getMonthGoalContributions("2026-08")).toBe(0);
+  });
+});
+
+describe("remainder helpers", () => {
+  it("resolveSpentForRemainder prefers expense log, falls back to plan", () => {
+    expect(resolveSpentForRemainder(29877, 37300)).toBe(29877);
+    expect(resolveSpentForRemainder(0, 37300)).toBe(37300);
+    expect(resolveSpentForRemainder(0, 0)).toBe(0);
+  });
+
+  it("computeMonthRemainder = income − spent − goal deposits", () => {
+    expect(computeMonthRemainder(60000, 29877, 25000)).toBe(5123);
+    expect(computeMonthRemainder(60000, 37300, 25000)).toBe(-2300);
+  });
+
+  it("sumGoalMonthContributions ignores carried-over money", () => {
+    expect(
+      sumGoalMonthContributions([
+        goal({ id: "a", currentAmount: 50000, broughtForward: 45000 }),
+        goal({ id: "b", currentAmount: 10000, broughtForward: 0 }),
+      ]),
+    ).toBe(15000);
   });
 });

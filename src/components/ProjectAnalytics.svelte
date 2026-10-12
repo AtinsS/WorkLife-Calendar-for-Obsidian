@@ -259,4 +259,18 @@
       text-overflow: unset;
     }
   }
+
+  @media (max-width: 480px) {
+    .project-table-header,
+    .project-table-row {
+      grid-template-columns: minmax(0, 1fr) 52px 52px 36px;
+      gap: 3px;
+      font-size: 10px;
+    }
+    .pt-col-time,
+    .pt-col-earnings,
+    .pt-col-share {
+      font-size: 10px;
+    }
+  }
 </style>

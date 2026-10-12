@@ -30,6 +30,7 @@
     fetchWeekWeather,
     type DayWeather,
   } from "../services/weatherService";
+  import { isDesktopAI } from "../services/aiQuickAdd";
   import { app } from "../stores/appStore";
   // holidays —暂时隐藏
   export let plugin: CalendarPlugin;
@@ -673,7 +674,9 @@
   function initCalendar(): void {
     const initialView = isSmallPhone ? "timeGridDay" : "timeGridWeek";
     const aiEnabled =
-      ($settings as { aiScheduleActionsEnabled?: boolean }).aiScheduleActionsEnabled !== false;
+      ($settings as { ollamaEnabled?: boolean }).ollamaEnabled === true &&
+      ($settings as { aiScheduleActionsEnabled?: boolean }).aiScheduleActionsEnabled !== false &&
+      isDesktopAI();
     const headerToolbar = {
       left: "prev,next",
       center: "title",
@@ -1699,7 +1702,10 @@
           ]
         : []),
       { divider: true },
-      ...(!isMobile
+      ...(!isMobile &&
+      ($settings as { ollamaEnabled?: boolean }).ollamaEnabled === true &&
+      ($settings as { aiSubtasksEnabled?: boolean }).aiSubtasksEnabled !== false &&
+      isDesktopAI()
         ? [
             {
               label: tRaw("ai.contextMenuSubtasks"),

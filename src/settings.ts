@@ -118,6 +118,8 @@ export interface ISettings {
 
   // Overdue task carry-over
   carryOverOverdue?: boolean;
+  /** When false, moving a task to «В работе» does not auto-start the work timer. */
+  autoStartTimerOnWork?: boolean;
 
   // Color settings
   bgColor?: string;
@@ -156,13 +158,6 @@ export interface ISettings {
   // Status bar
   showStatusBar: boolean;
   dtwShowOnAllPages: boolean;
-
-  // Nav panel button style
-  navBtnColor?: string;
-  navBtnBg?: string;
-  navBtnRadius?: string;
-  navBtnSize?: string;
-  navAccentColor?: string;
 
   // Ollama AI settings
   ollamaEnabled: boolean;
@@ -267,6 +262,7 @@ export const defaultSettings = Object.freeze({
   glassOpacity: 55,
 
   carryOverOverdue: true,
+  autoStartTimerOnWork: true,
 
   // Color defaults
   bgColor: "#0E0F13",
@@ -300,12 +296,6 @@ export const defaultSettings = Object.freeze({
 
   showStatusBar: true,
   dtwShowOnAllPages: false,
-
-  navBtnColor: "",
-  navBtnBg: "",
-  navBtnRadius: "",
-  navBtnSize: "",
-  navAccentColor: "",
 
   // Ollama AI defaults
   ollamaEnabled: false,
@@ -732,17 +722,11 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addAccentColorSetting(appearance);
     this.addGlassBgColorSetting(appearance);
 
-    // 2. Advanced colors (collapsed behind a toggle)
+    // 2. Advanced colors (full palette)
     new Setting(appearance).setName(tRaw("settings.appearance.sectionAdvanced")).setHeading();
     const advancedDesc = appearance.createDiv({ cls: "setting-item-description" });
     advancedDesc.setText(tRaw("settings.appearance.sectionAdvancedDesc"));
     this.addColorSettings(appearance);
-
-    // 3. Nav panel in notes
-    new Setting(appearance).setName(tRaw("settings.appearance.sectionNav")).setHeading();
-    this.addNavPanelInstructions(appearance);
-    new Setting(appearance).setName(tRaw("settings.appearance.sectionNavStyle")).setHeading();
-    this.addNavBtnStyleSettings(appearance);
 
     // Sync tab
     const sync = tabContainers["sync"];
@@ -1641,6 +1625,16 @@ export class CalendarSettingsTab extends PluginSettingTab {
           await this.plugin.writeOptions({ carryOverOverdue: value });
         });
       });
+
+    new Setting(container)
+      .setName(tRaw("settings.general.autoStartTimerOnWork"))
+      .setDesc(tRaw("settings.general.autoStartTimerOnWorkDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.autoStartTimerOnWork !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ autoStartTimerOnWork: value });
+        });
+      });
   }
 
   /** Лимиты автоочистки — намеренно вне вкладки «Синхронизация». */
@@ -2173,97 +2167,6 @@ export class CalendarSettingsTab extends PluginSettingTab {
     });
   }
 
-  addNavPanelInstructions(container: HTMLElement): void {
-    const frag = createFragment();
-    const wrapper = frag.createDiv({ cls: "mcp-nav-instructions" });
-
-    wrapper.createEl("p", { text: tRaw("settings.appearance.navInstructions1") });
-
-    wrapper.createEl("pre", {
-      text: "```calendar-nav\nschedule:" + tRaw("hello.navSchedule") + "\ntasks:" + tRaw("hello.navTasks") + "\nfinance:" + tRaw("hello.navFinance") + "\nanalytics:" + tRaw("hello.navAnalytics") + "\n```",
-    });
-
-    wrapper.createEl("p", { text: tRaw("settings.appearance.navInstructions2") });
-    wrapper.createEl("p", { text: tRaw("settings.appearance.navInstructions3") });
-
-    wrapper.createEl("pre", {
-      text: "```calendar-nav\n%color:#fff;bg:#333;border-radius:20px;size:14px;accent:#5f99e1\nschedule:" + tRaw("hello.navSchedule") + "\n```",
-    });
-
-    wrapper.createEl("p", { text: tRaw("settings.appearance.navInstructions4") });
-
-    new Setting(container)
-      .setName(tRaw("settings.appearance.navInstructionsTitle"))
-      .setDesc(frag);
-  }
-
-  addNavBtnStyleSettings(container: HTMLElement): void {
-    new Setting(container)
-      .setName(tRaw("settings.appearance.navBtnColor"))
-      .setDesc(tRaw("settings.appearance.navBtnColorDesc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("#ffffff")
-          .setValue(this.plugin.options.navBtnColor || "")
-          .onChange(async (value) => {
-            await this.plugin.writeOptions({ navBtnColor: value });
-          });
-        text.inputEl.addClass("mcp-input-md");
-      });
-
-    new Setting(container)
-      .setName(tRaw("settings.appearance.navBtnBg"))
-      .setDesc(tRaw("settings.appearance.navBtnBgDesc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("#333333")
-          .setValue(this.plugin.options.navBtnBg || "")
-          .onChange(async (value) => {
-            await this.plugin.writeOptions({ navBtnBg: value });
-          });
-        text.inputEl.addClass("mcp-input-md");
-      });
-
-    new Setting(container)
-      .setName(tRaw("settings.appearance.navBtnRadius"))
-      .setDesc(tRaw("settings.appearance.navBtnRadiusDesc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("12px")
-          .setValue(this.plugin.options.navBtnRadius || "")
-          .onChange(async (value) => {
-            await this.plugin.writeOptions({ navBtnRadius: value });
-          });
-        text.inputEl.addClass("mcp-input-md");
-      });
-
-    new Setting(container)
-      .setName(tRaw("settings.appearance.navBtnSize"))
-      .setDesc(tRaw("settings.appearance.navBtnSizeDesc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("13px")
-          .setValue(this.plugin.options.navBtnSize || "")
-          .onChange(async (value) => {
-            await this.plugin.writeOptions({ navBtnSize: value });
-          });
-        text.inputEl.addClass("mcp-input-md");
-      });
-
-    new Setting(container)
-      .setName(tRaw("settings.appearance.navAccentColor"))
-      .setDesc(tRaw("settings.appearance.navAccentColorDesc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("#5f99e1")
-          .setValue(this.plugin.options.navAccentColor || "")
-          .onChange(async (value) => {
-            await this.plugin.writeOptions({ navAccentColor: value });
-          });
-        text.inputEl.addClass("mcp-input-md");
-      });
-  }
-
   addOllamaSettings(container: HTMLElement): void {
     // AI is desktop-only: hide the whole surface on mobile (user rule)
     const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
@@ -2369,24 +2272,28 @@ export class CalendarSettingsTab extends PluginSettingTab {
       });
     }
 
+    // Cloud / remote models help
+    const cloudHelp = container.createDiv({ cls: "setting-item-description ai-howto-text" });
+    cloudHelp.createEl("strong", { text: tRaw("settings.ai.cloudModelsTitle") });
+    const cloudBody = cloudHelp.createEl("p", { cls: "ai-cloud-models-desc" });
+    cloudBody.setText(tRaw("settings.ai.cloudModelsDesc"));
+
     // ── 4. Actions ───────────────────────────────────────────────────────
     new Setting(container).setName(tRaw("settings.ai.sectionActions")).setHeading();
 
+    new Setting(container).setName(tRaw("settings.ai.sectionActionsTasks")).setHeading();
     this.addCompactToggle(container, "aiExtractEnabled", "extractEnabled", "extractEnabledDesc");
     this.addCompactToggle(container, "aiSubtasksEnabled", "subtasksEnabled", "subtasksEnabledDesc");
-    this.addCompactToggle(container, "aiWorkoutEnabled", "workoutEnabled", "workoutEnabledDesc");
     this.addCompactToggle(container, "aiQuickAddEnabled", "quickAddEnabled", "quickAddEnabledDesc", {
       onAfter: () => this.render(),
     });
-
     if (this.plugin.options.aiQuickAddEnabled !== false) {
       this.addCompactToggle(container, "aiConfirmBeforeAdd", "confirmBeforeAdd", "confirmBeforeAddDesc");
       const quickAddHowTo = container.createDiv({ cls: "setting-item-description ai-howto-text" });
       quickAddHowTo.setText(tRaw("settings.ai.quickAddHowTo"));
     }
 
-    this.addCompactToggle(container, "aiScheduleActionsEnabled", "scheduleActionsEnabled", "scheduleActionsEnabledDesc");
-
+    new Setting(container).setName(tRaw("settings.ai.sectionActionsNotes")).setHeading();
     this.addCompactToggle(container, "aiSummaryEnabled", "summaryEnabled", "summaryEnabledDesc", {
       onAfter: () => this.render(),
     });
@@ -2444,8 +2351,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
     }
 
-    // Finance AI tips toggle (privacy warnings live in the Privacy section below)
+    new Setting(container).setName(tRaw("settings.ai.sectionActionsFinance")).setHeading();
     this.addCompactToggle(container, "aiFinanceInsightsEnabled", "financeInsights", "financeInsightsDesc");
+
+    new Setting(container).setName(tRaw("settings.ai.sectionActionsSchedule")).setHeading();
+    this.addCompactToggle(container, "aiWorkoutEnabled", "workoutEnabled", "workoutEnabledDesc");
+    this.addCompactToggle(container, "aiScheduleActionsEnabled", "scheduleActionsEnabled", "scheduleActionsEnabledDesc");
 
     // ── 5. Privacy ───────────────────────────────────────────────────────
     new Setting(container).setName(tRaw("settings.ai.sectionPrivacy")).setHeading();

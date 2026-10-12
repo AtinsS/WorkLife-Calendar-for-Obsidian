@@ -10,7 +10,7 @@ import { loadTaskData, saveTaskData, generateId } from "./storage";
 import { startTimer, resumeTimer, stopTimer, addTimeLog } from "./TimerManager";
 import { settings } from "../ui/stores";
 import { tRaw } from "../i18n";
-import { setHabitProgress } from "../habit-tracker/stores";
+import { habits as habitsStore, setHabitProgress } from "../habit-tracker/stores";
 
 let pluginInstance: CalendarPlugin | null = null;
 let saveTimeout: number | null = null;
@@ -265,9 +265,7 @@ export function updateTask(id: string, changes: Partial<ITask>): void {
       autoCleanupCompleted();
     }
     const after = allTasks.find((t) => t.id === id);
-    if (after && after.kind === "workout" && after.completed && !wasDone) {
-      syncWorkoutStreak(after);
-    }
+    maybeSyncWorkoutStreakOnDone(after, wasDone);
   }
 }
 
@@ -386,9 +384,7 @@ function stopTaskTimerAndLog(id: string, status: TaskStatus): void {
     );
   }
   const after = get(tasks).find((t) => t.id === id);
-  if (after && after.kind === "workout" && after.completed && !wasDone) {
-    syncWorkoutStreak(after);
-  }
+  maybeSyncWorkoutStreakOnDone(after, wasDone);
 }
 
 function pauseTaskTimer(id: string): void {
@@ -455,29 +451,68 @@ function setTaskStatus(id: string, status: TaskStatus): void {
     )
   );
   const after = get(tasks).find((t) => t.id === id);
-  if (after && after.kind === "workout" && after.completed && !wasDone) {
-    syncWorkoutStreak(after);
+  maybeSyncWorkoutStreakOnDone(after, wasDone);
+}
+
+/** Workout session = kind=workout on the task or on its recurring parent. */
+export function isWorkoutSession(task: ITask | undefined): boolean {
+  if (!task) return false;
+  if (task.kind === "workout" || task.workoutDayKey) return true;
+  if (task.isRecurringInstance && task.parentTaskId) {
+    const parent = get(tasks).find((t) => t.id === task.parentTaskId);
+    return parent?.kind === "workout" || !!parent?.workoutDayKey;
   }
+  return false;
+}
+
+/** Habit used for workout streaks (settings id, else projectId workout-streak). */
+export function resolveWorkoutStreakHabitId(): string | null {
+  const fromSettings = get(settings).workoutHabitId;
+  if (fromSettings) return fromSettings;
+  const fallback = get(habitsStore).find(
+    (h) => !h.archived && h.projectId === "workout-streak",
+  );
+  return fallback?.id ?? null;
+}
+
+/** Date key (YYYY-MM-DD) for streak log — task day, else today. */
+export function resolveWorkoutStreakDateKey(dateUID: string): string {
+  const m = /^day-(\d{4}-\d{2}-\d{2})/.exec(dateUID);
+  if (m) return m[1];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /** Tick the linked streak habit when a workout session is completed. */
 function syncWorkoutStreak(task: ITask): void {
-  const habitId = get(settings).workoutHabitId;
+  const habitId = resolveWorkoutStreakHabitId();
   if (!habitId) return;
-  const m = /^day-(\d{4}-\d{2}-\d{2})/.exec(task.dateUID);
-  const dateKey = m
-    ? m[1]
-    : `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`;
-  setHabitProgress(habitId, dateKey, 2);
+  setHabitProgress(habitId, resolveWorkoutStreakDateKey(task.dateUID), 2);
+}
+
+/**
+ * Fire streak side-effect when a task flips to done from any path
+ * (timer stop, status set, updateTask completed flag).
+ */
+function maybeSyncWorkoutStreakOnDone(after: ITask | undefined, wasDone: boolean): void {
+  if (!after || wasDone || !after.completed) return;
+  if (!isWorkoutSession(after)) return;
+  syncWorkoutStreak(after);
 }
 
 export function updateTaskStatus(id: string, status: TaskStatus): void {
   const allTasks = get(tasks);
   const task = allTasks.find((t) => t.id === id);
   const oldStatus = task?.status;
+  const autoStartTimer = get(settings).autoStartTimerOnWork !== false;
 
   if (oldStatus !== "progress" && status === "progress") {
-    startTaskTimer(id);
+    if (autoStartTimer) {
+      startTaskTimer(id);
+    } else {
+      // Status change only — timer stays off (user setting)
+      setTaskStatus(id, status);
+    }
     notifyStatusChange(task?.title || tRaw("taskStore.defaultTaskTitle"), tRaw("taskStore.statusToWork"));
   } else if (oldStatus === "progress" && status === "paused") {
     pauseTaskTimer(id);
@@ -485,7 +520,11 @@ export function updateTaskStatus(id: string, status: TaskStatus): void {
   } else if (oldStatus === "progress" && status !== "progress") {
     stopTaskTimerAndLog(id, status);
   } else if (oldStatus === "paused" && status === "progress") {
-    startTaskTimer(id);
+    if (autoStartTimer) {
+      startTaskTimer(id);
+    } else {
+      setTaskStatus(id, status);
+    }
     notifyStatusChange(task?.title || tRaw("taskStore.defaultTaskTitle"), tRaw("taskStore.statusResumed"));
   } else {
     setTaskStatus(id, status);

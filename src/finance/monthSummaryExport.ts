@@ -8,7 +8,7 @@ import { tRaw, getCurrencySymbol } from "../i18n";
 import { get } from "svelte/store";
 import { settings } from "../ui/stores";
 import { buildMonthSummaryMarkdown, monthSummaryTitle, type MonthSummaryLabels } from "./monthSummary";
-import { resolveStoredIncome } from "./income";
+import { resolveMonthIncome } from "./income";
 import { getMonthData } from "./storage";
 import type { FinanceMonthData } from "./types";
 import {
@@ -22,7 +22,7 @@ export function monthSummaryLabels(): MonthSummaryLabels {
   return {
     title: tRaw("finance.exportTitle"),
     income: tRaw("finance.income"),
-    expenses: tRaw("finance.expenses"),
+    expenses: tRaw("habitAnalytics.expenses"),
     budget: tRaw("finance.tabBudget"),
     balance: tRaw("finance.balance"),
     remainder: tRaw("finance.remainder"),
@@ -50,6 +50,7 @@ export function monthSummaryLabels(): MonthSummaryLabels {
     insights: tRaw("finance.insights"),
     share: tRaw("finance.share"),
     generated: tRaw("finance.generated"),
+    goalDeposits: tRaw("finance.goalDeposits"),
   };
 }
 
@@ -86,6 +87,7 @@ function buildAiSnapshot(data: FinanceMonthData, incomeTotal: number) {
       icon: c.icon,
       amount: c.amount,
     })),
+    actualCategories: [...byCat.values()],
     goals: (data.monthGoals || []).map((g) => ({
       name: g.name,
       currentAmount: g.currentAmount,
@@ -106,7 +108,7 @@ function buildAiSnapshot(data: FinanceMonthData, incomeTotal: number) {
  * Generate AI tips for the month, or null when disabled/unavailable.
  * Never throws — export must work without Ollama.
  */
-async function tryGenerateInsights(data: FinanceMonthData, incomeTotal: number): Promise<string | null> {
+export async function tryGenerateInsights(data: FinanceMonthData, incomeTotal: number): Promise<string | null> {
   if (!isFinanceInsightsEnabled()) return null;
   try {
     const snapshot = buildAiSnapshot(data, incomeTotal);
@@ -115,6 +117,16 @@ async function tryGenerateInsights(data: FinanceMonthData, incomeTotal: number):
   } catch {
     return null;
   }
+}
+
+/** Generate tips with a progress notice (shared by MD / Excel export). */
+export async function generateInsightsWithNotice(
+  data: FinanceMonthData,
+  incomeTotal: number,
+): Promise<string | null> {
+  if (!isFinanceInsightsEnabled()) return null;
+  new Notice(tRaw("finance.insightsGenerating"));
+  return tryGenerateInsights(data, incomeTotal);
 }
 
 /**
@@ -129,13 +141,10 @@ export async function exportMonthSummaryToNote(
 ): Promise<string> {
   const data = monthData ?? getMonthData(monthKey);
   const [year, month] = monthKey.split("-").map(Number);
-  const income = resolveStoredIncome(data, year, month);
+  // Fact income only (tasks + manual sources). Budget plan income is not used.
+  const income = resolveMonthIncome(year, month, { mode: "fact" });
 
-  let insights: string | null = null;
-  if (isFinanceInsightsEnabled()) {
-    new Notice(tRaw("finance.insightsGenerating"));
-    insights = await tryGenerateInsights(data, income.total);
-  }
+  const insights = await generateInsightsWithNotice(data, income.total);
 
   const md = buildMonthSummaryMarkdown({
     monthKey,

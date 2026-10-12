@@ -1,11 +1,13 @@
 import { get } from "svelte/store";
 import { streamOllamaChat, parseOllamaJson, resolveModel, type ModelRole } from "./OllamaService";
+import { isDesktopAI } from "./aiQuickAdd";
 import { settings } from "../ui/stores";
 import {
   type ExpenseCategoryDef,
   guessCategory,
   categoryByName,
 } from "../finance/expenseCategories";
+import { computeMonthRemainder, resolveSpentForRemainder } from "../finance/types";
 
 export interface ParsedExpense {
   name: string;
@@ -18,12 +20,19 @@ export interface ParsedExpense {
 
 export interface FinanceSummary {
   monthlyIncome: number;
+  /** Budget plan total (main-account categories). */
   mainTotal: number;
+  /** Actual expense-log total (0 when the log is empty). */
+  actualTotal: number;
   goalContributions: number;
+  /** income − actualTotal (or plan if no log) − goalContributions. */
   balance: number;
   savingsTotal: number;
   daysLeftInMonth: number;
+  /** Budget plan by category. */
   categories: Array<{ name: string; icon: string; amount: number }>;
+  /** Actual spending by category (from the expense log). */
+  actualCategories: Array<{ name: string; icon: string; amount: number }>;
   goals: Array<{ name: string; current: number; target: number }>;
   savings: Array<{ name: string; amount: number; percent: number }>;
   rules: string[];
@@ -48,17 +57,32 @@ export function buildFinanceSummary(input: {
   savings: Array<{ name: string; amount: number; percent: number }>;
   rules: string[];
   goalContribution: number;
+  /** Actual expense log (optional). When present, balance uses it instead of the plan. */
+  actualCategories?: Array<{ name: string; icon: string; amount: number }>;
 }): FinanceSummary {
   const mainTotal = input.mainCategories.reduce((s, c) => s + (c.amount || 0), 0);
+  const actualCategories = input.actualCategories || [];
+  const actualTotal = actualCategories.reduce((s, c) => s + (c.amount || 0), 0);
+  const spent = resolveSpentForRemainder(actualTotal, mainTotal);
   const savingsTotal = input.savings.reduce((s, c) => s + (c.amount || 0), 0);
   return {
     monthlyIncome: input.monthlyIncome || 0,
     mainTotal,
+    actualTotal,
     goalContributions: input.goalContribution || 0,
-    balance: (input.monthlyIncome || 0) - mainTotal - (input.goalContribution || 0),
+    balance: computeMonthRemainder(
+      input.monthlyIncome || 0,
+      spent,
+      input.goalContribution || 0,
+    ),
     savingsTotal,
     daysLeftInMonth: daysLeftInMonth(),
     categories: input.mainCategories.map((c) => ({
+      name: c.name,
+      icon: c.icon || "📦",
+      amount: c.amount || 0,
+    })),
+    actualCategories: actualCategories.map((c) => ({
       name: c.name,
       icon: c.icon || "📦",
       amount: c.amount || 0,
@@ -86,7 +110,7 @@ function ollamaOpts(role: ModelRole = "reason"): { url: string; model: string; e
     ollamaModelExtract?: string;
   };
   return {
-    enabled: s.ollamaEnabled === true,
+    enabled: s.ollamaEnabled === true && isDesktopAI(),
     url: s.ollamaUrl || "http://localhost:11434",
     model: resolveModel(role, s),
   };
@@ -294,8 +318,11 @@ const INSIGHTS_SYSTEM = `You are a personal finance assistant. Analyze the month
 Write in the SAME language as the category names (Russian if they are Russian).
 Return ONLY markdown bullets (no code fences, no heading).
 - 3–5 bullets, each one sentence
-- Be concrete: name categories, amounts, percentages when possible
-- Cover: what stands out, where money goes, one risk, one actionable tip
+- Be concrete with numbers from the snapshot
+- Fields: monthlyIncome, actualTotal (real spending), mainTotal (budget plan), actualCategories, categories (plan), balance, goalContributions
+- Base spending facts on actualCategories/actualTotal — NOT on the budget plan
+- If actualCategories is empty, say the expense log is empty and only plan is known
+- Cover: what stands out, where money actually went, one risk, one actionable tip
 - No fluff, no "consider reviewing your budget" clichés
 Keep it under 120 words.`;
 
@@ -328,5 +355,5 @@ export function isFinanceInsightsEnabled(): boolean {
     ollamaEnabled?: boolean;
     aiFinanceInsightsEnabled?: boolean;
   };
-  return s.ollamaEnabled === true && s.aiFinanceInsightsEnabled !== false;
+  return s.ollamaEnabled === true && s.aiFinanceInsightsEnabled !== false && isDesktopAI();
 }

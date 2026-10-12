@@ -154,6 +154,16 @@ export function getManualIncomeForMonth(year: number, month: number): number {
     .reduce((sum, s) => sum + s.amount, 0);
 }
 
+export function getManualIncomeForYear(year: number): number {
+  const data = get(financialAnalyticsData);
+  return data.manualIncomeSources
+    .filter((source) => {
+      const match = /^(\d{4})/.exec(source.date);
+      return match ? parseInt(match[1], 10) === year : false;
+    })
+    .reduce((sum, s) => sum + s.amount, 0);
+}
+
 export function getIncomeCategories(): string[] {
   const data = get(financialAnalyticsData);
   return data.incomeCategories || [];

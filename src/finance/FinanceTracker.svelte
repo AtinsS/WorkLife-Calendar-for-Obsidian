@@ -23,22 +23,17 @@
   import { AIFinanceModal, type AIFinanceMode } from "../services/AIFinanceModal";
   import { AIExpenseParseModal } from "../services/AIExpenseParseModal";
   import { buildFinanceSummary, getFinanceAiConfig } from "../services/financeAI";
+  import { isDesktopAI } from "../services/aiQuickAdd";
   import { settings } from "../ui/stores";
   import { get } from "svelte/store";
-  import {
-    tasks,
-  } from "../task-tracker/stores";
-  import { financialAnalyticsData } from "./financialAnalyticsStorage";
   import { financeTabRequest, type FinanceTab } from "./financeUiStore";
-  import { resolveMonthIncome, getMonthIncomeTotal, normalizeIncomeMode, type IncomeMode } from "./income";
   import { exportMonthSummary } from "./monthSummaryExport";
+  import { exportPeriodExcelFile, type ExportPeriod } from "./monthSummaryExcel";
   import FinancialAnalytics from "./FinancialAnalytics.svelte";
   import { t, tArray, locale } from "../i18n";
   import { clampAmount } from "../utils/sanitize";
 
-  export let initialTab: FinanceTab = "income";
-
-  type DistributionIncomeSource = IncomeMode;
+  export let initialTab: FinanceTab = "budget";
 
   function inputVal(e: Event): string {
     return (e.target as HTMLInputElement).value;
@@ -55,8 +50,6 @@
     expenses: [],
     updatedAt: "",
   };
-  let incomeSource: DistributionIncomeSource = "fact";
-  let manualIncome = 0;
   let editingRules = false;
   let editingGoalId: string | null = null;
   let editingMainCatId: string | null = null;
@@ -83,8 +76,6 @@
       const newData = getMonthData(monthKey);
       if (newData) {
         monthData = newData;
-        incomeSource = normalizeIncomeSource(monthData.incomeSource);
-        manualIncome = monthData.monthlyIncome;
       }
     }
   }
@@ -95,67 +86,27 @@
     ensureGoalsRollover(monthKey);
   }
 
-  // ── Sync income from tasks/analytics (only when not editing manually) ──
-  // Guard: only sync after data has been loaded from disk and user is not in manual mode
-  $: {
-    void $tasks;
-    void $financialAnalyticsData;
-    // Use a microtask to avoid updating during the same tick as the store reload above
-    if (incomeSource !== "manual" && monthData.updatedAt && monthKey) {
-      const income = getIncomeForSource(incomeSource);
-      if (income !== monthData.monthlyIncome || monthData.incomeSource !== incomeSource) {
-        // Directly update the store without re-reading monthData
-        financeData.update((current) => ({
-          ...current,
-          [monthKey]: {
-            ...(current[monthKey] || {
-              monthlyIncome: 0,
-              lastMonthExpense: 0,
-              mainAccountCategories: [],
-              monthGoals: [],
-              savingsCategories: [],
-              distributionRules: [],
-              expenses: [],
-              updatedAt: "",
-            }),
-            monthlyIncome: income,
-            incomeSource,
-            updatedAt: new Date().toISOString(),
-          },
-        }));
-      }
-    }
-  }
-
   $: mainTotal = monthData
     ? monthData.mainAccountCategories.reduce((sum, c) => sum + c.amount, 0)
     : 0;
   $: savingsTotal = monthData
     ? monthData.savingsCategories.reduce((sum, c) => sum + c.amount, 0)
     : 0;
-  // Only THIS month's goal deposits reduce the remainder —
-  // money carried over from previous months is already saved and must not be subtracted again.
+  // Only THIS month's goal deposits — money carried over from previous months is already saved.
   $: goalsMonthContributions = monthData
     ? (monthData.monthGoals || []).reduce((sum, g) => sum + getGoalMonthContribution(g), 0)
     : 0;
-  // Effective income is always resolved from sources (see finance/income.ts).
-  // `monthData.monthlyIncome` is only the manual override / persisted cache.
-  $: effectiveIncome = (() => {
-    void $tasks;
-    void $financialAnalyticsData;
-    const [y, m] = monthKey.split("-").map(Number);
-    return resolveMonthIncome(y, m, {
-      mode: incomeSource,
-      manualOverride: incomeSource === "manual" ? manualIncome : monthData.monthlyIncome,
-    }).total;
-  })();
+  // Budget tab uses planned income only (manual). Fact income lives in the Income tab.
+  $: plannedIncome = Math.max(0, monthData?.monthlyIncome ?? 0);
 
+  // Free money for the savings plan: planned income − planned categories.
+  // Goal deposits are fact outflows and intentionally do NOT change the plan.
   $: balance = monthData
-    ? effectiveIncome - mainTotal - goalsMonthContributions
+    ? plannedIncome - mainTotal
     : 0;
 
   // Recalculate savings amounts from percentages when balance changes
-  // (e.g. after duplicating from previous month or when income source updates)
+  // (e.g. after duplicating from previous month or when planned income updates)
   let lastCalcBalance = -1;
   $: monthKey, (lastCalcBalance = -1);
   $: if (monthData && balance > 0 && balance !== lastCalcBalance) {
@@ -181,55 +132,21 @@
     return all[key] || null;
   })();
 
-  $: prevIncome = (() => {
-    if (!prevMonthData) return 0;
-    const d = new Date(displayYear, displayMonth - 2, 1);
-    return resolveMonthIncome(d.getFullYear(), d.getMonth() + 1, {
-      mode: normalizeIncomeMode(prevMonthData.incomeSource),
-      manualOverride: prevMonthData.monthlyIncome,
-    }).total;
-  })();
-  $: incomeDelta = prevMonthData ? effectiveIncome - prevIncome : 0;
+  $: prevIncome = prevMonthData ? Math.max(0, prevMonthData.monthlyIncome ?? 0) : 0;
+  $: incomeDelta = prevMonthData ? plannedIncome - prevIncome : 0;
   $: expenseDelta = prevMonthData ? mainTotal - (prevMonthData.mainAccountCategories?.reduce((s, c) => s + c.amount, 0) || 0) : 0;
   $: balanceDelta = prevMonthData
     ? balance - (prevIncome
-        - (prevMonthData.mainAccountCategories?.reduce((s, c) => s + c.amount, 0) || 0)
-        - (prevMonthData.monthGoals || []).reduce((s, g) => s + getGoalMonthContribution(g), 0))
+        - (prevMonthData.mainAccountCategories?.reduce((s, c) => s + c.amount, 0) || 0))
     : 0;
 
-  function normalizeIncomeSource(source: FinanceMonthData["incomeSource"]): DistributionIncomeSource {
-    return normalizeIncomeMode(source);
-  }
-
-  function getIncomeForSource(source: Exclude<DistributionIncomeSource, "manual">): number {
-    const [year, month] = monthKey.split("-").map(Number);
-    return getMonthIncomeTotal(year, month, { mode: source });
-  }
-
-  function setIncomeSource(source: DistributionIncomeSource) {
-    incomeSource = source;
-    if (source === "manual") {
-      updateMonthData(monthKey, {
-        monthlyIncome: manualIncome,
-        incomeSource: "manual",
-      });
-    } else {
-      const income = getIncomeForSource(source);
-      updateMonthData(monthKey, {
-        monthlyIncome: income,
-        incomeSource: source,
-      });
-    }
-  }
-
-  function updateManualIncome(value: string) {
-    manualIncome = clampAmount(parseFloat(value.replace(/[^0-9.,]/g, "")) || 0);
+  function updatePlannedIncome(value: string) {
+    const amount = clampAmount(parseFloat(value.replace(/[^0-9.,]/g, "")) || 0);
     updateMonthData(monthKey, {
-      monthlyIncome: manualIncome,
+      monthlyIncome: amount,
       incomeSource: "manual",
     });
-    // Keep incomeSource in sync for the UI
-    incomeSource = "manual";
+    monthData = { ...monthData, monthlyIncome: amount, incomeSource: "manual" };
   }
 
   // ── Main categories ──
@@ -595,8 +512,8 @@
     if (editingCatId === id) editingCatId = null;
   }
 
-  // ── AI finance tools ──
-  $: ollamaOn = $settings.ollamaEnabled === true;
+  // ── AI finance tools ── (desktop-only + Ollama on — user rule)
+  $: ollamaOn = $settings.ollamaEnabled === true && isDesktopAI();
 
   function openExpenseParse() {
     if (!getFinanceAiConfig().enabled) return;
@@ -626,11 +543,23 @@
   function openAiFinance(mode: AIFinanceMode) {
     if (!getFinanceAiConfig().enabled) return;
     const app = window.app as never;
+    const actualByCat = (() => {
+      const map = new Map<string, { name: string; icon: string; amount: number }>();
+      for (const e of monthData.expenses || []) {
+        const key = e.categoryName || "—";
+        const prev = map.get(key) || { name: key, icon: e.icon || "📦", amount: 0 };
+        prev.amount += e.amount || 0;
+        if (e.icon) prev.icon = e.icon;
+        map.set(key, prev);
+      }
+      return [...map.values()];
+    })();
     new AIFinanceModal(app, mode, {
       getSummary: () =>
         buildFinanceSummary({
-          monthlyIncome: effectiveIncome,
+          monthlyIncome: plannedIncome,
           mainCategories: monthData.mainAccountCategories,
+          actualCategories: actualByCat,
           goals: monthData.monthGoals || [],
           savings: monthData.savingsCategories || [],
           rules: monthData.distributionRules || [],
@@ -654,9 +583,24 @@
     }).open();
   }
 
-  function exportSummary(): void {
+  let exportFormat: "md" | "xlsx" = "md";
+  let exportPeriod: ExportPeriod = "month";
+
+  function weekStartsOn(): number {
+    const sow: string = $settings.startOfWeek || "system";
+    if (sow === "monday") return 1;
+    if (sow === "sunday") return 0;
+    return $locale === "en" ? 0 : 1;
+  }
+
+  function runExport(): void {
     const app = window.app as never;
-    void exportMonthSummary(app, monthKey, displayMonthName);
+    if (exportFormat === "xlsx") {
+      // Excel: period (week / month / year), saved to vault — no new tab.
+      void exportPeriodExcelFile(app, exportPeriod, new Date(), weekStartsOn());
+    } else {
+      void exportMonthSummary(app, monthKey, displayMonthName);
+    }
   }
 </script>
 
@@ -678,6 +622,20 @@
     <div class="fin-tabs" role="tablist">
       <button
         class="fin-tab"
+        class:is-active={activeTab === "budget"}
+        role="tab"
+        aria-selected={activeTab === "budget"}
+        on:click={() => activeTab = "budget"}
+      >{$t("finance.tabBudget")}</button>
+      <button
+        class="fin-tab"
+        class:is-active={activeTab === "savings"}
+        role="tab"
+        aria-selected={activeTab === "savings"}
+        on:click={() => activeTab = "savings"}
+      >{$t("finance.tabSavings")}</button>
+      <button
+        class="fin-tab"
         class:is-active={activeTab === "income"}
         role="tab"
         aria-selected={activeTab === "income"}
@@ -690,23 +648,127 @@
         aria-selected={activeTab === "expenses"}
         on:click={() => activeTab = "expenses"}
       >{$t("finance.tabExpenses")}</button>
-      <button
-        class="fin-tab"
-        class:is-active={activeTab === "budget"}
-        role="tab"
-        aria-selected={activeTab === "budget"}
-        on:click={() => activeTab = "budget"}
-      >{$t("finance.tabBudget")}</button>
     </div>
-    <button
-      class="fin-export-btn"
-      on:click={exportSummary}
-      title={$t("finance.exportButton")}
-    >{$t("finance.exportButton")}</button>
+    <div class="fin-export">
+      <select
+        class="fin-export-select"
+        bind:value={exportFormat}
+        aria-label={$t("finance.exportMenu")}
+        title={$t("finance.exportMenu")}
+      >
+        <option value="md">Markdown</option>
+        <option value="xlsx">Excel</option>
+      </select>
+      {#if exportFormat === "xlsx"}
+        <select
+          class="fin-export-select"
+          bind:value={exportPeriod}
+          aria-label={$t("finance.exportPeriodLabel")}
+          title={$t("finance.exportPeriodLabel")}
+        >
+          <option value="month">{$t("finance.exportPeriodMonth")}</option>
+          <option value="year">{$t("finance.exportPeriodYear")}</option>
+        </select>
+      {/if}
+      <button
+        class="fin-export-btn"
+        on:click={runExport}
+        title={$t("finance.exportMenu")}
+      >{$t("finance.exportMenu")}</button>
+    </div>
   </div>
 
   {#if activeTab === "income"}
     <FinancialAnalytics embedded selectedYear={displayYear} selectedMonth={displayMonth} />
+  {:else if activeTab === "savings"}
+    <!-- Блок: Копилка (цели) — взносы по факту уменьшают свободные деньги -->
+    <div class="glass-card">
+      <div class="glass-card-header">
+        <span class="glass-icon">🏆</span>
+        <h3>{$t("finance.monthGoals")}</h3>
+        {#if goalsMonthContributions > 0}
+          <span class="glass-badge">+{formatMoney(goalsMonthContributions)} {$t("locale.currencySymbol")}</span>
+        {/if}
+      </div>
+      <div class="goals-list">
+        {#each (monthData.monthGoals || []) as goal (goal.id)}
+          {#if editingGoalId === goal.id}
+            <div class="goal-row editing">
+              <input type="text" value={goal.icon} on:input={(e) => updateGoal(goal.id, { icon: inputVal(e) })} class="goal-edit-icon" maxlength="2" />
+              <div class="goal-info">
+                <div class="goal-edit-row">
+                  <input type="text" value={goal.name} on:input={(e) => updateGoal(goal.id, { name: inputVal(e) })} class="goal-edit-name" placeholder="{$t('finance.newGoal')}" />
+                  <input type="number" value={goal.currentAmount} on:input={(e) => updateGoal(goal.id, { currentAmount: clampAmount(parseFloat(inputVal(e)) || 0) })} min="0" class="goal-edit-amount" placeholder="{$t('finance.amountPlaceholder')}" />
+                  <span class="goal-edit-sep">/</span>
+                  <input type="number" value={goal.targetAmount} on:input={(e) => updateGoal(goal.id, { targetAmount: clampAmount(parseFloat(inputVal(e)) || 0) })} min="0" class="goal-edit-amount" placeholder="{$t('finance.goalPlaceholder')}" />
+                </div>
+              </div>
+              <button class="goal-done-btn" on:click={() => editingGoalId = null}>✓</button>
+            </div>
+          {:else}
+            <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+            <div class="goal-row" class:goal-complete={isGoalComplete(goal)} role="button" tabindex="0" on:click={() => editingGoalId = goal.id} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editingGoalId = goal.id; }}>
+              <span class="goal-icon">{goal.icon}</span>
+              <div class="goal-info">
+                <div class="goal-header">
+                  <span class="goal-name">{goal.name}</span>
+                  <span class="goal-amounts">{formatMoney(goal.currentAmount)} {$t("locale.currencySymbol")} / {formatMoney(goal.targetAmount)} {$t("locale.currencySymbol")}</span>
+                </div>
+                <div class="goal-progress-bar">
+                  <div class="goal-progress-fill" class:complete={isGoalComplete(goal)} style="width: {goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0}%"></div>
+                </div>
+                <div class="goal-meta">
+                  <span class="goal-percent">{goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0}%</span>
+                  {#if getGoalMonthContribution(goal) > 0}
+                    <span class="goal-month-add">+{formatMoney(getGoalMonthContribution(goal))} {$t("locale.currencySymbol")}</span>
+                  {/if}
+                  {#if (goal.broughtForward ?? 0) > 0}
+                    <span class="goal-brought">↩ {formatMoney(goal.broughtForward ?? 0)}</span>
+                  {/if}
+                </div>
+                <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+                <div class="goal-adjust" role="group" on:click|stopPropagation on:keydown|stopPropagation>
+                  <div class="goal-adjust-mode" role="group">
+                    <button
+                      type="button"
+                      class="goal-adjust-mode-btn"
+                      class:active={goalAdjustMode === "amount"}
+                      on:click={() => goalAdjustMode = "amount"}
+                    >{$t("finance.amount")}</button>
+                    <button
+                      type="button"
+                      class="goal-adjust-mode-btn"
+                      class:active={goalAdjustMode === "percent"}
+                      on:click={() => goalAdjustMode = "percent"}
+                    >%</button>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    class="goal-adjust-input"
+                    placeholder={goalAdjustMode === "amount" ? $t("finance.adjustPlaceholder") : "0%"}
+                    value={goalAdjustValues[goal.id] ?? ""}
+                    on:input={(e) => setGoalAdjustValue(goal.id, inputVal(e))}
+                    on:keydown={(e) => {
+                      if (e.key === "Enter") applyGoalAdjust(goal, "deposit");
+                    }}
+                  />
+                  <button type="button" class="goal-adjust-btn deposit" title={$t("finance.depositThisMonth")} on:click={() => applyGoalAdjust(goal, "deposit")}>
+                    + {$t("finance.deposit")}
+                  </button>
+                  <button type="button" class="goal-adjust-btn withdraw" title={$t("finance.withdrawThisMonth")} on:click={() => applyGoalAdjust(goal, "withdraw")}>
+                    − {$t("finance.withdraw")}
+                  </button>
+                </div>
+              </div>
+              <button class="cat-delete" on:click|stopPropagation={() => removeGoal(goal.id)}>✕</button>
+            </div>
+          {/if}
+        {/each}
+      </div>
+      <button class="glass-add-btn" on:click={addGoal}>{$t("finance.addGoal")}</button>
+      <p class="glass-hint">{$t("finance.goalDepositsHint")}</p>
+    </div>
   {:else if activeTab === "budget"}
     {#if ollamaOn}
       <div class="ai-finance-bar">
@@ -725,43 +787,23 @@
       </button>
     {/if}
 
-  <!-- Блок 1: Общий баланс -->
+  <!-- Блок 1: Плановый бюджет (только план, не влияет на факт) -->
   <div class="glass-card">
     <div class="glass-card-header">
       <span class="glass-icon">💎</span>
-      <h3>{$t("finance.balance")}</h3>
-    </div>
-    <div class="income-toggle">
-      <button
-        class="toggle-btn"
-        class:active={incomeSource === "plan"}
-        on:click={() => setIncomeSource("plan")}
-      >{$t("finance.planToggle")}</button>
-      <button
-        class="toggle-btn"
-        class:active={incomeSource === "fact"}
-        on:click={() => setIncomeSource("fact")}
-      >{$t("finance.factToggle")}</button>
-      <button
-        class="toggle-btn"
-        class:active={incomeSource === "manual"}
-        on:click={() => setIncomeSource("manual")}
-      >{$t("finance.manualToggle")}</button>
+      <h3>{$t("finance.budgetPlanOnly")}</h3>
     </div>
     <div class="balance-grid">
       <div class="balance-item">
-        <span class="balance-label">{$t("finance.income")}</span>
-        {#if incomeSource === "manual"}
-          <input
-            type="number"
-            value={manualIncome}
-            on:input={(e) => updateManualIncome(inputVal(e))}
-            min="0"
-            class="balance-input income-input"
-          />
-        {:else}
-          <span class="balance-value income">{formatMoney(effectiveIncome)} {$t("locale.currencySymbol")}</span>
-        {/if}
+        <span class="balance-label">{$t("finance.plannedIncome")}</span>
+        <input
+          type="number"
+          min="0"
+          class="balance-input income-input"
+          value={plannedIncome}
+          on:input={(e) => updatePlannedIncome(inputVal(e))}
+          title={$t("finance.plannedIncomeHint")}
+        />
         {#if incomeDelta !== 0}
           <span class="balance-delta" class:delta-up={incomeDelta > 0} class:delta-down={incomeDelta < 0}>
             {formatDelta(incomeDelta)}
@@ -769,7 +811,7 @@
         {/if}
       </div>
       <div class="balance-item">
-        <span class="balance-label">{$t("finance.expenses")}</span>
+        <span class="balance-label">{$t("finance.mainAccount")}</span>
         <span class="balance-value expense">{formatMoney(mainTotal)} {$t("locale.currencySymbol")}</span>
         {#if expenseDelta !== 0}
           <span class="balance-delta" class:delta-up={expenseDelta < 0} class:delta-down={expenseDelta > 0}>
@@ -787,9 +829,10 @@
         {/if}
       </div>
     </div>
+    <p class="glass-hint">{$t("finance.plannedIncomeHint")}</p>
   </div>
 
-  <!-- Блок 2: Основной счёт -->
+  <!-- Блок 2: План категорий (куда раскидать) -->
   <div class="glass-card">
     <div class="glass-card-header">
       <span class="glass-icon">🏦</span>
@@ -817,91 +860,6 @@
       {/each}
     </div>
     <button class="glass-add-btn" on:click={addMainCategory}>{$t("finance.addCategory")}</button>
-  </div>
-
-  <!-- Блок 3: Цели на месяц -->
-  <div class="glass-card">
-    <div class="glass-card-header">
-      <span class="glass-icon">🎯</span>
-      <h3>{$t("finance.monthGoals")}</h3>
-    </div>
-    <div class="goals-list">
-      {#each (monthData.monthGoals || []) as goal (goal.id)}
-        {#if editingGoalId === goal.id}
-          <div class="goal-row editing">
-            <input type="text" value={goal.icon} on:input={(e) => updateGoal(goal.id, { icon: inputVal(e) })} class="goal-edit-icon" maxlength="2" />
-            <div class="goal-info">
-              <div class="goal-edit-row">
-                <input type="text" value={goal.name} on:input={(e) => updateGoal(goal.id, { name: inputVal(e) })} class="goal-edit-name" placeholder="{$t('finance.newGoal')}" />
-                <input type="number" value={goal.currentAmount} on:input={(e) => updateGoal(goal.id, { currentAmount: clampAmount(parseFloat(inputVal(e)) || 0) })} min="0" class="goal-edit-amount" placeholder="{$t('finance.amountPlaceholder')}" />
-                <span class="goal-edit-sep">/</span>
-                <input type="number" value={goal.targetAmount} on:input={(e) => updateGoal(goal.id, { targetAmount: clampAmount(parseFloat(inputVal(e)) || 0) })} min="0" class="goal-edit-amount" placeholder="{$t('finance.goalPlaceholder')}" />
-              </div>
-            </div>
-            <button class="goal-done-btn" on:click={() => editingGoalId = null}>✓</button>
-          </div>
-        {:else}
-          <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-          <div class="goal-row" class:goal-complete={isGoalComplete(goal)} role="button" tabindex="0" on:click={() => editingGoalId = goal.id} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editingGoalId = goal.id; }}>
-            <span class="goal-icon">{goal.icon}</span>
-            <div class="goal-info">
-              <div class="goal-header">
-                <span class="goal-name">{goal.name}</span>
-                <span class="goal-amounts">{formatMoney(goal.currentAmount)} {$t("locale.currencySymbol")} / {formatMoney(goal.targetAmount)} {$t("locale.currencySymbol")}</span>
-              </div>
-              <div class="goal-progress-bar">
-                <div class="goal-progress-fill" class:complete={isGoalComplete(goal)} style="width: {goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0}%"></div>
-              </div>
-              <div class="goal-meta">
-                <span class="goal-percent">{goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0}%</span>
-                {#if getGoalMonthContribution(goal) > 0}
-                  <span class="goal-month-add">+{formatMoney(getGoalMonthContribution(goal))} {$t("locale.currencySymbol")}</span>
-                {/if}
-                {#if (goal.broughtForward ?? 0) > 0}
-                  <span class="goal-brought">↩ {formatMoney(goal.broughtForward ?? 0)}</span>
-                {/if}
-              </div>
-              <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-              <div class="goal-adjust" role="group" on:click|stopPropagation on:keydown|stopPropagation>
-                <div class="goal-adjust-mode" role="group">
-                  <button
-                    type="button"
-                    class="goal-adjust-mode-btn"
-                    class:active={goalAdjustMode === "amount"}
-                    on:click={() => goalAdjustMode = "amount"}
-                  >{$t("finance.amount")}</button>
-                  <button
-                    type="button"
-                    class="goal-adjust-mode-btn"
-                    class:active={goalAdjustMode === "percent"}
-                    on:click={() => goalAdjustMode = "percent"}
-                  >%</button>
-                </div>
-                <input
-                  type="number"
-                  min="0"
-                  class="goal-adjust-input"
-                  placeholder={goalAdjustMode === "amount" ? $t("finance.adjustPlaceholder") : "0%"}
-                  value={goalAdjustValues[goal.id] ?? ""}
-                  on:input={(e) => setGoalAdjustValue(goal.id, inputVal(e))}
-                  on:keydown={(e) => {
-                    if (e.key === "Enter") applyGoalAdjust(goal, "deposit");
-                  }}
-                />
-                <button type="button" class="goal-adjust-btn deposit" title={$t("finance.depositThisMonth")} on:click={() => applyGoalAdjust(goal, "deposit")}>
-                  + {$t("finance.deposit")}
-                </button>
-                <button type="button" class="goal-adjust-btn withdraw" title={$t("finance.withdrawThisMonth")} on:click={() => applyGoalAdjust(goal, "withdraw")}>
-                  − {$t("finance.withdraw")}
-                </button>
-              </div>
-            </div>
-            <button class="cat-delete" on:click|stopPropagation={() => removeGoal(goal.id)}>✕</button>
-          </div>
-        {/if}
-      {/each}
-    </div>
-    <button class="glass-add-btn" on:click={addGoal}>{$t("finance.addGoal")}</button>
   </div>
 
   <!-- Блок 4: Куда отложить -->
@@ -1149,6 +1107,23 @@
         {/each}
       {/if}
     </div>
+
+    <!-- Взносы в копилку — факт, уменьшают свободные деньги -->
+    {#if goalsMonthContributions > 0}
+      <div class="goal-deposits">
+        <div class="goal-deposits__title">🏆 {$t("finance.goalDeposits")}</div>
+        {#each (monthData.monthGoals || []).filter((g) => getGoalMonthContribution(g) > 0) as goal (goal.id)}
+          <div class="goal-deposits__row">
+            <span>{goal.icon} {goal.name}</span>
+            <span class="goal-deposits__amt">{formatMoney(getGoalMonthContribution(goal))} {$t("locale.currencySymbol")}</span>
+          </div>
+        {/each}
+        <div class="goal-deposits__row total">
+          <span>{$t("financeAnalytics.total")}</span>
+          <span class="goal-deposits__amt">{formatMoney(goalsMonthContributions)} {$t("locale.currencySymbol")}</span>
+        </div>
+      </div>
+    {/if}
   </div>
   {/if}
 </div>
@@ -1213,6 +1188,23 @@
     border-radius: 12px;
     background: var(--fi-surface);
     border: 1px solid var(--fi-border);
+  }
+
+  .fin-export {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .fin-export-select {
+    padding: 7px 10px;
+    border: 1px solid var(--fi-border);
+    border-radius: 9px;
+    background: var(--fi-surface);
+    color: var(--fi-text);
+    font-size: 12.5px;
+    font-family: inherit;
+    cursor: pointer;
   }
 
   .fin-export-btn {
@@ -1701,41 +1693,6 @@
   .glass-badge.badge-warn {
     color: var(--fi-red);
     background: var(--fi-red-bg);
-  }
-
-  /* ── Income toggle ───────────────────────────────────── */
-  .income-toggle {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-    background: var(--fi-surface-hover);
-    border-radius: var(--fi-radius-sm);
-    padding: 4px;
-  }
-
-  .toggle-btn {
-    flex: 1;
-    padding: 9px 12px;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
-    color: var(--fi-muted);
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    font-family: inherit;
-    transition: all 0.2s ease;
-  }
-
-  .toggle-btn.active {
-    background: var(--fi-accent);
-    color: var(--text-on-accent, #fff);
-    box-shadow: 0 2px 8px var(--fi-accent);
-  }
-
-  .toggle-btn:hover:not(.active) {
-    color: var(--fi-text);
-    background: rgba(255, 255, 255, 0.04);
   }
 
   .income-input {
@@ -2416,6 +2373,52 @@
 
   .over-budget {
     border-color: rgba(220, 150, 150, 0.25);
+  }
+
+  .glass-hint {
+    margin: 10px 0 0;
+    color: var(--fi-muted);
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  /* ── Goal deposits (expense tab) ─────────────────────── */
+  .goal-deposits {
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: var(--fi-green-bg);
+    border: 1px solid rgba(80, 200, 160, 0.15);
+    border-radius: var(--fi-radius-sm);
+  }
+
+  .goal-deposits__title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--fi-text);
+  }
+
+  .goal-deposits__row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12px;
+    padding: 4px 0;
+    color: var(--fi-muted);
+  }
+
+  .goal-deposits__row.total {
+    border-top: 1px solid var(--fi-border);
+    margin-top: 6px;
+    padding-top: 8px;
+    font-weight: 600;
+    color: var(--fi-text);
+  }
+
+  .goal-deposits__amt {
+    color: var(--fi-green);
+    font-weight: 600;
+    white-space: nowrap;
   }
 
   /* ── Cleanup ─────────────────────────────────────────── */
