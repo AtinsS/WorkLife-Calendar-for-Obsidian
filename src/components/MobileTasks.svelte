@@ -27,6 +27,8 @@
 
   .mobile-tasks :global(.task-tracker-list) {
     flex: 1;
+    /* Allow the list to shrink so header/filters/date keep full height. */
+    min-height: 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }

@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, TFolder, Notice, TextComponent } from "obsidian";
+import { App, PluginSettingTab, Setting, TFolder, Notice, TextComponent, setIcon } from "obsidian";
 import type { SettingDefinitionItem } from "obsidian";
 import { appHasDailyNotesPluginLoaded } from "obsidian-daily-notes-interface";
 import type { ILocaleOverride } from "obsidian-calendar-ui";
@@ -438,97 +438,149 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.render(host);
   }
 
+  /** Card-style section: icon + title + optional desc, returns body for settings rows. */
+  private section(
+    parent: HTMLElement,
+    opts: { title: string; desc?: string; icon?: string; tone?: "default" | "warning" | "accent" },
+  ): HTMLElement {
+    const card = parent.createDiv({
+      cls: `wl-settings-card${opts.tone && opts.tone !== "default" ? ` wl-settings-card--${opts.tone}` : ""}`,
+    });
+    const head = card.createDiv({ cls: "wl-settings-card-head" });
+    if (opts.icon) {
+      const iconEl = head.createDiv({ cls: "wl-settings-card-icon" });
+      setIcon(iconEl, opts.icon);
+    }
+    const titles = head.createDiv({ cls: "wl-settings-card-titles" });
+    titles.createDiv({ cls: "wl-settings-card-title", text: opts.title });
+    if (opts.desc) {
+      titles.createDiv({ cls: "wl-settings-card-desc", text: opts.desc });
+    }
+    return card.createDiv({ cls: "wl-settings-card-body" });
+  }
+
+  /** Compact note / callout under a section. */
+  private note(parent: HTMLElement, text: string, cls = "wl-settings-note"): HTMLElement {
+    const el = parent.createDiv({ cls });
+    el.setText(text);
+    return el;
+  }
+
+  /** Code sample block (```hello``` / ```dashboard```). */
+  private codeSample(parent: HTMLElement, code: string): HTMLElement {
+    const pre = parent.createEl("pre", { cls: "mcp-code-block wl-settings-code" });
+    pre.createEl("code", { text: code });
+    return pre;
+  }
+
   private render(containerEl: HTMLElement = this.containerEl): void {
     containerEl.empty();
 
-    // Coffee banner
-    const coffeeBanner = containerEl.createDiv({
-      cls: "settings-coffee-banner",
-    });
-    new Setting(coffeeBanner)
-      .setName(tRaw("settings.general.supportTitle"))
-      .setHeading();
-    const coffeeDesc = coffeeBanner.createEl("p", {
-      cls: "settings-coffee-desc",
-    });
-    coffeeDesc.textContent = tRaw("settings.general.supportDesc");
-    const coffeeActions = coffeeBanner.createDiv({ cls: "settings-coffee-actions" });
-    const coffeeBtn = coffeeActions.createEl("a", {
-      cls: "settings-coffee-btn",
-      text: tRaw("settings.general.supportBtn"),
-      href: "https://boosty.to/atins/donate",
-    });
-    coffeeBtn.setAttribute("target", "_blank");
-    coffeeBtn.setAttribute("rel", "noopener");
-    const starBtn = coffeeActions.createEl("a", {
-      cls: "settings-coffee-btn settings-github-star-btn",
-      text: tRaw("settings.general.githubStarBtn"),
-      href: "https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian",
-    });
-    starBtn.setAttribute("target", "_blank");
-    starBtn.setAttribute("rel", "noopener");
-
     if (!appHasDailyNotesPluginLoaded()) {
-      const banner = containerEl.createDiv({ cls: "settings-banner" });
-      new Setting(banner)
-        .setName(tRaw("settings.general.dailyNotesWarning"))
-        .setHeading();
+      const banner = containerEl.createDiv({ cls: "wl-settings-banner wl-settings-banner--warn" });
+      banner.createDiv({
+        cls: "wl-settings-banner-title",
+        text: tRaw("settings.general.dailyNotesWarning"),
+      });
       banner.createEl("p", {
-        cls: "setting-item-description",
+        cls: "wl-settings-banner-desc",
         text: tRaw("settings.general.dailyNotesWarningDesc"),
       });
     }
 
-    // Tab bar
-    const tabBar = containerEl.createDiv({ cls: "settings-tab-bar" });
-    const tabs: { key: string; label: string }[] = [
-      { key: "general", label: tRaw("settings.tabs.general") },
-      { key: "dashboard", label: tRaw("settings.tabs.dashboard") },
-      { key: "schedule", label: tRaw("settings.tabs.schedule") },
-      { key: "finance", label: tRaw("settings.tabs.finance") },
-      { key: "weather", label: tRaw("settings.tabs.weather") },
-      { key: "appearance", label: tRaw("settings.tabs.appearance") },
-      { key: "sync", label: tRaw("settings.tabs.sync") },
-      { key: "notifications", label: tRaw("settings.tabs.notifications") },
-      { key: "ai", label: tRaw("settings.tabs.ai") },
+    // ── Tab shell: icon rail + content ──
+    const shell = containerEl.createDiv({ cls: "wl-settings-shell" });
+    const tabBar = shell.createDiv({ cls: "wl-settings-tabs" });
+    const tabs: { key: string; label: string; icon: string }[] = [
+      { key: "general", label: tRaw("settings.tabs.general"), icon: "sliders-horizontal" },
+      { key: "interface", label: tRaw("settings.tabs.interface"), icon: "layout-dashboard" },
+      { key: "dashboard", label: tRaw("settings.tabs.dashboard"), icon: "gauge" },
+      { key: "schedule", label: tRaw("settings.tabs.schedule"), icon: "calendar-days" },
+      { key: "finance", label: tRaw("settings.tabs.finance"), icon: "wallet" },
+      { key: "weather", label: tRaw("settings.tabs.weather"), icon: "cloud-sun" },
+      { key: "appearance", label: tRaw("settings.tabs.appearance"), icon: "palette" },
+      { key: "sync", label: tRaw("settings.tabs.sync"), icon: "refresh-cw" },
+      { key: "notifications", label: tRaw("settings.tabs.notifications"), icon: "bell" },
+      { key: "ai", label: tRaw("settings.tabs.ai"), icon: "sparkles" },
     ];
 
     const tabButtons: Record<string, HTMLButtonElement> = {};
     const tabContainers: Record<string, HTMLDivElement> = {};
+    const contentWrap = shell.createDiv({ cls: "wl-settings-content" });
 
     for (const tab of tabs) {
       const btn = tabBar.createEl("button", {
-        cls: "settings-tab-btn",
-        text: tab.label,
+        cls: "wl-settings-tab",
+        attr: { type: "button", "data-tab": tab.key },
       });
+      const iconEl = btn.createSpan({ cls: "wl-settings-tab-icon" });
+      setIcon(iconEl, tab.icon);
+      btn.createSpan({ cls: "wl-settings-tab-label", text: tab.label });
       tabButtons[tab.key] = btn;
       btn.addEventListener("click", () => this.switchTab(tab.key));
     }
 
-    // Tab content containers
     for (const tab of tabs) {
-      const container = containerEl.createDiv({
-        cls: "settings-tab-content",
+      const container = contentWrap.createDiv({
+        cls: "wl-settings-panel",
       });
       container.style.display = tab.key === this.activeTab ? "" : "none";
-      // Tab description
       const descKey = `settings.tabs.${tab.key}Desc`;
       const desc = tRaw(descKey);
       if (desc && desc !== descKey) {
-        container.createEl("p", { cls: "settings-tab-desc", text: desc });
+        container.createEl("p", { cls: "wl-settings-panel-desc", text: desc });
       }
       tabContainers[tab.key] = container;
     }
 
-    // Highlight active tab
     tabButtons[this.activeTab]?.addClass("active");
 
-    // General tab
+    // ── General ──
     const general = tabContainers["general"];
 
-    // ── Plugin updates (first) ──
-    new Setting(general).setName(tRaw("settings.update.checkEnabled")).setHeading();
-    new Setting(general)
+    const identity = this.section(general, {
+      title: tRaw("settings.general.sectionIdentity"),
+      desc: tRaw("settings.general.sectionIdentityDesc"),
+      icon: "user-round",
+    });
+
+    this.addUserNameSetting(identity);
+
+    new Setting(identity)
+      .setName(tRaw("settings.general.languageLabel"))
+      .setDesc(tRaw("settings.general.languageDesc"))
+      .addDropdown((dropdown) => {
+        dropdown.addOption("system", tRaw("settings.general.languageSystem"));
+        dropdown.addOption("ru", tRaw("settings.general.languageRu"));
+        dropdown.addOption("en", tRaw("settings.general.languageEn"));
+        dropdown.setValue(this.plugin.options.language || "system");
+        dropdown.onChange(async (value: "ru" | "en" | "system") => {
+          await this.plugin.writeOptions({ language: value });
+          initLocale(value);
+          this.render();
+          new Notice(tRaw("settings.language.restartNotice"));
+        });
+      });
+
+    new Setting(identity)
+      .setName(tRaw("settings.general.startOfWeekLabel"))
+      .setDesc(tRaw("settings.general.startOfWeekDesc"))
+      .addDropdown((dropdown) => {
+        dropdown.addOption("system", tRaw("settings.general.startOfWeekSystem"));
+        dropdown.addOption("monday", tRaw("settings.general.startOfWeekMonday"));
+        dropdown.addOption("sunday", tRaw("settings.general.startOfWeekSunday"));
+        dropdown.setValue(this.plugin.options.startOfWeek || "system");
+        dropdown.onChange(async (value: "monday" | "sunday" | "system") => {
+          await this.plugin.writeOptions({ startOfWeek: value });
+        });
+      });
+
+    const updates = this.section(general, {
+      title: tRaw("settings.general.sectionUpdates"),
+      desc: tRaw("settings.update.checkEnabledDesc"),
+      icon: "download",
+    });
+    new Setting(updates)
       .setName(tRaw("settings.update.checkEnabled"))
       .setDesc(tRaw("settings.update.checkEnabledDesc"))
       .addToggle((toggle) => {
@@ -537,7 +589,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
           await this.plugin.writeOptions({ checkPluginUpdates: value });
         });
       });
-    new Setting(general)
+    const updateRow = updates.createDiv({ cls: "wl-settings-actions" });
+    new Setting(updateRow)
       .setName(tRaw("settings.update.checkNow"))
       .addButton((btn) => {
         btn.setButtonText(tRaw("settings.update.checkNow"));
@@ -602,62 +655,43 @@ export class CalendarSettingsTab extends PluginSettingTab {
         void unsub;
       });
 
+    const dataCard = this.section(general, {
+      title: tRaw("settings.general.sectionDataCleanup"),
+      desc: tRaw("settings.general.sectionDataCleanupDesc"),
+      icon: "database",
+    });
+    this.addDataCleanupSettings(dataCard);
+
     // ── Interface ──
-    new Setting(general).setName(tRaw("settings.general.sectionInterface")).setHeading();
+    const iface = tabContainers["interface"];
 
-    // Language setting
-    new Setting(general)
-      .setName(tRaw("settings.general.languageLabel"))
-      .setDesc(tRaw("settings.general.languageDesc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("system", tRaw("settings.general.languageSystem"));
-        dropdown.addOption("ru", tRaw("settings.general.languageRu"));
-        dropdown.addOption("en", tRaw("settings.general.languageEn"));
-        dropdown.setValue(this.plugin.options.language || "system");
-        dropdown.onChange(async (value: "ru" | "en" | "system") => {
-          await this.plugin.writeOptions({ language: value });
-          initLocale(value);
-          // Re-render settings to reflect new language
-          this.render();
-          new Notice(tRaw("settings.language.restartNotice"));
-        });
-      });
+    const panels = this.section(iface, {
+      title: tRaw("settings.general.sectionPanels"),
+      desc: tRaw("settings.general.sectionPanelsDesc"),
+      icon: "panel-top",
+    });
+    this.addShowStatusBarSetting(panels);
+    this.addDtwShowOnAllPagesSetting(panels);
+    this.addViewSwitcherModeSetting(panels);
+    this.addHabitTrackerModeSetting(panels);
+    this.addWeightControlSetting(panels);
 
-    // Start of week setting
-    new Setting(general)
-      .setName(tRaw("settings.general.startOfWeekLabel"))
-      .setDesc(tRaw("settings.general.startOfWeekDesc"))
-      .addDropdown((dropdown) => {
-        dropdown.addOption("system", tRaw("settings.general.startOfWeekSystem"));
-        dropdown.addOption("monday", tRaw("settings.general.startOfWeekMonday"));
-        dropdown.addOption("sunday", tRaw("settings.general.startOfWeekSunday"));
-        dropdown.setValue(this.plugin.options.startOfWeek || "system");
-        dropdown.onChange(async (value: "monday" | "sunday" | "system") => {
-          await this.plugin.writeOptions({ startOfWeek: value });
-        });
-      });
+    const taskBehavior = this.section(iface, {
+      title: tRaw("settings.general.sectionTaskBehavior"),
+      desc: tRaw("settings.general.sectionTaskBehaviorDesc"),
+      icon: "list-checks",
+    });
+    this.addCarryOverOverdueSetting(taskBehavior);
 
-    this.addUserNameSetting(general);
-
-    // ── Panels & widgets ──
-    new Setting(general).setName(tRaw("settings.general.sectionPanels")).setHeading();
-
-    this.addShowStatusBarSetting(general);
-    this.addDtwShowOnAllPagesSetting(general);
-    this.addHabitTrackerModeSetting(general);
-    this.addViewSwitcherModeSetting(general);
-    this.addWeightControlSetting(general);
-    this.addWorkTaskSettings(general);
-    this.addCarryOverOverdueSetting(general);
-
-    // ── Data cleanup ──
-    new Setting(general).setName(tRaw("settings.general.sectionDataCleanup")).setHeading();
-    this.addDataCleanupSettings(general);
-
-    // Dashboard tab
+    // ── Dashboard ──
     const dashboard = tabContainers["dashboard"];
-    new Setting(dashboard).setName(tRaw("settings.dashboard.sectionWidgets")).setHeading();
-    new Setting(dashboard)
+
+    const widgets = this.section(dashboard, {
+      title: tRaw("settings.dashboard.sectionWidgets"),
+      desc: tRaw("settings.dashboard.sectionWidgetsDesc"),
+      icon: "layout-grid",
+    });
+    new Setting(widgets)
       .setName(tRaw("settings.dashboard.showTasks"))
       .setDesc(tRaw("settings.dashboard.showTasksDesc"))
       .addToggle((toggle) => {
@@ -666,7 +700,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           await this.plugin.writeOptions({ dashboardShowTasks: value });
         });
       });
-    new Setting(dashboard)
+    new Setting(widgets)
       .setName(tRaw("settings.dashboard.showHabits"))
       .setDesc(tRaw("settings.dashboard.showHabitsDesc"))
       .addToggle((toggle) => {
@@ -675,7 +709,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           await this.plugin.writeOptions({ dashboardShowHabits: value });
         });
       });
-    new Setting(dashboard)
+    new Setting(widgets)
       .setName(tRaw("settings.dashboard.showGoals"))
       .setDesc(tRaw("settings.dashboard.showGoalsDesc"))
       .addToggle((toggle) => {
@@ -685,67 +719,103 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    // Instructions for adding dashboard block
-    const dashInstructions = dashboard.createDiv({ cls: "settings-banner" });
-    new Setting(dashInstructions).setName(tRaw("settings.dashboard.blockTitle")).setHeading();
-    dashInstructions.createEl("p", {
-      text: tRaw("settings.dashboard.blockDesc"),
+    const helloCard = this.section(dashboard, {
+      title: tRaw("settings.dashboard.sectionHello"),
+      desc: tRaw("settings.general.sectionHelloDesc"),
+      icon: "hand",
     });
-    const dashCode = dashInstructions.createEl("pre");
-    dashCode.createEl("code", { text: "```dashboard\n```" });
-    dashCode.addClass("mcp-code-block");
-    dashInstructions.createEl("p", {
-      text: tRaw("settings.dashboard.blockHint"),
+    this.addHelloButtonSettings(helloCard);
+
+    const dashBlock = this.section(dashboard, {
+      title: tRaw("settings.dashboard.blockTitle"),
+      desc: tRaw("settings.dashboard.blockDesc"),
+      icon: "code-2",
     });
+    this.codeSample(dashBlock, "```dashboard\n```");
+    this.note(dashBlock, tRaw("settings.dashboard.blockHint"));
 
-    new Setting(dashboard).setName(tRaw("settings.dashboard.sectionHello")).setHeading();
-    this.addHelloButtonSettings(dashboard);
-
-    // Schedule tab
+    // ── Schedule ──
     const schedule = tabContainers["schedule"];
-    new Setting(schedule).setName(tRaw("settings.schedule.sectionDisplay")).setHeading();
-    this.addScheduleDisplaySettings(schedule);
+    const scheduleCard = this.section(schedule, {
+      title: tRaw("settings.schedule.sectionDisplay"),
+      desc: tRaw("settings.schedule.sectionDisplayDesc"),
+      icon: "eye",
+    });
+    this.addScheduleDisplaySettings(scheduleCard);
 
-    // Finance tab
+    // ── Finance ──
     const finance = tabContainers["finance"];
     this.addFinanceSettings(finance);
 
-    // Weather tab
+    // ── Weather ──
     const weather = tabContainers["weather"];
     this.addWeatherSettings(weather);
 
-    // Appearance tab
+    // ── Appearance ──
     const appearance = tabContainers["appearance"];
-    // Intro so the user knows what this tab is for
-    const appearanceIntro = appearance.createDiv({ cls: "setting-item-description" });
-    appearanceIntro.setText(tRaw("settings.appearance.intro"));
 
-    // 1. Quick look — the two controls most people need
-    new Setting(appearance).setName(tRaw("settings.appearance.sectionQuick")).setHeading();
-    this.addAccentColorSetting(appearance);
-    this.addGlassBgColorSetting(appearance);
+    const quick = this.section(appearance, {
+      title: tRaw("settings.appearance.sectionQuick"),
+      desc: tRaw("settings.appearance.intro"),
+      icon: "sparkles",
+    });
+    this.addAccentColorSetting(quick);
+    this.addGlassBgColorSetting(quick);
 
-    // 2. Advanced colors (full palette)
-    new Setting(appearance).setName(tRaw("settings.appearance.sectionAdvanced")).setHeading();
-    const advancedDesc = appearance.createDiv({ cls: "setting-item-description" });
-    advancedDesc.setText(tRaw("settings.appearance.sectionAdvancedDesc"));
-    this.addColorSettings(appearance);
+    const advanced = this.section(appearance, {
+      title: tRaw("settings.appearance.sectionAdvanced"),
+      desc: tRaw("settings.appearance.sectionAdvancedDesc"),
+      icon: "palette",
+    });
+    this.addColorSettings(advanced);
 
-    // Sync tab
+    // ── Sync ──
     const sync = tabContainers["sync"];
-    new Setting(sync).setName(tRaw("settings.sync.sectionVault")).setHeading();
-    this.addSyncConflictCleanupSetting(sync);
+
+    const vaultCard = this.section(sync, {
+      title: tRaw("settings.sync.sectionVault"),
+      desc: tRaw("settings.sync.sectionVaultDesc"),
+      icon: "hard-drive",
+    });
+    this.addSyncConflictCleanupSetting(vaultCard);
+
     this.addGitHubGistSettings(sync);
 
-    // Notifications tab
+    // ── Notifications ──
     const notif = tabContainers["notifications"];
     this.addNotificationSettings(notif);
 
-    // AI tab
+    // ── AI ──
     const ai = tabContainers["ai"];
     this.addOllamaSettings(ai);
 
-    // Store references for switchTab
+    // Support footer (quiet, after all tabs)
+    const footer = containerEl.createDiv({ cls: "wl-settings-footer" });
+    const footerText = footer.createDiv({ cls: "wl-settings-footer-text" });
+    footerText.createDiv({
+      cls: "wl-settings-footer-title",
+      text: tRaw("settings.general.supportTitle"),
+    });
+    footerText.createEl("p", {
+      cls: "wl-settings-footer-desc",
+      text: tRaw("settings.general.supportDesc"),
+    });
+    const footerActions = footer.createDiv({ cls: "wl-settings-footer-actions" });
+    const coffeeBtn = footerActions.createEl("a", {
+      cls: "wl-settings-footer-btn",
+      text: tRaw("settings.general.supportBtn"),
+      href: "https://boosty.to/atins/donate",
+    });
+    coffeeBtn.setAttribute("target", "_blank");
+    coffeeBtn.setAttribute("rel", "noopener");
+    const starBtn = footerActions.createEl("a", {
+      cls: "wl-settings-footer-btn wl-settings-footer-btn--ghost",
+      text: tRaw("settings.general.githubStarBtn"),
+      href: "https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian",
+    });
+    starBtn.setAttribute("target", "_blank");
+    starBtn.setAttribute("rel", "noopener");
+
     this._tabButtons = tabButtons;
     this._tabContainers = tabContainers;
   }
@@ -779,10 +849,6 @@ export class CalendarSettingsTab extends PluginSettingTab {
   }
 
   addHelloButtonSettings(container: HTMLElement): void {
-    new Setting(container)
-      .setName(tRaw("settings.general.sectionHello"))
-      .setDesc(tRaw("settings.general.sectionHelloDesc"));
-
     new Setting(container)
       .setName(tRaw("settings.general.showTasksBtn"))
       .addToggle((toggle) => {
@@ -839,18 +905,9 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    // Instructions for adding hello block
-    const helloInstructions = container.createDiv({ cls: "settings-banner" });
-    new Setting(helloInstructions).setName(tRaw("settings.general.helloBlockTitle")).setHeading();
-    helloInstructions.createEl("p", {
-      text: tRaw("settings.general.helloBlockDesc"),
-    });
-    const codeBlock = helloInstructions.createEl("pre");
-    codeBlock.createEl("code", { text: "```hello\n```" });
-    codeBlock.addClass("mcp-code-block");
-    helloInstructions.createEl("p", {
-      text: tRaw("settings.general.helloBlockHint"),
-    });
+    this.note(container, tRaw("settings.general.helloBlockDesc"));
+    this.codeSample(container, "```hello\n```");
+    this.note(container, tRaw("settings.general.helloBlockHint"));
   }
 
   addShowStatusBarSetting(container: HTMLElement): void {
@@ -1020,7 +1077,13 @@ export class CalendarSettingsTab extends PluginSettingTab {
   addWeatherSettings(container: HTMLElement): void {
     const opts = this.plugin.options;
 
-    new Setting(container)
+    const weatherCard = this.section(container, {
+      title: tRaw("settings.weather.showWeather"),
+      desc: tRaw("settings.weather.showWeatherDesc"),
+      icon: "cloud-sun",
+    });
+
+    new Setting(weatherCard)
       .setName(tRaw("settings.weather.showWeather"))
       .setDesc(tRaw("settings.weather.showWeatherDesc"))
       .addToggle((toggle) => {
@@ -1030,7 +1093,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(weatherCard)
       .setName(tRaw("settings.weather.provider"))
       .setDesc(tRaw("settings.weather.providerDesc"))
       .addDropdown((dropdown) => {
@@ -1051,16 +1114,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
     // Attribution notice
     const attribution = getWeatherAttribution(provider);
     if (attribution) {
-      const attrEl = container.createDiv();
-      attrEl.addClass("mcp-weather-attr");
-      attrEl.textContent = attribution;
+      this.note(weatherCard, attribution);
     }
 
     // WeatherAPI disclaimer (required by their TOS)
     if (provider === "weatherapi") {
-      const disclaimerEl = container.createDiv();
-      disclaimerEl.addClass("mcp-weather-disclaimer");
-      disclaimerEl.textContent = tRaw("settings.weather.disclaimer");
+      this.note(weatherCard, tRaw("settings.weather.disclaimer"));
     }
 
     if (needsKey) {
@@ -1069,7 +1128,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         "weatherapi": "WeatherAPI (weatherapi.com)",
         "visual-crossing": "Visual Crossing (visualcrossing.com)",
       };
-      new Setting(container)
+      new Setting(weatherCard)
         .setName(tRaw("settings.weather.apiKey"))
         .setDesc(tRaw("settings.weather.apiKeyDesc", { provider: providerNames[provider] || provider }))
         .addText((text) => {
@@ -1084,7 +1143,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
     }
 
-    new Setting(container)
+    new Setting(weatherCard)
       .setName(tRaw("settings.weather.latitude"))
       .setDesc(tRaw("settings.weather.latitudeDesc"))
       .addText((text) => {
@@ -1104,7 +1163,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.addClass("mcp-input-md");
       });
 
-    new Setting(container)
+    new Setting(weatherCard)
       .setName(tRaw("settings.weather.longitude"))
       .setDesc(tRaw("settings.weather.longitudeDesc"))
       .addText((text) => {
@@ -1125,8 +1184,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       });
 
     // Test & confirm buttons
-    const btnRow = container.createDiv();
-    btnRow.addClass("mcp-btn-row");
+    const btnRow = weatherCard.createDiv({ cls: "mcp-btn-row" });
 
     const testBtn = btnRow.createEl("button", { text: tRaw("settings.weather.checkConnection") });
     testBtn.addClass("mcp-btn");
@@ -1163,7 +1221,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
     });
 
     // Weather animation previews
-    this.addWeatherPreviews(container);
+    const previews = this.section(container, {
+      title: tRaw("settings.weather.previewTitle"),
+      desc: tRaw("settings.weather.previewDesc"),
+      icon: "eye",
+    });
+    this.addWeatherPreviews(previews);
   }
 
   private addWeatherPreviews(container: HTMLElement): void {
@@ -1331,13 +1394,14 @@ export class CalendarSettingsTab extends PluginSettingTab {
   }
 
   addColorSettings(container: HTMLElement): void {
-    new Setting(container).setName(tRaw("settings.appearance.sectionInterfaceColors")).setHeading();
-
     // Main colors
-    new Setting(container).setName(tRaw("settings.appearance.sectionMainColors")).setHeading();
+    const mainColors = this.section(container, {
+      title: tRaw("settings.appearance.sectionMainColors"),
+      icon: "paint-bucket",
+    });
 
     this.addColorPickerSetting(
-      container,
+      mainColors,
       tRaw("settings.appearance.bgColor"),
       tRaw("settings.appearance.bgColorDesc"),
       "bgColor",
@@ -1345,7 +1409,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     this.addColorPickerSetting(
-      container,
+      mainColors,
       tRaw("settings.appearance.surfaceColor"),
       tRaw("settings.appearance.surfaceColorDesc"),
       "surfaceColor",
@@ -1353,7 +1417,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     this.addColorPickerSetting(
-      container,
+      mainColors,
       tRaw("settings.appearance.surface2Color"),
       tRaw("settings.appearance.surface2ColorDesc"),
       "surface2Color",
@@ -1361,7 +1425,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     this.addColorPickerSetting(
-      container,
+      mainColors,
       tRaw("settings.appearance.surfaceHoverColor"),
       tRaw("settings.appearance.surfaceHoverColorDesc"),
       "surfaceHoverColor",
@@ -1369,10 +1433,13 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     // Semantic colors
-    new Setting(container).setName(tRaw("settings.appearance.sectionSemanticColors")).setHeading();
+    const semanticColors = this.section(container, {
+      title: tRaw("settings.appearance.sectionSemanticColors"),
+      icon: "tags",
+    });
 
     this.addColorPickerSetting(
-      container,
+      semanticColors,
       tRaw("settings.appearance.successColor"),
       tRaw("settings.appearance.successColorDesc"),
       "successColor",
@@ -1380,7 +1447,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     this.addColorPickerSetting(
-      container,
+      semanticColors,
       tRaw("settings.appearance.dangerColor"),
       tRaw("settings.appearance.dangerColorDesc"),
       "dangerColor",
@@ -1388,7 +1455,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     this.addColorPickerSetting(
-      container,
+      semanticColors,
       tRaw("settings.appearance.warningColor"),
       tRaw("settings.appearance.warningColorDesc"),
       "warningColor",
@@ -1396,7 +1463,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     this.addColorPickerSetting(
-      container,
+      semanticColors,
       tRaw("settings.appearance.amberColor"),
       tRaw("settings.appearance.amberColorDesc"),
       "amberColor",
@@ -1404,10 +1471,13 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     // Text colors
-    new Setting(container).setName(tRaw("settings.appearance.sectionTextColors")).setHeading();
+    const textColors = this.section(container, {
+      title: tRaw("settings.appearance.sectionTextColors"),
+      icon: "type",
+    });
 
     this.addColorPickerSetting(
-      container,
+      textColors,
       tRaw("settings.appearance.textColor"),
       tRaw("settings.appearance.textColorDesc"),
       "textColor",
@@ -1415,7 +1485,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     this.addColorPickerSetting(
-      container,
+      textColors,
       tRaw("settings.appearance.textMutedColor"),
       tRaw("settings.appearance.textMutedColorDesc"),
       "textMutedColor",
@@ -1423,7 +1493,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     this.addColorPickerSetting(
-      container,
+      textColors,
       tRaw("settings.appearance.textFaintColor"),
       tRaw("settings.appearance.textFaintColorDesc"),
       "textFaintColor",
@@ -1431,10 +1501,13 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     // Glass panel colors
-    new Setting(container).setName(tRaw("settings.appearance.sectionGlass")).setHeading();
+    const glassColors = this.section(container, {
+      title: tRaw("settings.appearance.sectionGlass"),
+      icon: "layers",
+    });
 
     this.addColorPickerSetting(
-      container,
+      glassColors,
       tRaw("settings.appearance.glassBorderColor"),
       tRaw("settings.appearance.glassBorderColorDesc"),
       "glassBorderColor",
@@ -1442,7 +1515,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     this.addColorPickerSetting(
-      container,
+      glassColors,
       tRaw("settings.appearance.glassHighlightColor"),
       tRaw("settings.appearance.glassHighlightColorDesc"),
       "glassHighlightColor",
@@ -1450,7 +1523,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
     );
 
     // Reset all button
-    new Setting(container)
+    const resetRow = container.createDiv({ cls: "wl-settings-actions" });
+    new Setting(resetRow)
       .setName(tRaw("settings.appearance.resetAllColors"))
       .setDesc(tRaw("settings.appearance.resetAllColorsDesc"))
       .addButton((btn) =>
@@ -1539,13 +1613,15 @@ export class CalendarSettingsTab extends PluginSettingTab {
       });
   }
 
-  /** Finance: currency symbol + month-summary export folder. */
+  /** Finance: currency, work-task defaults, month-summary export folders. */
   addFinanceSettings(container: HTMLElement): void {
-    new Setting(container)
-      .setName(tRaw("settings.finance.sectionCurrency"))
-      .setHeading();
+    const currency = this.section(container, {
+      title: tRaw("settings.finance.sectionCurrency"),
+      desc: tRaw("settings.finance.currencyDesc"),
+      icon: "coins",
+    });
 
-    new Setting(container)
+    new Setting(currency)
       .setName(tRaw("settings.finance.currency"))
       .setDesc(tRaw("settings.finance.currencyDesc"))
       .addDropdown((dropdown) => {
@@ -1574,7 +1650,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(currency)
       .setName(tRaw("settings.finance.currencyCustom"))
       .setDesc(tRaw("settings.finance.currencyCustomDesc"))
       .addText((text) => {
@@ -1587,11 +1663,20 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.addClass("mcp-input-md");
       });
 
-    new Setting(container)
-      .setName(tRaw("settings.finance.sectionExport"))
-      .setHeading();
+    const work = this.section(container, {
+      title: tRaw("settings.general.sectionWorkTasks"),
+      desc: tRaw("settings.general.sectionWorkTasksDesc"),
+      icon: "briefcase",
+    });
+    this.addWorkTaskSettings(work);
 
-    new Setting(container)
+    const exportCard = this.section(container, {
+      title: tRaw("settings.finance.sectionExport"),
+      desc: tRaw("settings.finance.sectionExportDesc"),
+      icon: "folder-output",
+    });
+
+    new Setting(exportCard)
       .setName(tRaw("settings.finance.exportFolderMd"))
       .setDesc(tRaw("settings.finance.exportFolderMdDesc"))
       .addText((text) => {
@@ -1617,7 +1702,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           });
       });
 
-    new Setting(container)
+    new Setting(exportCard)
       .setName(tRaw("settings.finance.exportFolderExcel"))
       .setDesc(tRaw("settings.finance.exportFolderExcelDesc"))
       .addText((text) => {
@@ -1668,11 +1753,6 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
   /** Лимиты автоочистки — намеренно вне вкладки «Синхронизация». */
   addDataCleanupSettings(container: HTMLElement): void {
-    container.createEl("p", {
-      cls: "setting-item-description mcp-cleanup-note",
-      text: tRaw("settings.general.sectionDataCleanupDesc"),
-    });
-
     new Setting(container)
       .setName(tRaw("settings.general.autoCleanupThreshold"))
       .setDesc(
@@ -1715,10 +1795,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.addClass("mcp-input-sm");
       });
 
-    container.createEl("p", {
-      cls: "setting-item-description mcp-cleanup-note",
-      text: tRaw("settings.general.formatCleanup"),
-    });
+    this.note(container, tRaw("settings.general.formatCleanup"));
   }
 
   addSyncConflictCleanupSetting(container: HTMLElement): void {
@@ -1734,26 +1811,25 @@ export class CalendarSettingsTab extends PluginSettingTab {
   }
 
   addGitHubGistSettings(container: HTMLElement): void {
-    new Setting(container).setName(tRaw("settings.sync.sectionGithubGist")).setHeading();
+    const gist = this.section(container, {
+      title: tRaw("settings.sync.sectionGithubGist"),
+      desc: tRaw("settings.sync.gistDesc1"),
+      icon: "github",
+    });
 
-    const desc = container.createDiv({ cls: "setting-item-description mcp-format-info" });
-
-    const gistP1 = desc.createEl("p", { cls: "mcp-format-label" });
-    gistP1.textContent = `${tRaw("settings.sync.gistDesc1")} ${tRaw("settings.sync.gistDesc2")}`;
-
-    const gistP2 = desc.createEl("p", { cls: "mcp-format-label" });
-    const gistB = gistP2.createEl("b");
+    const howTo = gist.createDiv({ cls: "wl-settings-note" });
+    const gistB = howTo.createEl("b");
     gistB.textContent = tRaw("settings.sync.gistHowTo");
-    gistP2.createEl("br");
-    gistP2.appendText("1. GitHub → Settings → Credentials");
-    gistP2.createEl("br");
-    gistP2.appendText("2. Personal access tokens → Tokens (classic)");
-    gistP2.createEl("br");
-    gistP2.appendText(`3. ${tRaw("settings.sync.gistHowToStep1")}`);
-    gistP2.createEl("br");
-    gistP2.appendText(`4. ${tRaw("settings.sync.gistHowToStep2")}`);
+    howTo.createEl("br");
+    howTo.appendText("1. GitHub → Settings → Credentials");
+    howTo.createEl("br");
+    howTo.appendText("2. Personal access tokens → Tokens (classic)");
+    howTo.createEl("br");
+    howTo.appendText(`3. ${tRaw("settings.sync.gistHowToStep1")}`);
+    howTo.createEl("br");
+    howTo.appendText(`4. ${tRaw("settings.sync.gistHowToStep2")}`);
 
-    new Setting(container)
+    new Setting(gist)
       .setName(tRaw("settings.sync.githubToken"))
       .setDesc(tRaw("settings.sync.githubTokenDesc"))
       .addText((text) => {
@@ -1767,7 +1843,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.addClass("mcp-input-xl");
       });
 
-    new Setting(container)
+    new Setting(gist)
       .setName(tRaw("settings.sync.gistSyncBtn"))
       .setDesc(tRaw("settings.sync.gistSyncBtnDesc"))
       .addButton((btn) =>
@@ -1809,7 +1885,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           }),
       );
 
-    new Setting(container)
+    new Setting(gist)
       .setName(tRaw("settings.sync.gistAutoSync"))
       .setDesc(
         tRaw("settings.sync.gistAutoSyncDesc"),
@@ -1835,12 +1911,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
     statusDesc.textContent = this.plugin.options.gistAutoSync
       ? tRaw("settings.sync.gistAutoSyncOn")
       : tRaw("settings.sync.gistAutoSyncOff");
-    container
+    gist
       .querySelector(".setting-item:last-child")
       ?.appendChild(statusDesc);
 
     if (this.plugin.options.gistRawUrl) {
-      new Setting(container)
+      new Setting(gist)
         .setName(tRaw("settings.sync.gistCalendarUrl"))
         .setDesc(tRaw("settings.sync.gistCalendarUrlDesc"))
         .addText((text) => {
@@ -1851,7 +1927,13 @@ export class CalendarSettingsTab extends PluginSettingTab {
   }
 
   addNotificationSettings(container: HTMLElement): void {
-    new Setting(container)
+    const local = this.section(container, {
+      title: tRaw("settings.notifications.sectionGeneral"),
+      desc: tRaw("settings.notifications.enabledDesc"),
+      icon: "bell-ring",
+    });
+
+    new Setting(local)
       .setName(tRaw("settings.notifications.enabled"))
       .setDesc(tRaw("settings.notifications.enabledDesc"))
       .addToggle((toggle) => {
@@ -1862,7 +1944,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(local)
       .setName(tRaw("settings.notifications.reminderMinutes"))
       .setDesc(tRaw("settings.notifications.reminderMinutesDesc"))
       .addDropdown((dropdown) => {
@@ -1878,11 +1960,13 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
-      .setName(tRaw("settings.notifications.typesTitle"))
-      .setDesc(tRaw("settings.notifications.typesDesc"));
+    const types = this.section(container, {
+      title: tRaw("settings.notifications.typesTitle"),
+      desc: tRaw("settings.notifications.typesDesc"),
+      icon: "list-filter",
+    });
 
-    new Setting(container)
+    new Setting(types)
       .setName(tRaw("settings.notifications.notifyReminders"))
       .setDesc(tRaw("settings.notifications.notifyRemindersDesc"))
       .addToggle((toggle) => {
@@ -1892,7 +1976,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(types)
       .setName(tRaw("settings.notifications.notifyOverdue"))
       .setDesc(tRaw("settings.notifications.notifyOverdueDesc"))
       .addToggle((toggle) => {
@@ -1902,7 +1986,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(types)
       .setName(tRaw("settings.notifications.notifyEstimateExceeded"))
       .setDesc(tRaw("settings.notifications.notifyEstimateExceededDesc"))
       .addToggle((toggle) => {
@@ -1912,7 +1996,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(types)
       .setName(tRaw("settings.notifications.notifyDeadlines"))
       .setDesc(tRaw("settings.notifications.notifyDeadlinesDesc"))
       .addToggle((toggle) => {
@@ -1922,7 +2006,13 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    const ntfy = this.section(container, {
+      title: tRaw("settings.notifications.sectionNtfy"),
+      desc: tRaw("settings.notifications.ntfyEnabledDesc"),
+      icon: "smartphone",
+    });
+
+    new Setting(ntfy)
       .setName(tRaw("settings.notifications.ntfyEnabled"))
       .setDesc(tRaw("settings.notifications.ntfyEnabledDesc"))
       .addToggle((toggle) => {
@@ -1939,7 +2029,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(ntfy)
       .setName(tRaw("settings.notifications.ntfyTopic"))
       .setDesc(tRaw("settings.notifications.ntfyTopicDesc"))
       .addText((text) => {
@@ -1953,7 +2043,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.addClass("mcp-input-lg");
       });
 
-    new Setting(container)
+    new Setting(ntfy)
       .setName(tRaw("settings.notifications.ntfyScheduled"))
       .setDesc(tRaw("settings.notifications.ntfyScheduledDesc"))
       .addToggle((toggle) => {
@@ -1973,7 +2063,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(ntfy)
       .setName(tRaw("settings.notifications.ntfyScheduledSkipDevice"))
       .setDesc(tRaw("settings.notifications.ntfyScheduledSkipDeviceDesc"))
       .addToggle((toggle) => {
@@ -1986,7 +2076,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(ntfy)
       .setName(tRaw("settings.notifications.ntfyDailyDigest"))
       .setDesc(tRaw("settings.notifications.ntfyDailyDigestDesc"))
       .addToggle((toggle) => {
@@ -2001,7 +2091,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(ntfy)
       .setName(tRaw("settings.notifications.ntfyDigestTime"))
       .setDesc(tRaw("settings.notifications.ntfyDigestTimeDesc"))
       .addText((text) => {
@@ -2016,7 +2106,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
       });
 
-    new Setting(container)
+    new Setting(ntfy)
       .setName(tRaw("settings.notifications.ntfyDigestCommand"))
       .setDesc(tRaw("settings.notifications.ntfyDigestCommandDesc"))
       .addButton((btn) => {
@@ -2035,9 +2125,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
   }
 
   private addNotificationDiagnostics(container: HTMLElement): void {
-    new Setting(container).setName(tRaw("settings.notifications.sectionDiagnostics")).setHeading();
+    const diag = this.section(container, {
+      title: tRaw("settings.notifications.sectionDiagnostics"),
+      icon: "activity",
+    });
 
-    const panel = container.createDiv({ cls: "mcp-notif-panel" });
+    const panel = diag.createDiv({ cls: "mcp-notif-panel" });
 
     const render = async () => {
       panel.empty();
@@ -2200,14 +2293,21 @@ export class CalendarSettingsTab extends PluginSettingTab {
     // AI is desktop-only: hide the whole surface on mobile (user rule)
     const isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
     if (isMobile) {
-      new Setting(container).setName(tRaw("settings.ai.sectionOllama")).setHeading();
-      const notice = container.createDiv({ cls: "setting-item-description" });
-      notice.setText(tRaw("settings.ai.mobileOnlyDesktop"));
+      const mobileCard = this.section(container, {
+        title: tRaw("settings.ai.sectionOllama"),
+        icon: "sparkles",
+      });
+      this.note(mobileCard, tRaw("settings.ai.mobileOnlyDesktop"));
       return;
     }
 
     // ── 1. On / off ──────────────────────────────────────────────────────
-    new Setting(container)
+    const power = this.section(container, {
+      title: tRaw("settings.ai.sectionOllama"),
+      desc: tRaw("settings.ai.enabledDesc"),
+      icon: "sparkles",
+    });
+    new Setting(power)
       .setName(tRaw("settings.ai.enabled"))
       .setDesc(tRaw("settings.ai.enabledDesc"))
       .addToggle((toggle) => {
@@ -2219,15 +2319,17 @@ export class CalendarSettingsTab extends PluginSettingTab {
       });
 
     if (!this.plugin.options.ollamaEnabled) {
-      const hint = container.createDiv({ cls: "setting-item-description ai-howto-text" });
-      hint.setText(tRaw("settings.ai.howToSteps"));
+      this.note(power, tRaw("settings.ai.howToSteps"));
       return;
     }
 
     // ── 2. Connection ────────────────────────────────────────────────────
-    new Setting(container).setName(tRaw("settings.ai.sectionConnection")).setHeading();
+    const connection = this.section(container, {
+      title: tRaw("settings.ai.sectionConnection"),
+      icon: "plug",
+    });
 
-    new Setting(container)
+    new Setting(connection)
       .setName(tRaw("settings.ai.url"))
       .setDesc(tRaw("settings.ai.urlDesc"))
       .addText((text) => {
@@ -2240,7 +2342,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.addClass("mcp-input-xl");
       });
 
-    new Setting(container)
+    new Setting(connection)
       .setName(tRaw("settings.ai.contextSize"))
       .setDesc(tRaw("settings.ai.contextSizeDesc"))
       .addText((text) => {
@@ -2258,16 +2360,19 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.addClass("mcp-input-md");
       });
 
-    const btnRow = container.createDiv({ cls: "mcp-btn-row" });
+    const btnRow = connection.createDiv({ cls: "mcp-btn-row" });
     this.addTestConnectionButton(btnRow);
     this.addTestAiButton(btnRow);
 
     // ── 3. Models ────────────────────────────────────────────────────────
-    new Setting(container).setName(tRaw("settings.ai.sectionModels")).setHeading();
+    const models = this.section(container, {
+      title: tRaw("settings.ai.sectionModels"),
+      icon: "cpu",
+    });
 
     const modelMode = this.plugin.options.ollamaModelMode === "dual" ? "dual" : "single";
 
-    new Setting(container)
+    new Setting(models)
       .setName(tRaw("settings.ai.modelMode"))
       .setDesc(tRaw("settings.ai.modelModeDesc"))
       .addDropdown((dropdown) => {
@@ -2283,7 +2388,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       });
 
     // Main model — always visible
-    this.addModelPicker(container, {
+    this.addModelPicker(models, {
       name: tRaw("settings.ai.model"),
       desc: tRaw("settings.ai.modelDesc"),
       getValue: () => this.plugin.options.ollamaModel || "llama3.1",
@@ -2292,7 +2397,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
     // Extract model — only in dual mode
     if (modelMode === "dual") {
-      this.addModelPicker(container, {
+      this.addModelPicker(models, {
         name: tRaw("settings.ai.modelExtract"),
         desc: tRaw("settings.ai.modelExtractDesc"),
         getValue: () => this.plugin.options.ollamaModelExtract || "",
@@ -2302,32 +2407,32 @@ export class CalendarSettingsTab extends PluginSettingTab {
     }
 
     // Cloud / remote models help
-    const cloudHelp = container.createDiv({ cls: "setting-item-description ai-howto-text" });
-    cloudHelp.createEl("strong", { text: tRaw("settings.ai.cloudModelsTitle") });
-    const cloudBody = cloudHelp.createEl("p", { cls: "ai-cloud-models-desc" });
-    cloudBody.setText(tRaw("settings.ai.cloudModelsDesc"));
+    this.note(models, `${tRaw("settings.ai.cloudModelsTitle")} — ${tRaw("settings.ai.cloudModelsDesc")}`);
 
     // ── 4. Actions ───────────────────────────────────────────────────────
-    new Setting(container).setName(tRaw("settings.ai.sectionActions")).setHeading();
-
-    new Setting(container).setName(tRaw("settings.ai.sectionActionsTasks")).setHeading();
-    this.addCompactToggle(container, "aiExtractEnabled", "extractEnabled", "extractEnabledDesc");
-    this.addCompactToggle(container, "aiSubtasksEnabled", "subtasksEnabled", "subtasksEnabledDesc");
-    this.addCompactToggle(container, "aiQuickAddEnabled", "quickAddEnabled", "quickAddEnabledDesc", {
+    const actionsTasks = this.section(container, {
+      title: tRaw("settings.ai.sectionActionsTasks"),
+      icon: "list-checks",
+    });
+    this.addCompactToggle(actionsTasks, "aiExtractEnabled", "extractEnabled", "extractEnabledDesc");
+    this.addCompactToggle(actionsTasks, "aiSubtasksEnabled", "subtasksEnabled", "subtasksEnabledDesc");
+    this.addCompactToggle(actionsTasks, "aiQuickAddEnabled", "quickAddEnabled", "quickAddEnabledDesc", {
       onAfter: () => this.render(),
     });
     if (this.plugin.options.aiQuickAddEnabled !== false) {
-      this.addCompactToggle(container, "aiConfirmBeforeAdd", "confirmBeforeAdd", "confirmBeforeAddDesc");
-      const quickAddHowTo = container.createDiv({ cls: "setting-item-description ai-howto-text" });
-      quickAddHowTo.setText(tRaw("settings.ai.quickAddHowTo"));
+      this.addCompactToggle(actionsTasks, "aiConfirmBeforeAdd", "confirmBeforeAdd", "confirmBeforeAddDesc");
+      this.note(actionsTasks, tRaw("settings.ai.quickAddHowTo"));
     }
 
-    new Setting(container).setName(tRaw("settings.ai.sectionActionsNotes")).setHeading();
-    this.addCompactToggle(container, "aiSummaryEnabled", "summaryEnabled", "summaryEnabledDesc", {
+    const actionsNotes = this.section(container, {
+      title: tRaw("settings.ai.sectionActionsNotes"),
+      icon: "file-text",
+    });
+    this.addCompactToggle(actionsNotes, "aiSummaryEnabled", "summaryEnabled", "summaryEnabledDesc", {
       onAfter: () => this.render(),
     });
     if (this.plugin.options.aiSummaryEnabled !== false) {
-      new Setting(container)
+      new Setting(actionsNotes)
         .setName(tRaw("settings.ai.summaryStyle"))
         .setDesc(tRaw("settings.ai.summaryStyleDesc"))
         .addDropdown((dropdown) => {
@@ -2362,10 +2467,9 @@ export class CalendarSettingsTab extends PluginSettingTab {
         bullets: tRaw("settings.ai.summaryStyleBulletsDesc"),
         executive: tRaw("settings.ai.summaryStyleExecutiveDesc"),
       };
-      const styleHint = container.createDiv({ cls: "setting-item-description ai-howto-text" });
-      styleHint.setText(styleDescMap[style] || "");
+      this.note(actionsNotes, styleDescMap[style] || "");
 
-      new Setting(container)
+      new Setting(actionsNotes)
         .setName(tRaw("settings.ai.summaryPrompt"))
         .setDesc(tRaw("settings.ai.summaryPromptDesc"))
         .addTextArea((area) => {
@@ -2380,35 +2484,35 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
     }
 
-    new Setting(container).setName(tRaw("settings.ai.sectionActionsFinance")).setHeading();
-    this.addCompactToggle(container, "aiFinanceInsightsEnabled", "financeInsights", "financeInsightsDesc");
+    const actionsFinance = this.section(container, {
+      title: tRaw("settings.ai.sectionActionsFinance"),
+      icon: "coins",
+    });
+    this.addCompactToggle(actionsFinance, "aiFinanceInsightsEnabled", "financeInsights", "financeInsightsDesc");
 
-    new Setting(container).setName(tRaw("settings.ai.sectionActionsSchedule")).setHeading();
-    this.addCompactToggle(container, "aiWorkoutEnabled", "workoutEnabled", "workoutEnabledDesc");
-    this.addCompactToggle(container, "aiScheduleActionsEnabled", "scheduleActionsEnabled", "scheduleActionsEnabledDesc");
+    const actionsSchedule = this.section(container, {
+      title: tRaw("settings.ai.sectionActionsSchedule"),
+      icon: "calendar-check",
+    });
+    this.addCompactToggle(actionsSchedule, "aiWorkoutEnabled", "workoutEnabled", "workoutEnabledDesc");
+    this.addCompactToggle(actionsSchedule, "aiScheduleActionsEnabled", "scheduleActionsEnabled", "scheduleActionsEnabledDesc");
 
     // ── 5. Privacy ───────────────────────────────────────────────────────
-    new Setting(container).setName(tRaw("settings.ai.sectionPrivacy")).setHeading();
-
-    const cloudWarn = container.createDiv({ cls: "settings-banner" });
-    new Setting(cloudWarn)
-      .setName(tRaw("settings.ai.cloudWarning"))
-      .setHeading();
-    cloudWarn.createEl("p", {
-      cls: "setting-item-description",
-      text: tRaw("settings.ai.cloudWarningDesc"),
+    const privacy = this.section(container, {
+      title: tRaw("settings.ai.sectionPrivacy"),
+      desc: tRaw("settings.ai.dataSentDesc"),
+      icon: "shield",
+      tone: "warning",
     });
-
-    const dataSent = container.createDiv({ cls: "setting-item-description ai-howto-text" });
-    dataSent.createEl("strong", { text: tRaw("settings.ai.dataSentTitle") });
-    dataSent.createEl("p", {
-      text: tRaw("settings.ai.dataSentDesc"),
-    });
+    this.note(privacy, tRaw("settings.ai.cloudWarningDesc"));
+    this.note(privacy, `${tRaw("settings.ai.dataSentTitle")}: ${tRaw("settings.ai.dataSentDesc")}`);
 
     // ── 6. How-to ────────────────────────────────────────────────────────
-    new Setting(container).setName(tRaw("settings.ai.howToTitle")).setHeading();
-    const howTo = container.createDiv({ cls: "setting-item-description ai-howto-text" });
-    howTo.setText(tRaw("settings.ai.howToSteps"));
+    const howToCard = this.section(container, {
+      title: tRaw("settings.ai.howToTitle"),
+      icon: "help-circle",
+    });
+    this.note(howToCard, tRaw("settings.ai.howToSteps"));
   }
 
   /** Small helper: toggle with short label, one-line desc. */

@@ -8,6 +8,8 @@
 
   export let date: string;
 
+  $: isWorkoutStreak = habit.projectId === "workout-streak";
+
   const dispatch = createEventDispatcher();
 
   let isCompleted = false;
@@ -76,6 +78,7 @@
   class:completed={isCompleted && !isMultiTarget}
   class:multi-target={isMultiTarget}
   class:fully-done={isMultiTarget && currentCount >= targetCount}
+  class:workout-streak={isWorkoutStreak}
   on:keydown={handleKeydown}
   tabindex="0"
   role="group"

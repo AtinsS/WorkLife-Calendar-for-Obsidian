@@ -78,6 +78,7 @@ export const ru = {
   settings: {
     tabs: {
       general: "Общее",
+      interface: "Интерфейс",
       dashboard: "Дашборд",
       schedule: "Расписание",
       finance: "Финансы",
@@ -86,14 +87,16 @@ export const ru = {
       sync: "Синхронизация",
       notifications: "Уведомления",
       ai: "ИИ (Ollama)",
-      generalDesc: "Язык, имя, режим привычек, настройки трекера задач",
+      generalDesc: "Имя, язык, начало недели, обновления и хранение данных",
+      interfaceDesc: "Панели, переключатель видов, привычки, вес и поведение задач",
       dashboardDesc: "Виджеты на главной странице и кнопки приветствия",
       scheduleDesc: "Какие элементы отображать в календарном расписании",
-      financeDesc: "Валюта и место выгрузки сводки за месяц",
+      financeDesc: "Валюта, оплата рабочих задач и выгрузка сводки",
       weatherDesc: "Прогноз погоды в заголовках календаря",
-      appearanceDesc: "Цвета, стеклянные панели, кнопки навигации в заметках",
-      syncDesc: "Хранилище в хранилище и экспорт в Google Calendar через GitHub Gist",
-      notificationsDesc: "Напоминания о задачах и оповещения",
+      appearanceDesc: "Цвета, стеклянные панели и стиль интерфейса",
+      syncDesc: "Синхронизация хранилища и экспорт в Google Calendar через GitHub Gist",
+      notificationsDesc: "Напоминания о задачах, push и диагностика",
+      aiDesc: "Локальный ИИ через Ollama: модели, действия и приватность",
     },
 
     finance: {
@@ -104,6 +107,7 @@ export const ru = {
       currencyCustom: "Свой символ",
       currencyCustomDesc: "Введите любой символ или текст (например: руб., USD, kzt)",
       sectionExport: "Выгрузка сводки",
+      sectionExportDesc: "Куда сохранять месячные сводки",
       exportFolder: "Папка для сводок",
       exportFolderDesc: "Куда сохранять MD-сводку за месяц. Пусто — корень хранилища",
       exportFolderMd: "Папка для MD-сводок",
@@ -119,8 +123,17 @@ export const ru = {
     },
 
     general: {
+      tabGeneral: "Настройки WorkLife",
+      sectionIdentity: "Профиль и язык",
+      sectionIdentityDesc: "Как обращаться к вам и в каком формате показывать даты",
+      sectionUpdates: "Обновления плагина",
       sectionInterface: "Интерфейс",
       sectionPanels: "Панели и виджеты",
+      sectionPanelsDesc: "Что показывать вокруг календаря и в переключателе видов",
+      sectionTaskBehavior: "Поведение задач",
+      sectionTaskBehaviorDesc: "Перенос просроченных и автозапуск таймера",
+      sectionWorkTasks: "Рабочие задачи",
+      sectionWorkTasksDesc: "Значения по умолчанию для новых оплачиваемых задач",
       userName: "Ваше имя",
       userNameDesc: "Имя будет отображаться в приветствии",
       userNamePlaceholder: "Введите имя...",
@@ -157,7 +170,7 @@ export const ru = {
       autoCleanupThresholdDesc: "Максимальное количество выполненных задач. При превышении старые задачи удаляются автоматически.",
       timeLogCleanupThreshold: "Лимит логов времени",
       timeLogCleanupThresholdDesc: "Максимальное количество записей логов времени. При превышении старые логи удаляются автоматически.",
-      sectionDataCleanup: "Очистка данных",
+      sectionDataCleanup: "Хранение данных",
       sectionDataCleanupDesc: "Локальные лимиты хранения. Не относятся к синхронизации — действуют только на этом устройстве.",
       defaultPaymentType: "Тип оплаты по умолчанию",
       defaultPaymentTypeDesc: "Тип оплаты для новых рабочих задач",
@@ -191,6 +204,7 @@ export const ru = {
 
     dashboard: {
       sectionWidgets: "Виджеты дашборда",
+      sectionWidgetsDesc: "Блоки с задачами, привычками и целями на главной странице",
       showTasks: "Виджет задач на сегодня",
       showTasksDesc: "Показывать количество задач и прогресс-бар в дашборде",
       showHabits: "Виджет привычек",
@@ -211,6 +225,7 @@ export const ru = {
 
     schedule: {
       sectionDisplay: "Отображаемые элементы",
+      sectionDisplayDesc: "Что показывать на карточках и в сетке расписания",
       showTime: "Время",
       showTimeDesc: "Отображать запланированное время задачи",
       showStatus: "Статус",
@@ -236,6 +251,8 @@ export const ru = {
     weather: {
       showWeather: "Показывать погоду",
       showWeatherDesc: "Отображать прогноз погоды в заголовках дней недели",
+      previewTitle: "Превью анимаций",
+      previewDesc: "Как выглядят типы погоды в календаре",
       latitude: "Широта",
       latitudeDesc: "Широта вашего местоположения (например: 55.75 для Москвы)",
       longitude: "Долгота",
@@ -306,6 +323,7 @@ export const ru = {
 
     sync: {
       sectionVault: "Синхронизация через хранилище",
+      sectionVaultDesc: "Хранить данные плагина в папке хранилища для облачной синхронизации",
       syncToVault: "Сохранять данные в хранилище",
       syncToVaultDesc: "Хранить данные в папке calendar-data/ для синхронизации через WebDAV, iCloud и другие сервисы",
       syncConflictCleanup: "Чистка конфликтов Syncthing",
@@ -410,7 +428,7 @@ export const ru = {
       enabledDesc: "Запросы идут на Ollama по адресу ниже.",
       mobileOnlyDesktop: "ИИ работает только на десктопе.",
 
-      sectionConnection: "2. Подключение",
+      sectionConnection: "Подключение",
       url: "Адрес Ollama",
       urlDesc: "По умолчанию — http://localhost:11434",
       urlPlaceholder: "http://localhost:11434",
@@ -424,7 +442,7 @@ export const ru = {
       contextSize: "Размер контекста",
       contextSizeDesc: "0 — без ограничений.",
 
-      sectionModels: "3. Модели",
+      sectionModels: "Модели",
       modelMode: "Сколько моделей",
       modelModeDesc: "Две модели быстрее и дешевле для коротких задач.",
       modelModeSingle: "Одна",
@@ -441,7 +459,7 @@ export const ru = {
       cloudModelsTitle: "Совместимые адреса",
       cloudModelsDesc: "Нужен сервер с API Ollama: localhost, LAN, SSH-туннель, Tailscale. OpenAI-совместимые API (OpenRouter, Groq, ChatGPT) не подходят.",
 
-      sectionActions: "4. Действия",
+      sectionActions: "Действия",
       sectionActionsTasks: "Задачи",
       sectionActionsNotes: "Заметки",
       sectionActionsFinance: "Финансы",
@@ -476,7 +494,7 @@ export const ru = {
       quickAddHowTo: "В «Быстро добавить» можно писать обычным текстом — дата, @проект и приоритет распознаются сами.",
       financeInsights: "Советы в финансовой сводке",
       financeInsightsDesc: "Краткий разбор месяца при выгрузке MD.",
-      sectionPrivacy: "5. Данные",
+      sectionPrivacy: "Данные",
       cloudWarning: "⚠️ Адрес отличный от localhost",
       cloudWarningDesc: "Заметки, задачи и финансы уйдут на эту машину. Для личных данных используйте localhost.",
       dataSentTitle: "Что отправляется",

@@ -28,6 +28,8 @@
   import { get } from "svelte/store";
   import { financeTabRequest, type FinanceTab } from "./financeUiStore";
   import { exportMonthSummary } from "./monthSummaryExport";
+  import { fly } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
   import { exportPeriodExcelFile } from "./monthSummaryExcel";
   import { ExportSummaryModal } from "./ExportSummaryModal";
   import FinancialAnalytics from "./FinancialAnalytics.svelte";
@@ -657,6 +659,11 @@
     </div>
   </div>
 
+  {#key activeTab}
+  <div
+    class="fin-panel"
+    in:fly={{ x: 22, duration: 280, easing: cubicOut }}
+  >
   {#if activeTab === "income"}
     <FinancialAnalytics embedded selectedYear={displayYear} selectedMonth={displayMonth} />
   {:else if activeTab === "savings"}
@@ -1105,9 +1112,16 @@
     {/if}
   </div>
   {/if}
+  </div>
+  {/key}
 </div>
 
 <style>
+  .fin-panel {
+    min-height: 120px;
+    will-change: transform, opacity;
+  }
+
   .finance-tracker {
     --fi-bg: transparent;
     --fi-surface: var(--mcp-glass-bg, rgba(35, 40, 55, 0.4));
@@ -1162,11 +1176,12 @@
 
   .fin-tabs {
     display: inline-flex;
-    gap: 4px;
+    gap: 2px;
     padding: 4px;
-    border-radius: 12px;
-    background: var(--fi-surface);
+    border-radius: var(--mcp-radius, 16px);
+    background: color-mix(in srgb, var(--fi-surface) 80%, transparent);
     border: 1px solid var(--fi-border);
+    position: relative;
   }
 
   .fin-export {
@@ -1186,34 +1201,44 @@
     font-family: inherit;
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   }
 
   .fin-export-btn:hover {
     background: var(--fi-surface-hover);
     border-color: var(--fi-border-focus);
     color: var(--fi-accent);
+    transform: translateY(-1px);
+  }
+
+  .fin-export-btn:active {
+    transform: translateY(0) scale(0.97);
   }
 
   .fin-tab {
     padding: 7px 16px;
     border: none;
-    border-radius: 9px;
+    border-radius: calc(var(--mcp-radius, 16px) - 5px);
     background: transparent;
     color: var(--fi-muted);
     font-size: 12.5px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1), color 0.18s ease,
+      box-shadow 0.22s ease, transform 0.18s ease;
   }
 
   .fin-tab:hover { color: var(--fi-text); }
 
+  .fin-tab:active {
+    transform: scale(0.96);
+  }
+
   .fin-tab.is-active {
     background: var(--fi-accent);
     color: var(--text-on-accent, #fff);
-    box-shadow: 0 2px 10px color-mix(in srgb, var(--fi-accent) 35%, transparent);
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--fi-accent) 40%, transparent);
   }
 
   /* ── Month navigator ─────────────────────────────────── */

@@ -775,86 +775,286 @@
   width: 100%;
 }
 
-.settings-coffee-banner {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(180, 120, 40, 0.08));
-  border: 1px solid rgba(251, 191, 36, 0.25);
-  border-radius: var(--mcp-radius-lg);
-  padding: 1.5em 2em;
-  margin-bottom: 1.5em;
-  text-align: center;
-  backdrop-filter: var(--mcp-blur);
-  -webkit-backdrop-filter: var(--mcp-blur);
+/* ── Settings shell: banner, tabs, panels, cards ── */
+.wl-settings-banner {
+  padding: 1rem 1.15rem;
+  margin-bottom: 1.25rem;
+  border-radius: var(--mcp-radius-sm);
+  border: 1px solid var(--mcp-glass-border);
+  background: var(--mcp-glass-bg);
 }
 
-.settings-coffee-title {
-  margin: 0 0 0.3em;
-  font-size: 1.3em;
-  font-weight: 700;
-  color: rgba(251, 191, 36, 0.95);
-  background: none;
+.wl-settings-banner--warn {
+  border-color: rgba(245, 166, 35, 0.35);
+  background: rgba(245, 166, 35, 0.1);
 }
 
-.settings-coffee-desc {
-  margin: 0 0 1em;
+.wl-settings-banner-title {
+  font-weight: 650;
   font-size: 0.95em;
-  color: var(--text-muted, rgba(255, 255, 255, 0.5));
+  color: var(--mcp-text);
+  margin-bottom: 0.35rem;
 }
 
-.settings-coffee-actions {
+.wl-settings-banner-desc {
+  margin: 0;
+  font-size: 0.88em;
+  line-height: 1.55;
+  color: var(--mcp-text-muted);
+}
+
+.wl-settings-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+}
+
+/* Icon tab rail */
+.wl-settings-tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  justify-content: center;
-  align-items: center;
-}
-
-.settings-coffee-btn {
-  display: inline-block;
-  padding: 8px 24px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.3), rgba(251, 191, 36, 0.15));
-  border: 1px solid rgba(251, 191, 36, 0.4);
-  color: rgba(251, 191, 36, 0.95);
-  font-weight: 600;
-  font-size: 0.95em;
-  text-decoration: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.settings-coffee-btn:hover {
-  background: linear-gradient(135deg, rgba(251, 191, 36, 0.45), rgba(251, 191, 36, 0.25));
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(251, 191, 36, 0.2);
-}
-
-.settings-github-star-btn {
-  background: linear-gradient(135deg, rgba(88, 166, 255, 0.28), rgba(88, 166, 255, 0.12));
-  border-color: rgba(88, 166, 255, 0.4);
-  color: rgba(120, 180, 255, 0.98);
-}
-
-.settings-github-star-btn:hover {
-  background: linear-gradient(135deg, rgba(88, 166, 255, 0.42), rgba(88, 166, 255, 0.22));
-  box-shadow: 0 4px 12px rgba(88, 166, 255, 0.22);
-}
-
-.settings-banner {
-  background: var(--mcp-glass-bg);
-  backdrop-filter: var(--mcp-blur);
-  -webkit-backdrop-filter: var(--mcp-blur);
+  gap: 0.4rem;
+  padding: 0.4rem;
+  border-radius: var(--mcp-radius);
+  background: color-mix(in srgb, var(--background-secondary) 88%, transparent);
   border: 1px solid var(--mcp-glass-border);
-  border-radius: var(--mcp-radius-lg);
-  margin-bottom: 2em;
-  padding: 2em;
+}
+
+.wl-settings-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.86em;
+  font-weight: 550;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: color var(--mcp-transition-fast), background var(--mcp-transition-fast),
+    border-color var(--mcp-transition-fast);
+}
+
+.wl-settings-tab:hover {
+  color: var(--text-normal);
+  background: var(--background-modifier-hover);
+}
+
+.wl-settings-tab.active {
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.wl-settings-tab-icon {
+  display: inline-flex;
+  width: 1.05em;
+  height: 1.05em;
+  flex-shrink: 0;
+}
+
+.wl-settings-tab-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.wl-settings-tab-label {
+  white-space: nowrap;
+}
+
+.wl-settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  animation: fadeIn 0.18s ease;
+  padding-bottom: 0.5rem;
+}
+
+.wl-settings-panel-desc {
+  margin: 0;
+  padding: 0.85rem 1.05rem;
+  border-radius: var(--mcp-radius-sm);
+  border-left: 3px solid var(--interactive-accent);
+  background: color-mix(in srgb, var(--background-secondary) 80%, transparent);
+  color: var(--text-muted);
+  font-size: 0.9em;
+  line-height: 1.55;
+}
+
+/* Section cards */
+.wl-settings-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 1.25rem 1.35rem 1.15rem;
+  border-radius: var(--mcp-radius);
+  border: 1px solid var(--mcp-glass-border);
+  background: var(--mcp-glass-bg);
   box-shadow: var(--mcp-shadow);
 }
 
-.settings-banner h4 {
-  margin: 0 0 0.5em;
-  font-size: 1.25em;
-  font-weight: 700;
-  color: var(--mcp-text);
+.wl-settings-card--warning {
+  border-color: rgba(245, 166, 35, 0.3);
+  background: color-mix(in srgb, var(--mcp-glass-bg) 88%, #f5a623);
+}
+
+.wl-settings-card--accent {
+  border-color: rgba(124, 92, 252, 0.28);
+}
+
+.wl-settings-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.wl-settings-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border-radius: 10px;
+  color: var(--interactive-accent);
+  background: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--interactive-accent) 22%, transparent);
+}
+
+.wl-settings-card-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.wl-settings-card-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+  padding-top: 0.15rem;
+}
+
+.wl-settings-card-title {
+  font-size: 1em;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--text-normal);
+  line-height: 1.3;
+}
+
+.wl-settings-card-desc {
+  font-size: 0.86em;
+  line-height: 1.5;
+  color: var(--text-muted);
+  max-width: 62ch;
+}
+
+.wl-settings-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.wl-settings-note {
+  margin: 0.35rem 0;
+  padding: 0.75rem 0.95rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-secondary) 75%, transparent);
+  border: 1px solid color-mix(in srgb, var(--background-modifier-border) 70%, transparent);
+  color: var(--text-muted);
+  font-size: 0.88em;
+  line-height: 1.55;
+}
+
+.wl-settings-code {
+  margin: 0.5rem 0;
+  padding: 0.75rem 0.95rem;
+  border-radius: 10px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  overflow-x: auto;
+}
+
+.wl-settings-code code {
+  background: transparent;
+  padding: 0;
+  font-family: var(--font-monospace, monospace);
+  font-size: 0.88em;
+  color: var(--text-normal);
+}
+
+.wl-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+}
+
+/* Quiet support footer */
+.wl-settings-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.75rem;
+  padding: 1.15rem 1.25rem;
+  border-radius: var(--mcp-radius);
+  border: 1px solid var(--mcp-glass-border);
+  background: color-mix(in srgb, var(--background-secondary) 70%, transparent);
+}
+
+.wl-settings-footer-title {
+  font-size: 0.95em;
+  font-weight: 650;
+  color: var(--text-normal);
+  margin-bottom: 0.25rem;
+}
+
+.wl-settings-footer-desc {
+  margin: 0;
+  font-size: 0.86em;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.wl-settings-footer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.wl-settings-footer-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.55rem 1.05rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  font-size: 0.88em;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform var(--mcp-transition-fast), box-shadow var(--mcp-transition-fast);
+}
+
+.wl-settings-footer-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--interactive-accent) 28%, transparent);
+}
+
+.wl-settings-footer-btn--ghost {
+  background: transparent;
+  border-color: var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.wl-settings-footer-btn--ghost:hover {
+  color: var(--text-normal);
+  box-shadow: none;
 }
 
 /* Hide calendar dot indicators from obsidian-calendar-ui */
@@ -5601,13 +5801,20 @@ h2.tm-title.tm-title {
   align-items: center;
   gap: 6px;
   padding: 10px 12px 8px;
-  border-bottom: none;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent);
+  border-bottom: 1px solid var(--mcp-glass-border, rgba(255, 255, 255, 0.06));
+  /* Sticky chrome must be opaque — a translucent gradient let the list
+     show through when scrolling under the bar. No backdrop-filter (WebKit). */
+  background: var(--background-primary, #1a1a2e);
   position: sticky;
   top: 0;
   z-index: 20;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  /* Chrome rows must keep full height — never let flex shrink clip them
+     (overflow-x on filters turns overflow-y into auto and would cut chips). */
+  flex-shrink: 0;
+  /* Keep hit-testing reliable on touch WebKit: no backdrop-filter here
+     (it can drop taps on sticky bars) and force pointer events on. */
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 
 .task-tracker-mob-header .task-tracker-btn {
@@ -5657,7 +5864,11 @@ h2.tm-title.tm-title {
   font-weight: 650;
   letter-spacing: 0.01em;
   color: var(--mcp-text);
-  background: transparent;
+  background: var(--background-primary, #1a1a2e);
+  /* Below filters in paint order — filters chips stay visible if boxes meet. */
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
 }
 
 .task-tracker-mob-date .task-tracker-date,
@@ -5672,6 +5883,7 @@ h2.tm-title.tm-title {
 .task-tracker-mob-date .date-nav-btn {
   width: 34px;
   height: 34px;
+  min-height: 34px;
   border-radius: 12px;
   display: inline-flex;
   align-items: center;
@@ -5689,7 +5901,9 @@ h2.tm-title.tm-title {
   background: rgba(255, 255, 255, 0.08);
 }
 
-/* Mobile filter tabs */
+/* Mobile filter tabs
+   NOTE: do NOT put mask-image on this element — on iOS/Android WebKit
+   masked scrollers stop delivering touch hits to child buttons. */
 .task-tracker-mob-filters {
   display: flex;
   gap: 6px;
@@ -5697,7 +5911,21 @@ h2.tm-title.tm-title {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
-  mask-image: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 6px), transparent);
+  position: relative;
+  /* Status chips must paint above the date row, never under it. */
+  z-index: 2;
+  flex-shrink: 0;
+  background: var(--background-primary, #1a1a2e);
+  touch-action: pan-x;
+}
+
+.task-tracker-mob-filters::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, #000 6px, #000 calc(100% - 6px), transparent);
+  opacity: 0;
 }
 
 .task-tracker-mob-filters::-webkit-scrollbar {
@@ -5715,6 +5943,8 @@ h2.tm-title.tm-title {
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition:
     background 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
     color 0.18s ease,
@@ -7128,6 +7358,39 @@ h2.tm-title.tm-title {
   font-weight: 600;
 }
 
+/* --- Workout session task (AI plan) --- */
+
+.task-workout-badge {
+  font-size: 11px;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: rgba(61, 220, 151, 0.14);
+  border: 1px solid rgba(61, 220, 151, 0.28);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.task-item.workout-session {
+  border-left: 3px solid rgba(61, 220, 151, 0.55);
+  background: linear-gradient(90deg, rgba(61, 220, 151, 0.06), transparent 55%);
+}
+
+.task-item.workout-session.completed {
+  border-left-color: rgba(61, 220, 151, 0.85);
+}
+
+.habit-item.workout-streak {
+  border-left: 3px solid rgba(61, 220, 151, 0.55);
+  background: linear-gradient(90deg, rgba(61, 220, 151, 0.07), transparent 55%);
+}
+
+.habit-item.workout-streak .habit-title {
+  font-weight: 650;
+}
+
 /* --- Carried-over (overdue) task highlight --- */
 
 .task-item.carried-over {
@@ -8005,144 +8268,66 @@ h2.tm-title.tm-title {
 }
 
 /* ============================================
-   SETTINGS TABS
+   SETTINGS TABS (legacy shell — new UI uses .wl-settings-*)
    ============================================ */
 
-.settings-tab-bar {
-  display: flex;
-  gap: 6px;
-  padding: 10px 0 18px;
-  border-bottom: 1px solid var(--background-modifier-border);
-  margin-bottom: 22px;
-  flex-wrap: wrap;
+.wl-settings-panel .setting-item,
+.wl-settings-card-body .setting-item {
+  padding: 0.95rem 0;
+  gap: 1.15rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 48%, transparent);
 }
 
-.settings-tab-btn {
-  padding: 9px 18px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
-  background: var(--background-secondary);
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.settings-tab-btn:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
-}
-
-.settings-tab-btn.active {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border-color: var(--interactive-accent);
-}
-
-.settings-tab-content {
-  animation: fadeIn 0.15s ease;
-  padding-bottom: 2.5rem;
-}
-
-.settings-tab-desc {
-  font-size: 13px;
-  color: var(--text-muted);
-  margin: 0 0 28px;
-  padding: 12px 16px;
-  line-height: 1.55;
-  background: var(--background-secondary);
-  border-radius: 10px;
-  border-left: 3px solid var(--interactive-accent);
-}
-
-/* ── Section headings: clear visual break between groups ── */
-.settings-tab-content .setting-item-heading,
-.worklife-settings-host .setting-item-heading {
-  justify-content: flex-start;
-  margin-top: 2.25rem;
-  margin-bottom: 0.35rem;
-  padding: 1.15rem 0 0.65rem;
-  border-top: 1px solid var(--background-modifier-border);
+.wl-settings-panel .setting-item:last-child,
+.wl-settings-card-body .setting-item:last-child {
   border-bottom: none;
-  gap: 0.5rem;
+  padding-bottom: 0.15rem;
 }
 
-.settings-tab-content .setting-item-heading:first-child,
-.worklife-settings-host .setting-item-heading:first-child {
-  margin-top: 0.5rem;
-  border-top: none;
-  padding-top: 0.25rem;
+.wl-settings-panel .setting-item:first-child,
+.wl-settings-card-body .setting-item:first-child {
+  padding-top: 0.15rem;
 }
 
-.settings-tab-content .setting-item-heading .setting-item-name,
-.worklife-settings-host .setting-item-heading .setting-item-name {
-  font-size: 1.05em;
-  font-weight: 700;
-  letter-spacing: -0.015em;
-  color: var(--text-normal);
-}
-
-/* ── Rows: room to breathe ── */
-.settings-tab-content .setting-item:not(.setting-item-heading),
-.worklife-settings-host .setting-item:not(.setting-item-heading) {
-  padding: 1.15rem 0;
-  gap: 1.25rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--background-modifier-border) 55%, transparent);
-}
-
-.settings-tab-content .setting-item:not(.setting-item-heading):last-child,
-.worklife-settings-host .setting-item:not(.setting-item-heading):last-child {
-  border-bottom: none;
-}
-
-/* First row after a section heading sits closer to its title */
-.settings-tab-content .setting-item-heading + .setting-item,
-.worklife-settings-host .setting-item-heading + .setting-item {
-  padding-top: 0.85rem;
-}
-
-.settings-tab-content .setting-item-description,
-.worklife-settings-host .setting-item-description {
-  margin-top: 0.4rem;
+.wl-settings-panel .setting-item-description,
+.wl-settings-card-body .setting-item-description {
+  margin-top: 0.35rem;
   line-height: 1.55;
   max-width: 58ch;
+  color: var(--text-muted);
+  font-size: 0.88em;
 }
 
-.settings-tab-content .setting-item-info,
-.worklife-settings-host .setting-item-info {
+.wl-settings-panel .setting-item-info,
+.wl-settings-card-body .setting-item-info {
   min-width: 0;
   flex: 1 1 220px;
 }
 
-.settings-tab-content .setting-item-control,
-.worklife-settings-host .setting-item-control {
+.wl-settings-panel .setting-item-control,
+.wl-settings-card-body .setting-item-control {
   min-height: 28px;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-/* Banners & instruction cards keep air around them */
-.settings-tab-content .settings-banner,
-.worklife-settings-host .settings-banner {
-  margin: 1.75rem 0 2rem;
-}
-
-.settings-tab-content .ai-howto-text,
-.settings-tab-content .mcp-cleanup-note,
-.settings-tab-content .mcp-format-info {
-  margin: 0.85rem 0 1.35rem;
-  line-height: 1.55;
+.wl-settings-panel .setting-item-name,
+.wl-settings-card-body .setting-item-name {
+  font-size: 0.95em;
+  font-weight: 550;
+  color: var(--text-normal);
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
+    transform: translateY(4px);
   }
 
   to {
     opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -10384,6 +10569,8 @@ textarea.qa2-textarea.qa2-textarea {
   cursor: pointer;
   white-space: nowrap;
   opacity: 0.72;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition:
     background 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
     color 0.2s ease,
@@ -10460,8 +10647,11 @@ textarea.qa2-textarea.qa2-textarea {
   pointer-events: none;
 }
 
+/* Header must stay operable during leave — it is the tab switcher. */
 .view-switch-leave > .view-switch-header {
-  animation: view-switch-fade 0.14s ease forwards;
+  animation: none;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .view-switch-enter > :not(.view-switch-header),
@@ -10498,12 +10688,6 @@ textarea.qa2-textarea.qa2-textarea {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-
-@keyframes view-switch-fade {
-  to {
-    opacity: 0;
   }
 }
 

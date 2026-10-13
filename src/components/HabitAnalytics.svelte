@@ -38,6 +38,8 @@
   import { t, tArray, locale } from "../i18n";
   import { settings } from "../ui/stores";
   import { derived as derivedStore } from "svelte/store";
+  import { fly } from "svelte/transition";
+  import { cubicOut } from "svelte/easing";
   import { countUp } from "../utils/visualMotion";
   import { analyticsTabRequest, type AnalyticsTab as RequestedTab } from "../stores/analyticsStore";
 
@@ -389,6 +391,11 @@
     </button>
   </div>
 
+  {#key activeTab}
+  <div
+    class="analytics-panel"
+    in:fly={{ x: 22, duration: 280, easing: cubicOut }}
+  >
   <!-- Weight Control -->
   {#if activeTab === "weight" && weightEnabled}
     <div class="habit-analytics-section">
@@ -698,9 +705,16 @@
     {/if}
     </div>
   {/if}
+  </div>
+  {/key}
 </div>
 
 <style>
+  .analytics-panel {
+    min-height: 120px;
+    will-change: transform, opacity;
+  }
+
   .habit-analytics {
     padding: 20px 16px;
     height: 100%;
@@ -713,32 +727,41 @@
   .analytics-tabs {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 2px;
     margin-bottom: 16px;
+    padding: 4px;
+    border-radius: var(--mcp-radius, 16px);
+    background: color-mix(in srgb, var(--mcp-glass-bg) 80%, transparent);
+    border: 1px solid var(--mcp-glass-border);
+    width: fit-content;
   }
 
   .analytics-tab {
-    padding: 8px 14px;
-    border: 1px solid var(--mcp-glass-border);
-    border-radius: 12px;
-    background: var(--mcp-glass-bg);
+    padding: 8px 16px;
+    border: none;
+    border-radius: calc(var(--mcp-radius, 16px) - 5px);
+    background: transparent;
     color: var(--text-muted);
     font-size: 12px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background 0.22s cubic-bezier(0.4, 0, 0.2, 1), color 0.18s ease,
+      box-shadow 0.22s ease, transform 0.18s ease;
   }
 
   .analytics-tab:hover {
     color: var(--text-normal);
-    border-color: var(--mcp-accent);
+  }
+
+  .analytics-tab:active {
+    transform: scale(0.96);
   }
 
   .analytics-tab.active {
     background: var(--mcp-accent);
-    border-color: var(--mcp-accent);
     color: var(--text-on-accent, #fff);
+    box-shadow: 0 2px 12px color-mix(in srgb, var(--mcp-accent) 40%, transparent);
   }
 
   .habit-analytics-header {
@@ -1576,13 +1599,12 @@
 
     .analytics-tabs {
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 2px;
     }
 
     .analytics-tab {
-      padding: 7px 11px;
+      padding: 7px 12px;
       font-size: 11px;
-      border-radius: 10px;
     }
 
     .habit-analytics-header h1 {

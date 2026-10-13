@@ -647,12 +647,8 @@ export default class CalendarPlugin extends Plugin {
     );
   }
 
-  private isMobile(): boolean {
-    return typeof window !== "undefined" && window.innerWidth <= 768;
-  }
-
   private injectDateTimeWeather(): void {
-    if (!this.options.showStatusBar || this.isMobile()) {
+    if (!this.options.showStatusBar) {
       this.removeDateTimeWeather();
       return;
     }
@@ -667,7 +663,7 @@ export default class CalendarPlugin extends Plugin {
   }
 
   private moveDateTimeWeatherToActiveView(): void {
-    if (!this.options.showStatusBar || this.isMobile()) {
+    if (!this.options.showStatusBar) {
       this.removeDateTimeWeather();
       return;
     }
@@ -711,7 +707,7 @@ export default class CalendarPlugin extends Plugin {
     // Header может быть ещё не пересобран после setViewState — повторим
     if (!headerEl) {
       window.setTimeout(() => {
-        if (!this.dtwContainer && this.options.showStatusBar && !this.isMobile()) {
+        if (!this.dtwContainer && this.options.showStatusBar) {
           this.createDateTimeWeatherPanel();
         }
       }, 80);

@@ -78,6 +78,7 @@ export const en = {
   settings: {
     tabs: {
       general: "General",
+      interface: "Interface",
       dashboard: "Dashboard",
       schedule: "Schedule",
       finance: "Finance",
@@ -86,14 +87,16 @@ export const en = {
       sync: "Sync",
       notifications: "Notifications",
       ai: "AI (Ollama)",
-      generalDesc: "Language, name, habit mode, task tracker settings",
+      generalDesc: "Name, language, week start, updates and data storage",
+      interfaceDesc: "Panels, view switcher, habits, weight and task behavior",
       dashboardDesc: "Widgets on the main page and greeting buttons",
       scheduleDesc: "Which elements to show in the calendar schedule",
-      financeDesc: "Currency and month-summary export location",
+      financeDesc: "Currency, work-task rates and summary export",
       weatherDesc: "Weather forecast in calendar headers",
-      appearanceDesc: "Colors, glass panels, navigation buttons in notes",
-      syncDesc: "Vault storage and Google Calendar export via GitHub Gist",
-      notificationsDesc: "Task reminders and alerts",
+      appearanceDesc: "Colors, glass panels and interface style",
+      syncDesc: "Vault sync and Google Calendar export via GitHub Gist",
+      notificationsDesc: "Task reminders, push and diagnostics",
+      aiDesc: "Local AI via Ollama: models, actions and privacy",
     },
 
     finance: {
@@ -104,6 +107,7 @@ export const en = {
       currencyCustom: "Custom symbol",
       currencyCustomDesc: "Enter any symbol or text (e.g. usd, EUR, kzt)",
       sectionExport: "Summary export",
+      sectionExportDesc: "Where to save monthly summaries",
       exportFolder: "Summary folder",
       exportFolderDesc: "Where to save the month MD summary. Empty = vault root",
       exportFolderMd: "MD summary folder",
@@ -119,8 +123,17 @@ export const en = {
     },
 
     general: {
+      tabGeneral: "WorkLife settings",
+      sectionIdentity: "Profile & language",
+      sectionIdentityDesc: "How to address you and how to format dates",
+      sectionUpdates: "Plugin updates",
       sectionInterface: "Interface",
       sectionPanels: "Panels & widgets",
+      sectionPanelsDesc: "What to show around the calendar and in the view switcher",
+      sectionTaskBehavior: "Task behavior",
+      sectionTaskBehaviorDesc: "Carry-over of overdue tasks and auto-start timer",
+      sectionWorkTasks: "Work tasks",
+      sectionWorkTasksDesc: "Defaults for new paid work tasks",
       userName: "Your name",
       userNameDesc: "Name will be displayed in the greeting",
       userNamePlaceholder: "Enter name...",
@@ -157,7 +170,7 @@ export const en = {
       autoCleanupThresholdDesc: "Maximum number of completed tasks. When exceeded, old tasks are automatically deleted.",
       timeLogCleanupThreshold: "Time logs limit",
       timeLogCleanupThresholdDesc: "Maximum number of time log entries. When exceeded, old logs are automatically deleted.",
-      sectionDataCleanup: "Data cleanup",
+      sectionDataCleanup: "Data storage",
       sectionDataCleanupDesc: "Local storage limits. Not related to sync — they apply only on this device.",
       defaultPaymentType: "Default payment type",
       defaultPaymentTypeDesc: "Payment type for new work tasks",
@@ -191,6 +204,7 @@ export const en = {
 
     dashboard: {
       sectionWidgets: "Dashboard widgets",
+      sectionWidgetsDesc: "Task, habit and goal blocks on the main page",
       showTasks: "Today's tasks widget",
       showTasksDesc: "Show task count and progress bar in the dashboard",
       showHabits: "Habits widget",
@@ -211,6 +225,7 @@ export const en = {
 
     schedule: {
       sectionDisplay: "Display elements",
+      sectionDisplayDesc: "What to show on schedule cards and the calendar grid",
       showTime: "Time",
       showTimeDesc: "Display the scheduled time of the task",
       showStatus: "Status",
@@ -236,6 +251,8 @@ export const en = {
     weather: {
       showWeather: "Show weather",
       showWeatherDesc: "Display weather forecast in weekday headers",
+      previewTitle: "Animation preview",
+      previewDesc: "How weather types look in the calendar",
       latitude: "Latitude",
       latitudeDesc: "Your location latitude (e.g. 40.71 for New York)",
       longitude: "Longitude",
@@ -306,6 +323,7 @@ export const en = {
 
     sync: {
       sectionVault: "Vault sync",
+      sectionVaultDesc: "Store plugin data in the vault folder for cloud sync",
       syncToVault: "Save data to vault",
       syncToVaultDesc: "Store data in the calendar-data/ folder for sync via WebDAV, iCloud and other services",
       syncConflictCleanup: "Syncthing conflict cleanup",
@@ -410,7 +428,7 @@ export const en = {
       enabledDesc: "Requests go to the Ollama URL below.",
       mobileOnlyDesktop: "AI is desktop-only.",
 
-      sectionConnection: "2. Connection",
+      sectionConnection: "Connection",
       url: "Ollama URL",
       urlDesc: "Default: http://localhost:11434",
       urlPlaceholder: "http://localhost:11434",
@@ -424,7 +442,7 @@ export const en = {
       contextSize: "Context size",
       contextSizeDesc: "0 = unlimited.",
 
-      sectionModels: "3. Models",
+      sectionModels: "Models",
       modelMode: "How many models",
       modelModeDesc: "Two models are faster and cheaper for short tasks.",
       modelModeSingle: "One",
@@ -441,7 +459,7 @@ export const en = {
       cloudModelsTitle: "Compatible URLs",
       cloudModelsDesc: "Needs a server speaking the Ollama API: localhost, LAN, SSH tunnel, Tailscale. OpenAI-compatible APIs (OpenRouter, Groq, ChatGPT) are not supported.",
 
-      sectionActions: "4. Actions",
+      sectionActions: "Actions",
       sectionActionsTasks: "Tasks",
       sectionActionsNotes: "Notes",
       sectionActionsFinance: "Finance",
@@ -476,7 +494,7 @@ export const en = {
       quickAddHowTo: "Type naturally in Quick add — date, @project and priority are recognized.",
       financeInsights: "Finance summary tips",
       financeInsightsDesc: "Short month breakdown when exporting MD.",
-      sectionPrivacy: "5. Data",
+      sectionPrivacy: "Data",
       cloudWarning: "⚠️ Non-localhost URL",
       cloudWarningDesc: "Notes, tasks and finance data go to that machine. Use localhost for personal data.",
       dataSentTitle: "What is sent",

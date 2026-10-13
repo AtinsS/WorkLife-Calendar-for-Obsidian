@@ -21,6 +21,10 @@
   let clockTimer: ReturnType<typeof setInterval> | null = null;
   let weatherTimer: ReturnType<typeof setInterval> | null = null;
   let weather: DayWeather | null = null;
+  // HTML5 drag steals taps on touch WebKit — only enable reorder on desktop
+  const isTouch =
+    typeof window !== "undefined" &&
+    ("ontouchstart" in window || navigator.maxTouchPoints > 0);
 
   // Note search
   let noteSearchQuery = "";
@@ -238,15 +242,11 @@
   $: hour = now.hour();
   $: greetingText = hour < 6 ? $t("hello.goodNight") : hour < 12 ? $t("hello.goodMorning") : hour < 18 ? $t("hello.goodAfternoon") : $t("hello.goodEvening");
   $: greeting = userName ? `${greetingText}, ${userName}` : greetingText;
-  $: greetingEmoji = hour < 6 ? "🌙" : hour < 12 ? "☀️" : hour < 18 ? "🌤" : "🌆";
   $: monthNames = $tArray("common.months.genitive");
   $: dayNames = $tArray("common.weekdays.long");
   $: monthName = monthNames[now.month()] || "";
   $: year = now.format("YYYY");
   $: dateDisplay = `${now.date()} ${monthName} ${year}, ${dayNames[now.day()] || ""}`;
-
-  // Time-of-day theme
-  $: timeTheme = hour < 6 ? "night" : hour < 12 ? "morning" : hour < 18 ? "day" : "evening";
 
   // Weather animation class
   $: weatherAnim = (() => {
@@ -352,7 +352,7 @@
 
 </script>
 
-<div class="hello hello--{timeTheme}">
+<div class="hello">
   <!-- Weather animation layer -->
   {#if weatherAnim}
     <div class="hello-weather {weatherAnim}" aria-hidden="true">
@@ -419,7 +419,7 @@
 
   <!-- Hero -->
   <div class="hello-hero">
-    <h1 class="hello-title">{greeting} <span class="hello-emoji">{greetingEmoji}</span></h1>
+    <h1 class="hello-title">{greeting}</h1>
     <p class="hello-date">{dateDisplay}</p>
     {#if weather}
       <div class="hello-weather-card" title={weather.label}>
@@ -461,9 +461,9 @@
         class="hello-nav-btn"
         class:dragging={draggedNavId === item.id}
         class:drag-over={dragOverNavId === item.id}
-        draggable="true"
+        draggable={!isTouch}
         on:click={() => item.onClick?.()}
-        on:dragstart={(e) => onNavDragStart(e, item.id)}
+        on:dragstart={(e) => isTouch || onNavDragStart(e, item.id)}
         on:dragend={onNavDragEnd}
         on:dragover={(e) => onNavDragOver(e, item.id)}
         on:dragleave={onNavDragLeave}
@@ -486,32 +486,9 @@
     overflow: hidden;
     border-radius: 0;
     padding: 18px 16px 8px;
-    transition: background 1s ease;
   }
 
   .hello * { box-sizing: border-box; }
-
-  /* ═══ TIME-OF-DAY THEMES ═════════════════ */
-  .hello--morning {
-    background:
-      radial-gradient(ellipse 90% 70% at 28% 12%, rgba(255, 186, 92, 0.1) 0%, rgba(255, 186, 92, 0.03) 42%, transparent 72%),
-      radial-gradient(ellipse 80% 65% at 72% 88%, rgba(255, 140, 105, 0.06) 0%, transparent 68%);
-  }
-  .hello--day {
-    background:
-      radial-gradient(ellipse 95% 75% at 50% 22%, rgba(105, 185, 250, 0.09) 0%, rgba(105, 185, 250, 0.025) 45%, transparent 72%),
-      radial-gradient(ellipse 75% 60% at 38% 78%, rgba(135, 215, 255, 0.045) 0%, transparent 68%);
-  }
-  .hello--evening {
-    background:
-      radial-gradient(ellipse 90% 70% at 62% 14%, rgba(155, 120, 220, 0.1) 0%, rgba(155, 120, 220, 0.03) 44%, transparent 72%),
-      radial-gradient(ellipse 80% 65% at 28% 86%, rgba(105, 85, 175, 0.055) 0%, transparent 68%);
-  }
-  .hello--night {
-    background:
-      radial-gradient(ellipse 90% 70% at 38% 24%, rgba(40, 48, 95, 0.16) 0%, rgba(30, 34, 70, 0.05) 46%, transparent 72%),
-      radial-gradient(ellipse 75% 60% at 72% 78%, rgba(18, 22, 55, 0.1) 0%, transparent 68%);
-  }
 
   /* ═══ WEATHER ANIMATIONS ════════════════ */
   .hello-weather {
@@ -747,8 +724,6 @@
     letter-spacing: -0.03em;
   }
 
-  .hello-emoji { font-size: 32px; font-style: normal; vertical-align: middle; }
-
   .hello-date { margin: 0; font-size: 14px; color: var(--text-muted, #6b7280); font-weight: 500; }
 
   /* Compact, high-contrast weather chip */
@@ -860,7 +835,12 @@
   }
 
   /* Drag & drop reorder */
-  .hello-nav-btn { user-select: none; cursor: pointer; }
+  .hello-nav-btn {
+    user-select: none;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
   .hello-nav-btn.dragging {
     opacity: 0.45;
     cursor: pointer;
@@ -882,7 +862,6 @@
   @media (max-width: 768px) {
     .hello { padding: 28px 20px 36px; }
     .hello-title { font-size: 28px; }
-    .hello-emoji { font-size: 26px; }
     .hello-date { font-size: 13px; }
     .hello-nav { gap: 8px; margin-bottom: 20px; }
     .hello-nav-btn { padding: 9px 16px; font-size: 12px; }
@@ -893,7 +872,6 @@
     .hello { padding: 20px 14px 28px; }
     .hello-hero { margin-bottom: 20px; }
     .hello-title { font-size: 24px; }
-    .hello-emoji { font-size: 22px; }
     .hello-date { font-size: 12px; }
     .hello-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
     .hello-nav-btn { justify-content: center; padding: 12px 10px; font-size: 12px; }
@@ -908,7 +886,6 @@
   @media (min-width: 1200px) {
     .hello { padding: 48px 40px 56px; }
     .hello-title { font-size: 42px; }
-    .hello-emoji { font-size: 38px; }
     .hello-date { font-size: 15px; }
     .hello-nav { gap: 12px; }
     .hello-nav-btn { padding: 12px 24px; font-size: 14px; }

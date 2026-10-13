@@ -13,6 +13,8 @@
   export let task: ITask;
   export let appInstance: App;
 
+  $: isWorkoutTask = task.kind === "workout" || !!task.workoutDayKey;
+
   const dispatch = createEventDispatcher();
 
   let isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
@@ -330,6 +332,7 @@
   class:completed={task.status === "done"}
   class:failed={task.status === "failed"}
   class:carried-over={isCarriedOver}
+  class:workout-session={isWorkoutTask}
   data-status={task.status}
   draggable="true"
   role="listitem"
@@ -399,6 +402,10 @@
       <span class="task-status-badge status-badge-{task.status}">
         {#if task.status === "todo"}{$t("tasks.tabs.todo")}{:else if task.status === "progress"}{$t("tasks.item.progress")}{:else if task.status === "paused"}{$t("tasks.item.paused")}{/if}
       </span>
+    {/if}
+
+    {#if isWorkoutTask}
+      <span class="task-workout-badge">💪</span>
     {/if}
 
     {#if task.isWorkTask}

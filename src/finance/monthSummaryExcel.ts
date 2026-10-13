@@ -52,8 +52,8 @@ export interface ExcelSheet {
 
 /** Unwrap a cell for tests / value access. */
 export function cellVal(c: ExcelCell): ExcelCellValue {
-  if (typeof c === "object" && c !== null && "v" in c) return (c as StyledCell).v;
-  return c as ExcelCellValue;
+  if (isStyled(c)) return c.v;
+  return c;
 }
 
 /** Flatten rows to raw values (tests). */
@@ -74,11 +74,11 @@ function esc(v: ExcelCellValue): string {
 }
 
 function isStyled(c: ExcelCell): c is StyledCell {
-  return typeof c === "object" && c !== null && "v" in (c as StyledCell);
+  return typeof c === "object" && c !== null && "v" in c;
 }
 
 function cellXml(c: ExcelCell): string {
-  const st: StyledCell = isStyled(c) ? c : { v: c as ExcelCellValue };
+  const st: StyledCell = isStyled(c) ? c : { v: c };
   const type = typeof st.v === "number" ? "Number" : "String";
   const style = st.s ? ` ss:StyleID="${st.s}"` : "";
   return `<Cell${style}><Data ss:Type="${type}">${esc(st.v)}</Data></Cell>`;
@@ -615,7 +615,7 @@ export function resolveRangeIncome(start: Date, end: Date): MonthIncomeBreakdown
 }
 
 function getFinanceMap(): Record<string, FinanceMonthData> {
-  return get(financeData) as Record<string, FinanceMonthData>;
+  return get(financeData);
 }
 
 /** Expenses in a date range from all months. */
