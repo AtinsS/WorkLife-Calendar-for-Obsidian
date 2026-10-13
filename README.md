@@ -15,7 +15,7 @@
 
 [**Русский README**](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/blob/master/README.RU.md)
 
-![WorkLife Calendar](image-2.png)
+![alt text](image-3.png)
 
 ## 💡 Why This Plugin Exists
 
