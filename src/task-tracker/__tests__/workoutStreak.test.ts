@@ -5,7 +5,7 @@ import {
   updateTask,
   updateTaskStatus,
   isWorkoutSession,
-  resolveWorkoutStreakDateKey,
+  workoutStreakDateKey,
   resolveWorkoutStreakHabitId,
 } from "../stores";
 import {
@@ -68,9 +68,8 @@ describe("workout streak on task done", () => {
     settings.set({ ...defaultSettings, workoutHabitId: habitId });
   });
 
-  it("resolveWorkoutStreakDateKey parses day-YYYY-MM-DD dateUID", () => {
-    expect(resolveWorkoutStreakDateKey("day-2026-02-20T00:00:00+00:00")).toBe("2026-02-20");
-    expect(resolveWorkoutStreakDateKey("day-2026-02-20")).toBe("2026-02-20");
+  it("workoutStreakDateKey returns today as YYYY-MM-DD", () => {
+    expect(workoutStreakDateKey()).toBe(todayKey());
   });
 
   it("isWorkoutSession detects kind and parent kind", () => {
@@ -101,6 +100,15 @@ describe("workout streak on task done", () => {
 
     expect(isHabitCompletedOnDate(habitId, todayKey())).toBe(true);
     expect(calculateStreak(habitId)).toBe(1);
+  });
+
+  it("marks habit for the current day even when the task is scheduled for another day", () => {
+    const otherDay = "2020-01-15";
+    tasks.set([makeWorkoutTask({ dateUID: `day-${otherDay}T00:00:00+00:00` })]);
+    updateTaskStatus("wo-1", "done");
+
+    expect(isHabitCompletedOnDate(habitId, todayKey())).toBe(true);
+    expect(isHabitCompletedOnDate(habitId, otherDay)).toBe(false);
   });
 
   it("marks habit done when updateTaskStatus moves progress → done (timer path)", () => {

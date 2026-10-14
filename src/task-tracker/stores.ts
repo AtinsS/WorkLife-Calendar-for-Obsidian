@@ -477,19 +477,20 @@ export function resolveWorkoutStreakHabitId(): string | null {
   return fallback?.id ?? null;
 }
 
-/** Date key (YYYY-MM-DD) for streak log — task day, else today. */
-export function resolveWorkoutStreakDateKey(dateUID: string): string {
-  const m = /^day-(\d{4}-\d{2}-\d{2})/.exec(dateUID);
-  if (m) return m[1];
+/** Date key (YYYY-MM-DD) for the streak log — always the current day. */
+export function workoutStreakDateKey(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-/** Tick the linked streak habit when a workout session is completed. */
-function syncWorkoutStreak(task: ITask): void {
+/**
+ * Tick the linked streak habit when a workout session is completed.
+ * Completes the habit for the current day (not the task's scheduled date).
+ */
+function syncWorkoutStreak(): void {
   const habitId = resolveWorkoutStreakHabitId();
   if (!habitId) return;
-  setHabitProgress(habitId, resolveWorkoutStreakDateKey(task.dateUID), 2);
+  setHabitProgress(habitId, workoutStreakDateKey(), 2);
 }
 
 /**
@@ -499,7 +500,7 @@ function syncWorkoutStreak(task: ITask): void {
 function maybeSyncWorkoutStreakOnDone(after: ITask | undefined, wasDone: boolean): void {
   if (!after || wasDone || !after.completed) return;
   if (!isWorkoutSession(after)) return;
-  syncWorkoutStreak(after);
+  syncWorkoutStreak();
 }
 
 export function updateTaskStatus(
