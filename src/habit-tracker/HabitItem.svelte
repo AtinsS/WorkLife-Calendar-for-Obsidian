@@ -1,7 +1,7 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import type { IHabit } from "./types";
-  import { habitLogs, isHabitCompletedOnDate, calculateStreak, getHabitCountOnDate, getHabitProgressOnDate } from "./stores";
+  import { habitLogs, isHabitCompletedOnDate, calculateStreak, getHabitCountOnDate, getHabitProgressOnDate, isHabitManualLocked } from "./stores";
   import { t } from "../i18n";
 
   export let habit: IHabit;
@@ -9,6 +9,7 @@
   export let date: string;
 
   $: isWorkoutStreak = habit.projectId === "workout-streak";
+  $: isLocked = isHabitManualLocked(habit);
 
   const dispatch = createEventDispatcher();
 
@@ -35,6 +36,7 @@
   $: isMultiTarget = targetCount > 1;
 
   function toggle() {
+    if (isLocked) return;
     dispatch("toggle", { habit });
   }
 
@@ -79,6 +81,7 @@
   class:multi-target={isMultiTarget}
   class:fully-done={isMultiTarget && currentCount >= targetCount}
   class:workout-streak={isWorkoutStreak}
+  class:locked={isLocked}
   on:keydown={handleKeydown}
   tabindex="0"
   role="group"
@@ -91,8 +94,10 @@
     class:partial={isMultiTarget && currentCount > 0 && currentCount < targetCount}
     class:full={isMultiTarget && currentCount >= targetCount}
     style="--habit-color: {habit.color}; --progress: {progress}"
+    disabled={isLocked}
     on:click={toggle}
-    aria-label={isCompleted ? $t("habits.item.undo") : $t("habits.item.markDone")}
+    aria-label={isLocked ? $t("habits.item.autoOnly") : isCompleted ? $t("habits.item.undo") : $t("habits.item.markDone")}
+    title={isLocked ? $t("habits.item.autoOnly") : undefined}
   >
     {#if isMultiTarget}
       <span class="habit-check-count">{currentCount}</span>

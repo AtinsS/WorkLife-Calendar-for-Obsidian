@@ -491,36 +491,12 @@
     background: rgba(220, 100, 100, 0.1);
   }
 
+  /* Mobile: panel is not injected (main.ts gate) — hide as a CSS safety net */
   @media (max-width: 768px) {
     :global(.dtw-bar),
-    .dtw-bar {
-      display: flex;
-      flex-wrap: nowrap;
-      justify-content: flex-start;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-      gap: 0;
-      padding: 6px 8px;
-      font-size: 12px;
-    }
-
-    :global(.dtw-bar::-webkit-scrollbar),
-    .dtw-bar::-webkit-scrollbar {
-      display: none;
-    }
-
-    .dtw-item {
-      padding: 0 8px;
-      flex-shrink: 0;
-    }
-
-    .dtw-icon {
-      font-size: 12px;
-    }
-
-    .dtw-sep {
-      height: 14px;
+    .dtw-bar,
+    :global(.mcp-dtw-global) {
+      display: none !important;
     }
   }
 

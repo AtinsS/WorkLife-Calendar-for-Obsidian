@@ -4,9 +4,11 @@
   import type { App } from "obsidian";
   import { get } from "svelte/store";
   import { getDateUID } from "obsidian-daily-notes-interface";
-  import { tasks, projects, updateTaskStatus, updateTask, removeTask, carryOverOverdueTasks } from "../task-tracker/stores";
+  import { tasks, projects, updateTaskStatus, updateTask, removeTask, carryOverOverdueTasks, kanbanBoards, setTaskKanbanColumn, saveKanbanBoardFilters } from "../task-tracker/stores";
   import { activeTimers, formatDuration } from "../task-tracker/TimerManager";
-  import type { ITask, TaskStatus, IProject } from "../task-tracker/types";
+  import type { ITask, TaskStatus, IProject, IKanbanColumnDef } from "../task-tracker/types";
+  import { DEFAULT_KANBAN_BOARD_ID, createDefaultKanbanColumns } from "../task-tracker/types";
+  import { settings } from "../ui/stores";
   import { t } from "../i18n";
 
   const momentFn = obsMoment as unknown as (inp?: unknown, format?: string, strict?: boolean) => import("moment").Moment;
@@ -14,29 +16,77 @@
   export let appInstance: App;
 
   interface KanbanColumn {
-    key: TaskStatus;
+    key: string;
     icon: string;
     label: string;
     color: string;
+    statuses: TaskStatus[];
     statusIcon: string;
+    /** Empty statuses = free-form column keyed by task.kanbanColumnId. */
+    isFreeForm: boolean;
+    autoStartTimer: boolean;
   }
 
-  const columns: KanbanColumn[] = [
-    { key: "todo", icon: "🟢", label: "", color: "rgba(110, 130, 160, 0.8)", statusIcon: "○" },
-    { key: "progress", icon: "🔥", label: "", color: "rgba(180, 145, 85, 0.85)", statusIcon: "◐" },
-    { key: "paused", icon: "☕", label: "", color: "rgba(180, 150, 100, 0.7)", statusIcon: "⏸" },
-    { key: "done", icon: "✅", label: "", color: "rgba(85, 160, 130, 0.8)", statusIcon: "✓" },
-    { key: "failed", icon: "❌", label: "", color: "rgba(180, 90, 90, 0.85)", statusIcon: "✕" },
-  ];
+  function defaultColumns(): KanbanColumn[] {
+    const defs = createDefaultKanbanColumns();
+    return defs.map((d) => ({
+      key: d.id,
+      icon: d.icon,
+      label: "",
+      color: d.color,
+      statuses: d.statuses,
+      statusIcon: d.id === "todo" ? "○" : d.id === "progress" ? "◐" : d.id === "paused" ? "⏸" : d.id === "done" ? "✓" : "✕",
+      isFreeForm: false,
+      autoStartTimer: true,
+    }));
+  }
 
-  $: columns[0].label = $t("tasks.kanban.todo");
-  $: columns[1].label = $t("tasks.kanban.progress");
-  $: columns[2].label = $t("tasks.kanban.paused");
-  $: columns[3].label = $t("tasks.kanban.done");
-  $: columns[4].label = $t("tasks.kanban.failed");
+  function columnsFromDef(defs: IKanbanColumnDef[]): KanbanColumn[] {
+    return defs.map((d) => ({
+      key: d.id,
+      icon: d.icon,
+      label: d.title,
+      color: d.color,
+      statuses: d.statuses,
+      statusIcon: "○",
+      isFreeForm: d.statuses.length === 0,
+      autoStartTimer: d.autoStartTimer !== false,
+    }));
+  }
+
+  // Active board
+  let activeBoardId: string = DEFAULT_KANBAN_BOARD_ID;
+  let showBoardPicker = false;
+
+  $: customBoards = $kanbanBoards;
+  $: {
+    const preferred = ($settings as { defaultKanbanBoardId?: string }).defaultKanbanBoardId || DEFAULT_KANBAN_BOARD_ID;
+    // Keep current selection if it still exists; otherwise fall back to default
+    const ids = new Set([DEFAULT_KANBAN_BOARD_ID, ...customBoards.map((b) => b.id)]);
+    if (!ids.has(activeBoardId)) activeBoardId = preferred && ids.has(preferred) ? preferred : DEFAULT_KANBAN_BOARD_ID;
+    if (!activeBoardId) activeBoardId = preferred;
+  }
+  $: activeBoard = activeBoardId === DEFAULT_KANBAN_BOARD_ID
+    ? null
+    : customBoards.find((b) => b.id === activeBoardId) || null;
+  $: preferredDefaultId = ($settings as { defaultKanbanBoardId?: string }).defaultKanbanBoardId || DEFAULT_KANBAN_BOARD_ID;
+  $: isDefaultBoard = activeBoardId === preferredDefaultId;
+
+  $: columns = activeBoard ? columnsFromDef(activeBoard.columns) : defaultColumns();
+
+  $: {
+    // Localize built-in column labels
+    if (!activeBoard) {
+      columns[0].label = $t("tasks.kanban.todo");
+      columns[1].label = $t("tasks.kanban.progress");
+      columns[2].label = $t("tasks.kanban.paused");
+      columns[3].label = $t("tasks.kanban.done");
+      columns[4].label = $t("tasks.kanban.failed");
+    }
+  }
 
   let draggedTask: ITask | null = null;
-  let dragOverColumn: TaskStatus | null = null;
+  let dragOverColumn: string | null = null;
   let dateInputRef: HTMLInputElement | null = null;
 
   // Date filter
@@ -51,6 +101,7 @@
   function setFilter(mode: FilterMode) {
     filterMode = mode;
     if (mode === "today") filterDateStr = momentFn().format("YYYY-MM-DD");
+    persistFilters();
   }
 
   function toggleProjectPicker() {
@@ -60,6 +111,60 @@
   function selectProject(id: string | null) {
     projectFilterId = id;
     showProjectPicker = false;
+    persistFilters();
+  }
+
+  function selectBoard(id: string) {
+    // Persist current filters for the board we are leaving
+    persistFilters();
+    activeBoardId = id;
+    showBoardPicker = false;
+    restoreFilters();
+  }
+
+  function persistFilters(): void {
+    if (activeBoardId === DEFAULT_KANBAN_BOARD_ID) return;
+    saveKanbanBoardFilters(activeBoardId, {
+      filterMode,
+      filterDateStr,
+      projectFilterId,
+    });
+  }
+
+  function restoreFilters(): void {
+    const board = customBoards.find((b) => b.id === activeBoardId);
+    const f = board?.filters;
+    if (!f) {
+      filterMode = "today";
+      filterDateStr = momentFn().format("YYYY-MM-DD");
+      projectFilterId = null;
+      return;
+    }
+    filterMode = f.filterMode || "today";
+    filterDateStr = f.filterDateStr || momentFn().format("YYYY-MM-DD");
+    projectFilterId = f.projectFilterId ?? null;
+  }
+
+  async function openBoardsManager(): Promise<void> {
+    showBoardPicker = false;
+    const plugin = (
+      appInstance as unknown as {
+        plugins?: { getPlugin?: (id: string) => { writeOptions?: (c: Record<string, unknown>) => Promise<void> } | undefined };
+      }
+    ).plugins?.getPlugin?.("worklife-calendar");
+    const mod = await import("../task-tracker/KanbanBoardModal");
+    new mod.KanbanBoardsListModal(appInstance, {
+      defaultBoardId: preferredDefaultId,
+      onDefaultChange: (boardId: string) => {
+        if (plugin?.writeOptions) void plugin.writeOptions({ defaultKanbanBoardId: boardId });
+        else void settings.update((s) => ({ ...s, defaultKanbanBoardId: boardId }));
+      },
+      onEditBoard: (boardId: string | null) => {
+        void import("../task-tracker/KanbanBoardModal").then(({ KanbanBoardModal }) => {
+          new KanbanBoardModal(appInstance, { editBoardId: boardId }).open();
+        });
+      },
+    }).open();
   }
 
   // Close project picker on outside click
@@ -70,73 +175,60 @@
         showProjectPicker = false;
       }
     }
+    if (showBoardPicker) {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".kanban-board-picker")) {
+        showBoardPicker = false;
+      }
+    }
   }
 
   // Reactive filter UID — use getDateUID to match actual task dateUID format
   $: filterDateUID = filterMode === "all" ? null : getDateUID(momentFn(filterDateStr, "YYYY-MM-DD"), "day");
 
-  // Reactive filtered task lists — depend on $tasks AND filterMode/filterDateUID
-  $: todoTasks = $tasks
-    .filter((t) => {
-      if (t.status !== "todo" || t.completed) return false;
-      if (projectFilterId && t.projectId !== projectFilterId) return false;
-      if (filterMode === "all") return true;
-      return t.dateUID === filterDateUID;
-    })
-    .sort((a, b) => {
+  function matchesFilters(t: ITask): boolean {
+    if (projectFilterId && t.projectId !== projectFilterId) return false;
+    if (filterMode === "all") return true;
+    return t.dateUID === filterDateUID;
+  }
+
+  function sortColumnTasks(list: ITask[], statuses: TaskStatus[]): ITask[] {
+    const isDoneLike = statuses.length === 1 && (statuses[0] === "done" || statuses[0] === "failed");
+    const sorted = [...list];
+    if (isDoneLike) {
+      sorted.sort((a, b) => b.updatedAt - a.updatedAt);
+      return sorted.slice(0, 50);
+    }
+    sorted.sort((a, b) => {
       if (a.scheduledTime && b.scheduledTime) return a.scheduledTime.localeCompare(b.scheduledTime);
       if (a.scheduledTime) return -1;
       if (b.scheduledTime) return 1;
       return b.createdAt - a.createdAt;
     });
+    return sorted;
+  }
 
-  $: progressTasks = $tasks
-    .filter((t) => {
-      if (t.status !== "progress" || t.completed) return false;
-      if (projectFilterId && t.projectId !== projectFilterId) return false;
-      if (filterMode === "all") return true;
-      return t.dateUID === filterDateUID;
-    })
-    .sort((a, b) => {
-      if (a.scheduledTime && b.scheduledTime) return a.scheduledTime.localeCompare(b.scheduledTime);
-      if (a.scheduledTime) return -1;
-      if (b.scheduledTime) return 1;
-      return b.createdAt - a.createdAt;
-    });
-
-  $: pausedTasks = $tasks
-    .filter((t) => {
-      if (t.status !== "paused" || t.completed) return false;
-      if (projectFilterId && t.projectId !== projectFilterId) return false;
-      if (filterMode === "all") return true;
-      return t.dateUID === filterDateUID;
-    })
-    .sort((a, b) => {
-      if (a.scheduledTime && b.scheduledTime) return a.scheduledTime.localeCompare(b.scheduledTime);
-      if (a.scheduledTime) return -1;
-      if (b.scheduledTime) return 1;
-      return b.createdAt - a.createdAt;
-    });
-
-  $: doneTasks = $tasks
-    .filter((t) => {
-      if (t.status !== "done" && !t.completed) return false;
-      if (projectFilterId && t.projectId !== projectFilterId) return false;
-      if (filterMode === "all") return true;
-      return t.dateUID === filterDateUID;
-    })
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .slice(0, 50);
-
-  $: failedTasks = $tasks
-    .filter((t) => {
-      if (t.status !== "failed") return false;
-      if (projectFilterId && t.projectId !== projectFilterId) return false;
-      if (filterMode === "all") return true;
-      return t.dateUID === filterDateUID;
-    })
-    .sort((a, b) => b.updatedAt - a.updatedAt)
-    .slice(0, 50);
+  function tasksForColumn(col: KanbanColumn): ITask[] {
+    if (col.isFreeForm) {
+      return sortColumnTasks(
+        $tasks.filter((t) => t.kanbanColumnId === col.key && matchesFilters(t)),
+        col.statuses,
+      );
+    }
+    const statusSet = new Set(col.statuses);
+    return sortColumnTasks(
+      $tasks.filter((t) => {
+        // A task explicitly parked in a free-form column is not claimed by status columns
+        if (t.kanbanColumnId) return false;
+        if (!statusSet.has(t.status)) return false;
+        if (t.status === "done" || t.status === "failed") {
+          // keep
+        } else if (t.completed) return false;
+        return matchesFilters(t);
+      }),
+      col.statuses,
+    );
+  }
 
   // Timer — update displays every second via a reactive Map
   let timerDisplays = new Map<string, string>();
@@ -171,9 +263,14 @@
   }
 
   onMount(() => {
+    // Start on the user's default board
+    const preferred = ($settings as { defaultKanbanBoardId?: string }).defaultKanbanBoardId;
+    if (preferred) activeBoardId = preferred;
+    restoreFilters();
     carryOverOverdueTasks();
     refreshTimers();
     timerInterval = window.setInterval(refreshTimers, 1000);
+    return () => persistFilters();
   });
   onDestroy(() => {
     if (timerInterval !== null) { window.clearInterval(timerInterval); timerInterval = null; }
@@ -197,26 +294,44 @@
     dragOverColumn = null;
   }
 
-  function handleDragOver(e: DragEvent, status: TaskStatus): void {
+  function handleDragOver(e: DragEvent, colKey: string): void {
     e.preventDefault();
     if (e.dataTransfer) {
       e.dataTransfer.dropEffect = "move";
     }
-    dragOverColumn = status;
+    dragOverColumn = colKey;
   }
 
   function handleDragLeave(): void {
     dragOverColumn = null;
   }
 
-  function handleDrop(e: DragEvent, status: TaskStatus): void {
+  function handleDrop(e: DragEvent, col: KanbanColumn): void {
     e.preventDefault();
     dragOverColumn = null;
     const taskId = e.dataTransfer?.getData("text/plain") || draggedTask?.id;
     if (!taskId) return;
     const currentTask = $tasks.find((t) => t.id === taskId);
-    if (!currentTask || currentTask.status === status) return;
-    updateTaskStatus(taskId, status);
+    if (!currentTask) return;
+
+    if (col.isFreeForm) {
+      // Park the task in this status-less column (status stays as-is)
+      if (currentTask.kanbanColumnId === col.key) return;
+      setTaskKanbanColumn(taskId, col.key);
+      draggedTask = null;
+      return;
+    }
+
+    // Status column: keep current status if already in the set, else first status
+    const targetStatus: TaskStatus = col.statuses.includes(currentTask.status)
+      ? currentTask.status
+      : col.statuses[0];
+    if (!targetStatus) return;
+    if (currentTask.status === targetStatus && !currentTask.kanbanColumnId) return;
+    updateTaskStatus(taskId, targetStatus, {
+      // Per-column «Запускать таймер в работе» overrides the global setting
+      autoStartTimer: col.autoStartTimer,
+    });
     draggedTask = null;
   }
 
@@ -271,12 +386,16 @@
     return d.format("D MMM");
   }
 
-  function createTaskWithStatus(status: TaskStatus): void {
+  function createTaskWithStatus(status: TaskStatus, freeFormColId?: string): void {
     void import("../task-tracker/QuickAddModal").then(({ QuickAddModal }) => {
       new QuickAddModal(appInstance, momentFn(), () => {
         /* store-driven */
       }, {
         onTaskCreated: (task) => {
+          if (freeFormColId) {
+            setTaskKanbanColumn(task.id, freeFormColId);
+            return;
+          }
           if (task.status !== status) updateTask(task.id, { status, completed: status === "done" });
         },
       }).open();
@@ -296,8 +415,40 @@
     📆 {filterMode === "date" ? momentFn(filterDateStr, "YYYY-MM-DD").format("D MMM") : "..."}
   </button>
   <input type="date" bind:this={dateInputRef} class="kanban-date-hidden" value={filterDateStr}
-    on:change={(e) => { filterDateStr = e.currentTarget.value; filterMode = "date"; }}
+    on:change={(e) => { filterDateStr = e.currentTarget.value; filterMode = "date"; persistFilters(); }}
   />
+  <div class="kanban-project-picker kanban-board-picker">
+    <button class="kanban-filter-btn kanban-project-btn" class:active={activeBoardId !== DEFAULT_KANBAN_BOARD_ID} on:click|stopPropagation={() => { showBoardPicker = !showBoardPicker; showProjectPicker = false; }}>
+      <span>{activeBoard?.icon || "🗂"}</span>
+      <span>{activeBoard?.name || $t("kanban.title")}</span>
+      {#if isDefaultBoard}<span class="kanban-default-star" title={$t("kanban.defaultBoard")}>★</span>{/if}
+      <span class="kanban-project-arrow" class:rotated={showBoardPicker}>▾</span>
+    </button>
+    {#if showBoardPicker}
+      <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+      <div class="kanban-project-dropdown" on:click|stopPropagation on:keydown|stopPropagation>
+        <button class="kanban-project-item" class:active={activeBoardId === DEFAULT_KANBAN_BOARD_ID}
+          on:click={() => selectBoard(DEFAULT_KANBAN_BOARD_ID)}>
+          <span>🗂</span> {$t("kanban.title")}
+          {#if preferredDefaultId === DEFAULT_KANBAN_BOARD_ID}
+            <span class="kanban-default-star">★</span>
+          {/if}
+        </button>
+        {#each customBoards as board (board.id)}
+          <button class="kanban-project-item" class:active={activeBoardId === board.id}
+            on:click={() => selectBoard(board.id)}>
+            <span>{board.icon || "🗂"}</span> {board.name}
+            {#if preferredDefaultId === board.id}
+              <span class="kanban-default-star">★</span>
+            {/if}
+          </button>
+        {/each}
+        <button class="kanban-project-item kanban-manage-boards" on:click={() => openBoardsManager()}>
+          <span>⚙</span> {$t("kanban.manageBoards")}
+        </button>
+      </div>
+    {/if}
+  </div>
   <div class="kanban-project-picker">
     <button class="kanban-filter-btn kanban-project-btn" class:active={projectFilterId !== null} on:click|stopPropagation={toggleProjectPicker}>
       {#if projectFilterId}
@@ -330,13 +481,13 @@
 
 <div class="kanban-board">
   {#each columns as col (col.key)}
-    {@const columnTasks = col.key === "todo" ? todoTasks : col.key === "progress" ? progressTasks : col.key === "paused" ? pausedTasks : col.key === "failed" ? failedTasks : doneTasks}
+    {@const columnTasks = tasksForColumn(col)}
     <div
       class="kanban-column"
       class:drag-over={dragOverColumn === col.key}
       on:dragover={(e) => handleDragOver(e, col.key)}
       on:dragleave={handleDragLeave}
-      on:drop={(e) => handleDrop(e, col.key)}
+      on:drop={(e) => handleDrop(e, col)}
       role="region"
       aria-label={col.label}
     >
@@ -344,8 +495,8 @@
         <span class="kanban-col-icon">{col.icon}</span>
         <span class="kanban-col-label">{col.label}</span>
         <span class="kanban-col-count">{columnTasks.length}</span>
-        {#if col.key === "todo"}
-          <button class="kanban-col-add" on:click|stopPropagation={() => createTaskWithStatus(col.key)} title={$t("tasks.modal.newTask")}>+</button>
+        {#if col.isFreeForm || col.statuses.includes("todo")}
+          <button class="kanban-col-add" on:click|stopPropagation={() => createTaskWithStatus(col.statuses[0] || "todo", col.isFreeForm ? col.key : undefined)} title={$t("tasks.modal.newTask")}>+</button>
         {/if}
       </div>
       <div class="kanban-column-body">

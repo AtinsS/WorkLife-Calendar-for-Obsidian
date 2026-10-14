@@ -63,6 +63,8 @@ export interface ISettings {
 
   /** Видимость переключателя Задачи/Канбан/Расписание/Привычки */
   viewSwitcherMode?: "everywhere" | "desktop" | "mobile" | "hidden";
+  /** Kanban board shown when the Kanban view opens ("default" = built-in status board). */
+  defaultKanbanBoardId?: string;
 
   // Weight control
   weightControlEnabled?: boolean;
@@ -232,6 +234,7 @@ export const defaultSettings = Object.freeze({
   habitLogCleanupThreshold: 1000,
   weightControlEnabled: true,
   viewSwitcherMode: "everywhere" as const,
+  defaultKanbanBoardId: "default",
 
   syncToVault: true,
   syncConflictCleanupEnabled: true,

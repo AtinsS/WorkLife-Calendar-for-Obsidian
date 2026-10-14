@@ -7,9 +7,11 @@ import {
   removeHabit,
   toggleHabitCompletion,
   isHabitCompletedOnDate,
+  isHabitManualLocked,
   getHabitCountOnDate,
   calculateStreak,
   rebuildLogsCache,
+  setHabitProgress,
 } from "../stores";
 
 beforeEach(() => {
@@ -96,6 +98,49 @@ describe("removeHabit", () => {
 
     expect(get(habits).length).toBe(0);
     expect(get(habitLogs).length).toBe(0);
+  });
+});
+
+describe("locked habits (AI-workout streak)", () => {
+  it("isHabitManualLocked is true for locked flag and workout-streak project", () => {
+    expect(isHabitManualLocked({ locked: true })).toBe(true);
+    expect(isHabitManualLocked({ projectId: "workout-streak" })).toBe(true);
+    expect(isHabitManualLocked({ locked: false, projectId: null })).toBe(false);
+  });
+
+  it("toggleHabitCompletion is a no-op for locked habits", () => {
+    const habit = addHabit({
+      title: "Workouts",
+      icon: "\uD83D\uDCAA",
+      color: "#1b7942",
+      frequency: "weekly",
+      targetCount: 1,
+      archived: false,
+      sortOrder: 0,
+      projectId: "workout-streak",
+      locked: true,
+    });
+
+    toggleHabitCompletion(habit.id, "2026-07-05");
+    expect(get(habitLogs).length).toBe(0);
+    expect(isHabitCompletedOnDate(habit.id, "2026-07-05")).toBe(false);
+  });
+
+  it("setHabitProgress still auto-completes a locked habit", () => {
+    const habit = addHabit({
+      title: "Workouts",
+      icon: "\uD83D\uDCAA",
+      color: "#1b7942",
+      frequency: "weekly",
+      targetCount: 1,
+      archived: false,
+      sortOrder: 0,
+      projectId: "workout-streak",
+      locked: true,
+    });
+
+    setHabitProgress(habit.id, "2026-07-05", 2);
+    expect(isHabitCompletedOnDate(habit.id, "2026-07-05")).toBe(true);
   });
 });
 

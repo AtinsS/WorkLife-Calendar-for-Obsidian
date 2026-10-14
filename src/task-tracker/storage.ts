@@ -34,7 +34,7 @@ export async function loadTaskData(
     return data;
   }
   console.debug(`[Task] NO DATA`);
-  return { tasks: [], projects: [], timeLogs: [], checklists: [], version: TASK_TRACKER_DATA_VERSION };
+  return { tasks: [], projects: [], timeLogs: [], checklists: [], kanbanBoards: [], version: TASK_TRACKER_DATA_VERSION };
 }
 
 export async function saveTaskData(
@@ -106,6 +106,15 @@ function migrateData(data: ITaskTrackerData): ITaskTrackerData {
       ...migrated,
       checklists: [],
       version: 7,
+    };
+  }
+
+  // v7 -> v8: add custom kanban boards array
+  if (data.version < 8) {
+    migrated = {
+      ...migrated,
+      kanbanBoards: [],
+      version: 8,
     };
   }
 

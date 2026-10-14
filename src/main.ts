@@ -647,8 +647,13 @@ export default class CalendarPlugin extends Plugin {
     );
   }
 
+  /** dtw-bar is desktop-only — phones/tablets hide the info panel. */
+  private isDtwMobile(): boolean {
+    return typeof window !== "undefined" && window.innerWidth <= 768;
+  }
+
   private injectDateTimeWeather(): void {
-    if (!this.options.showStatusBar) {
+    if (!this.options.showStatusBar || this.isDtwMobile()) {
       this.removeDateTimeWeather();
       return;
     }
@@ -663,7 +668,7 @@ export default class CalendarPlugin extends Plugin {
   }
 
   private moveDateTimeWeatherToActiveView(): void {
-    if (!this.options.showStatusBar) {
+    if (!this.options.showStatusBar || this.isDtwMobile()) {
       this.removeDateTimeWeather();
       return;
     }
@@ -707,7 +712,7 @@ export default class CalendarPlugin extends Plugin {
     // Header может быть ещё не пересобран после setViewState — повторим
     if (!headerEl) {
       window.setTimeout(() => {
-        if (!this.dtwContainer && this.options.showStatusBar) {
+        if (!this.dtwContainer && this.options.showStatusBar && !this.isDtwMobile()) {
           this.createDateTimeWeatherPanel();
         }
       }, 80);

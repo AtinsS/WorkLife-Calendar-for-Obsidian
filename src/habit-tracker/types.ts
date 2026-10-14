@@ -11,6 +11,11 @@ export interface IHabit {
   archived: boolean;
   createdAt: number;
   sortOrder: number;
+  /**
+   * Display-only habit: shown in the list but not completable by hand.
+   * Used by the AI-workout streak — completion only via workout task → done.
+   */
+  locked?: boolean;
 }
 
 export interface IHabitLog {

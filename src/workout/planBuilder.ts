@@ -9,7 +9,12 @@ import {
   tasks as tasksStore,
 } from "../task-tracker/stores";
 import type { ITask } from "../task-tracker/types";
-import { addHabit, habits as habitsStore, setHabitProgress } from "../habit-tracker/stores";
+import {
+  addHabit,
+  habits as habitsStore,
+  setHabitProgress,
+  updateHabit,
+} from "../habit-tracker/stores";
 import type { IHabit } from "../habit-tracker/types";
 import { formatExercise, type WorkoutDayPlan, type WorkoutPlan } from "./types";
 
@@ -65,7 +70,14 @@ function ensureWorkoutHabit(title: string, daysOfWeek: number[]): IHabit {
   const existing = all.find(
     (h) => !h.archived && (h.title === title || h.projectId === "workout-streak"),
   );
-  if (existing) return existing;
+  if (existing) {
+    // Keep the streak habit display-only even if it was created before the lock flag.
+    if (!existing.locked) {
+      updateHabit(existing.id, { locked: true });
+      return { ...existing, locked: true };
+    }
+    return existing;
+  }
   return addHabit({
     title,
     icon: "💪",
@@ -76,6 +88,7 @@ function ensureWorkoutHabit(title: string, daysOfWeek: number[]): IHabit {
     targetCount: 1,
     archived: false,
     sortOrder: 0,
+    locked: true,
   });
 }
 

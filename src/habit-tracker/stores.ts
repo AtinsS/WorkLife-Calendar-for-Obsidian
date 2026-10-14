@@ -136,11 +136,19 @@ export function removeHabit(id: string): void {
   debouncedSave();
 }
 
+/** AI-workout streak (and any locked habit) is display-only — no manual toggle. */
+export function isHabitManualLocked(habit: Pick<IHabit, "locked" | "projectId">): boolean {
+  return habit.locked === true || habit.projectId === "workout-streak";
+}
+
 export function toggleHabitCompletion(
   habitId: string,
   date: string,
   targetCount = 1
 ): void {
+  const habit = get(habits).find((h) => h.id === habitId);
+  if (habit && isHabitManualLocked(habit)) return;
+
   const key = `${habitId}::${date}`;
   const existing = logsByHabitDate.get(key);
 

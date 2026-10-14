@@ -7373,14 +7373,7 @@ h2.tm-title.tm-title {
   white-space: nowrap;
 }
 
-.task-item.workout-session {
-  border-left: 3px solid rgba(61, 220, 151, 0.55);
-  background: linear-gradient(90deg, rgba(61, 220, 151, 0.06), transparent 55%);
-}
-
-.task-item.workout-session.completed {
-  border-left-color: rgba(61, 220, 151, 0.85);
-}
+/* Workout task: neutral card — the 💪 badge is the only AI-plan marker */
 
 .habit-item.workout-streak {
   border-left: 3px solid rgba(61, 220, 151, 0.55);
@@ -7389,6 +7382,17 @@ h2.tm-title.tm-title {
 
 .habit-item.workout-streak .habit-title {
   font-weight: 650;
+}
+
+/* Display-only habit (AI-workout streak) — check is disabled */
+.habit-item.locked .habit-check-btn:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.habit-item.locked .habit-check-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 /* --- Carried-over (overdue) task highlight --- */
@@ -10789,9 +10793,13 @@ textarea.qa2-textarea.qa2-textarea {
 .kanban-project-dropdown {
   position: absolute;
   top: calc(100% + 4px);
-  left: 0;
+  /* Right-align: the picker is the rightmost filter control, so left:0
+     overflows the viewport on phones. Keep the menu inside the screen. */
+  left: auto;
+  right: 0;
   z-index: 100;
   min-width: 160px;
+  max-width: calc(100vw - 24px);
   max-height: 260px;
   overflow-y: auto;
   background: var(--background-primary, #1e1e2e);
@@ -10825,6 +10833,682 @@ textarea.qa2-textarea.qa2-textarea {
 .kanban-project-item.active {
   background: var(--interactive-accent);
   color: var(--text-on-accent);
+}
+
+.kanban-default-star {
+  color: var(--mcp-warning, #f5a623);
+  font-size: 11px;
+  margin-left: 2px;
+}
+
+.kanban-manage-boards {
+  border-top: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.08));
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+/* --- Kanban board manager modal --- */
+/* Container is sized via .kbm-board-modal (set in KanbanBoardModal onOpen).
+   Fallback :has() covers builds that only add .kbm-modal to content. */
+.wf-dialog-container.kbm-board-modal,
+.wf-dialog-container:has(> .wf-dialog-content.kbm-modal) {
+  width: min(860px, calc(100vw - 40px));
+  max-width: min(860px, calc(100vw - 40px));
+  max-height: min(92vh, 940px);
+}
+
+.kbm-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 860px;
+  min-width: 0;
+  padding: 22px 24px 20px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.kbm-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding-right: 28px;
+}
+
+.kbm-title {
+  margin: 0;
+  font-size: 1.35em;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.kbm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kbm-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.kbm-input {
+  width: 100%;
+  padding: 11px 12px;
+  min-height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  background: var(--background-primary, #1e1e2e);
+  color: var(--text-normal);
+  font-size: 15px;
+  box-sizing: border-box;
+}
+
+.kbm-icon-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kbm-icon-btn {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--background-secondary, rgba(255, 255, 255, 0.04));
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+}
+
+.kbm-icon-btn:hover {
+  background: var(--background-modifier-hover, rgba(255, 255, 255, 0.06));
+  border-color: var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  transform: none;
+  box-shadow: none;
+}
+
+.kbm-icon-btn.is-active {
+  border-color: var(--interactive-accent);
+  background: var(--interactive-accent-hover, rgba(124, 92, 252, 0.15));
+}
+
+.kbm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.kbm-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kbm-section-title {
+  font-weight: 650;
+  font-size: 15px;
+}
+
+.kbm-add-col-btn {
+  padding: 9px 16px;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kbm-col-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: min(52vh, 520px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 2px;
+}
+
+.kbm-col-row {
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.08));
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.kbm-col-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.kbm-col-icon {
+  width: 48px;
+  height: 42px;
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  background: var(--background-primary, #1e1e2e);
+  color: var(--text-normal);
+  font-size: 18px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.kbm-col-title {
+  flex: 1 1 140px;
+  min-width: 120px;
+}
+
+.kbm-col-color {
+  width: 44px;
+  height: 42px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.kbm-col-del {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(240, 100, 100, 0.12);
+  color: var(--mcp-danger, #f06565);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  line-height: 1;
+  font-size: 14px;
+}
+
+/* --- Column drag & drop reorder --- */
+.kbm-dnd-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-bottom: 2px;
+}
+
+.kbm-col-row-drag {
+  cursor: grab;
+}
+
+.kbm-col-row-drag.is-dragging {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+.kbm-col-row-drag.is-drag-over {
+  border-color: var(--interactive-accent);
+  box-shadow: 0 0 0 1px var(--interactive-accent);
+}
+
+.kbm-dnd-handle {
+  color: var(--text-faint);
+  font-size: 16px;
+  cursor: grab;
+  user-select: none;
+  flex-shrink: 0;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.kbm-col-timer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(245, 166, 35, 0.08);
+  border: 1px solid rgba(245, 166, 35, 0.2);
+}
+
+.kbm-timer-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-normal);
+  cursor: pointer;
+  min-height: 28px;
+}
+
+.kbm-timer-cb {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--interactive-accent);
+  flex-shrink: 0;
+}
+
+.kbm-status-hint {
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.45;
+}
+
+.kbm-status-none.is-active {
+  background: var(--background-modifier-hover, rgba(255, 255, 255, 0.08));
+  border-color: var(--background-modifier-border, rgba(255, 255, 255, 0.16));
+  color: var(--text-normal);
+}
+
+.kbm-col-statuses {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.kbm-status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kbm-status-chip {
+  padding: 7px 12px;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.kbm-status-chip.is-active {
+  background: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.kbm-col-move {
+  display: flex;
+  gap: 8px;
+}
+
+.kbm-move-btn {
+  width: 36px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.kbm-move-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.kbm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+}
+
+.kbm-cancel-btn,
+.kbm-save-btn,
+.kbm-danger-btn {
+  padding: 11px 20px;
+  min-height: 42px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kbm-cancel-btn {
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--text-normal);
+}
+
+.kbm-save-btn {
+  border: none;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.kbm-danger-btn {
+  border: 1px solid rgba(240, 100, 100, 0.35);
+  background: rgba(240, 100, 100, 0.1);
+  color: var(--mcp-danger, #f06565);
+  margin-right: auto;
+}
+
+.kbm-board-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(58vh, 560px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kbm-board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.02);
+  flex-wrap: wrap;
+}
+
+.kbm-board-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.kbm-board-name {
+  flex: 1 1 120px;
+  min-width: 0;
+  font-weight: 600;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kbm-default-btn {
+  padding: 8px 14px;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.kbm-default-btn.is-active {
+  border-color: var(--mcp-warning, #f5a623);
+  color: var(--mcp-warning, #f5a623);
+  background: rgba(245, 166, 35, 0.1);
+}
+
+.kbm-built-in {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.kbm-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* --- Kanban board modal: mobile / tablet --- */
+@media (max-width: 860px) {
+  .wf-dialog-container.kbm-board-modal,
+  .wf-dialog-container:has(> .wf-dialog-content.kbm-modal) {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    max-height: min(92dvh, 100%);
+    border-radius: 14px;
+  }
+
+  .kbm-modal {
+    padding: 16px 16px 14px;
+    gap: 12px;
+  }
+
+  .kbm-head {
+    padding-right: 24px;
+  }
+
+  .kbm-title {
+    font-size: 1.2em;
+  }
+
+  .kbm-col-list {
+    max-height: min(48vh, 420px);
+  }
+
+  .kbm-board-list {
+    max-height: min(52vh, 460px);
+  }
+}
+
+@media (max-width: 640px) {
+  .wf-dialog-container.kbm-board-modal,
+  .wf-dialog-container:has(> .wf-dialog-content.kbm-modal) {
+    width: calc(100vw - 12px);
+    max-width: calc(100vw - 12px);
+    max-height: min(94dvh, 100%);
+    border-radius: 12px;
+  }
+
+  .wf-dialog-container.kbm-board-modal .wf-dialog-content,
+  .wf-dialog-container:has(> .wf-dialog-content.kbm-modal) .wf-dialog-content {
+    max-height: min(94dvh, 100%);
+  }
+
+  .kbm-modal {
+    padding: 14px 12px 12px;
+    gap: 12px;
+    font-size: 13px;
+    /* Full-height sheet so the list can scroll under a sticky footer */
+    min-height: min(70dvh, 520px);
+    justify-content: flex-start;
+  }
+
+  .kbm-title {
+    font-size: 1.15em;
+    line-height: 1.25;
+  }
+
+  .kbm-head {
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .kbm-head .kbm-add-col-btn {
+    width: 100%;
+    order: 2;
+  }
+
+  /* iOS zoom prevention */
+  .kbm-input,
+  .kbm-col-icon,
+  .kbm-col-title {
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  .kbm-icon-grid {
+    gap: 8px;
+  }
+
+  .kbm-icon-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 20px;
+    /* 6 across on a ~360px phone */
+    flex: 1 1 calc(16.66% - 8px);
+    max-width: calc(20% - 8px);
+  }
+
+  .kbm-section-head .kbm-add-col-btn {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .kbm-section-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .kbm-col-top {
+    gap: 8px;
+  }
+
+  .kbm-col-icon {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  .kbm-col-color {
+    width: 44px;
+    height: 44px;
+  }
+
+  .kbm-col-del,
+  .kbm-move-btn {
+    width: 44px;
+    height: 40px;
+    min-height: 40px;
+  }
+
+  .kbm-status-chip {
+    min-height: 38px;
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .kbm-col-list,
+  .kbm-board-list {
+    max-height: none;
+    overflow-y: visible;
+    padding-right: 0;
+  }
+
+  /* Content becomes the scroller so the sticky footer stays put */
+  .wf-dialog-container.kbm-board-modal .wf-dialog-content,
+  .wf-dialog-container:has(> .wf-dialog-content.kbm-modal) .wf-dialog-content {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .kbm-board-row {
+    padding: 12px;
+    gap: 8px 10px;
+  }
+
+  .kbm-board-icon {
+    font-size: 20px;
+  }
+
+  .kbm-board-name {
+    font-size: 14px;
+    flex: 1 1 100px;
+  }
+
+  .kbm-default-btn {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+
+  /* Sticky action bar for create/edit */
+  .kbm-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin: 4px -12px -12px;
+    padding: 12px;
+    background: var(--background-primary, #1a1a2e);
+    border-top: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.08));
+    justify-content: stretch;
+    gap: 8px;
+  }
+
+  .kbm-cancel-btn,
+  .kbm-save-btn,
+  .kbm-danger-btn {
+    flex: 1 1 auto;
+    min-height: 46px;
+    padding: 12px 14px;
+    text-align: center;
+  }
+
+  .kbm-danger-btn {
+    margin-right: 0;
+    flex: 1 1 100%;
+    order: 3;
+  }
+
+  .kbm-cancel-btn {
+    order: 1;
+  }
+
+  .kbm-save-btn {
+    order: 2;
+  }
+}
+
+@media (max-width: 400px) {
+  .kbm-modal {
+    padding: 12px 10px 10px;
+    gap: 10px;
+  }
+
+  .kbm-icon-btn {
+    flex: 1 1 calc(25% - 8px);
+    max-width: calc(25% - 8px);
+  }
+
+  .kbm-status-chips {
+    gap: 6px;
+  }
+
+  .kbm-status-chip {
+    flex: 1 1 auto;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+/* Soft-keyboard: keep the dialog usable above the keyboard */
+html.wl-keyboard-open .wf-dialog-container.kbm-board-modal,
+html.wl-keyboard-open .wf-dialog-container:has(> .wf-dialog-content.kbm-modal) {
+  max-height: min(70dvh, 100%);
+  margin-bottom: 8px;
 }
 
 .kanban-board {
@@ -11127,10 +11811,113 @@ textarea.qa2-textarea.qa2-textarea {
   .kanban-board {
     padding: 8px;
     gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
   }
 
   .kanban-column {
-    min-width: 200px;
+    min-width: min(260px, 78vw);
+    max-width: min(300px, 85vw);
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+    scroll-margin-left: 8px;
+  }
+
+  .kanban-filters {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    padding: 8px 8px 0;
+    gap: 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .kanban-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kanban-filter-btn {
+    flex-shrink: 0;
+    min-height: 36px;
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+
+  .kanban-column-header {
+    padding: 10px 12px;
+    gap: 6px;
+  }
+
+  .kanban-card {
+    padding: 10px;
+    margin: 8px;
+  }
+
+  .kanban-col-add {
+    min-height: 40px;
+    margin: 8px;
+    width: calc(100% - 16px);
+    box-sizing: border-box;
+  }
+}
+
+@media (max-width: 480px) {
+  .kanban-board {
+    padding: 6px;
+    gap: 6px;
+  }
+
+  .kanban-column {
+    min-width: calc(100vw - 28px);
+    max-width: calc(100vw - 28px);
+  }
+
+  .kanban-filters {
+    padding: 6px 6px 0;
+  }
+
+  /* Keep project picker menu on-screen */
+  .kanban-project-dropdown {
+    left: 0;
+    right: auto;
+    max-width: calc(100vw - 24px);
+  }
+
+  .kanban-card-actions {
+    opacity: 1;
+    gap: 6px;
+  }
+
+  .kanban-card-btn {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    font-size: 13px;
+  }
+
+  .kanban-trigger-label {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Touch devices: always show card actions (no hover) */
+@media (hover: none) and (pointer: coarse) {
+  .kanban-card-actions {
+    opacity: 1;
+  }
+
+  .kanban-card-btn {
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
   }
 }
 

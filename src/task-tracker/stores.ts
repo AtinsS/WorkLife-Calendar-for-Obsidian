@@ -4,7 +4,7 @@ import { momentFn, type Moment } from "../utils/moment";
 import type CalendarPlugin from "src/main";
 import { getDateUID } from "obsidian-daily-notes-interface";
 
-import type { ITask, IProject, ITaskTrackerData, IChecklistItem, TimeLog, TaskStatus, DateUID } from "./types";
+import type { ITask, IProject, ITaskTrackerData, IChecklistItem, TimeLog, TaskStatus, DateUID, IKanbanBoard, IKanbanColumnDef } from "./types";
 import { TASK_TRACKER_DATA_VERSION } from "./types";
 import { loadTaskData, saveTaskData, generateId } from "./storage";
 import { startTimer, resumeTimer, stopTimer, addTimeLog } from "./TimerManager";
@@ -56,6 +56,18 @@ export const taskFilter = writable<{
 
 export const timeLogs = writable<TimeLog[]>([]);
 export const checklists = writable<IChecklistItem[]>([]);
+export const kanbanBoards = writable<IKanbanBoard[]>([]);
+
+function buildTrackerData(): ITaskTrackerData {
+  return {
+    tasks: get(tasks),
+    projects: get(projects),
+    timeLogs: get(timeLogs),
+    checklists: get(checklists),
+    kanbanBoards: get(kanbanBoards),
+    version: TASK_TRACKER_DATA_VERSION,
+  };
+}
 
 function debouncedSave(): void {
   if (!loaded) return;
@@ -63,15 +75,8 @@ function debouncedSave(): void {
     window.clearTimeout(saveTimeout);
   }
   saveTimeout = window.setTimeout(() => {
-    const data: ITaskTrackerData = {
-      tasks: get(tasks),
-      projects: get(projects),
-      timeLogs: get(timeLogs),
-      checklists: get(checklists),
-      version: TASK_TRACKER_DATA_VERSION,
-    };
     if (pluginInstance) {
-      void saveTaskData(pluginInstance, data);
+      void saveTaskData(pluginInstance, buildTrackerData());
     }
   }, 300);
 }
@@ -82,14 +87,7 @@ export function immediateSave(): void {
     window.clearTimeout(saveTimeout);
     saveTimeout = null;
   }
-  const data: ITaskTrackerData = {
-    tasks: get(tasks),
-    projects: get(projects),
-    timeLogs: get(timeLogs),
-    checklists: get(checklists),
-    version: TASK_TRACKER_DATA_VERSION,
-  };
-  void saveTaskData(pluginInstance, data);
+  void saveTaskData(pluginInstance, buildTrackerData());
 }
 
 let lastCarryOverDate: string | null = null;
@@ -158,6 +156,7 @@ export async function initTaskStores(plugin: CalendarPlugin): Promise<void> {
     projects.set(data.projects);
     timeLogs.set(data.timeLogs || []);
     checklists.set(data.checklists || []);
+    kanbanBoards.set(data.kanbanBoards || []);
     loaded = true;
 
     // Only run cleanup if we actually loaded data (prevents overwriting vault with empty arrays
@@ -205,6 +204,7 @@ export function reloadTaskStores(plugin: CalendarPlugin): void {
     projects.set(data.projects);
     timeLogs.set(data.timeLogs || []);
     checklists.set(data.checklists || []);
+    kanbanBoards.set(data.kanbanBoards || []);
     if (data.tasks.length > 0) {
       autoCleanupCompleted();
     }
@@ -444,6 +444,8 @@ function setTaskStatus(id: string, status: TaskStatus): void {
             ...t,
             status,
             completed: status === "done",
+            // Status-column placement wins over free-form column placement
+            kanbanColumnId: undefined,
             carriedOverFrom: status === "done" || status === "failed" ? undefined : t.carriedOverFrom,
             updatedAt: Date.now(),
           }
@@ -500,11 +502,18 @@ function maybeSyncWorkoutStreakOnDone(after: ITask | undefined, wasDone: boolean
   syncWorkoutStreak(after);
 }
 
-export function updateTaskStatus(id: string, status: TaskStatus): void {
+export function updateTaskStatus(
+  id: string,
+  status: TaskStatus,
+  opts?: { autoStartTimer?: boolean }
+): void {
   const allTasks = get(tasks);
   const task = allTasks.find((t) => t.id === id);
   const oldStatus = task?.status;
-  const autoStartTimer = get(settings).autoStartTimerOnWork !== false;
+  const autoStartTimer =
+    opts?.autoStartTimer !== undefined
+      ? opts.autoStartTimer
+      : get(settings).autoStartTimerOnWork !== false;
 
   if (oldStatus !== "progress" && status === "progress") {
     if (autoStartTimer) {
@@ -530,6 +539,16 @@ export function updateTaskStatus(id: string, status: TaskStatus): void {
     setTaskStatus(id, status);
   }
 
+  debouncedSave();
+}
+
+/** Place a task in a status-less kanban column (and clear status-column placement). */
+export function setTaskKanbanColumn(taskId: string, columnId: string | null): void {
+  tasks.update((current) =>
+    current.map((t) =>
+      t.id === taskId ? { ...t, kanbanColumnId: columnId ?? undefined } : t
+    )
+  );
   debouncedSave();
 }
 
@@ -828,6 +847,84 @@ export function reorderProjects(orderedIds: string[]): void {
       })
       .filter((p): p is IProject => p !== null);
   });
+  debouncedSave();
+}
+
+// --- Custom kanban boards ---
+
+export function addKanbanBoard(
+  boardData: Omit<IKanbanBoard, "id" | "createdAt">
+): IKanbanBoard {
+  const board: IKanbanBoard = {
+    ...boardData,
+    id: generateId(),
+    createdAt: Date.now(),
+  };
+  kanbanBoards.update((current) => [...current, board]);
+  debouncedSave();
+  return board;
+}
+
+export function updateKanbanBoard(id: string, changes: Partial<IKanbanBoard>): void {
+  kanbanBoards.update((current) =>
+    current.map((b) => (b.id === id ? { ...b, ...changes } : b))
+  );
+  debouncedSave();
+}
+
+/** Persist the filter snapshot for a board (mode / date / project). */
+export function saveKanbanBoardFilters(
+  id: string,
+  filters: NonNullable<IKanbanBoard["filters"]>,
+): void {
+  kanbanBoards.update((current) =>
+    current.map((b) => (b.id === id ? { ...b, filters: { ...b.filters, ...filters } } : b))
+  );
+  debouncedSave();
+}
+
+export function removeKanbanBoard(id: string): void {
+  kanbanBoards.update((current) => current.filter((b) => b.id !== id));
+  debouncedSave();
+}
+
+export function addKanbanColumn(boardId: string, column: IKanbanColumnDef): void {
+  kanbanBoards.update((current) =>
+    current.map((b) =>
+      b.id === boardId ? { ...b, columns: [...b.columns, column] } : b
+    )
+  );
+  debouncedSave();
+}
+
+export function updateKanbanColumn(
+  boardId: string,
+  columnId: string,
+  changes: Partial<IKanbanColumnDef>
+): void {
+  kanbanBoards.update((current) =>
+    current.map((b) =>
+      b.id === boardId
+        ? {
+            ...b,
+            columns: b.columns.map((c) =>
+              c.id === columnId ? { ...c, ...changes } : c
+            ),
+          }
+        : b
+    )
+  );
+  debouncedSave();
+}
+
+export function removeKanbanColumn(boardId: string, columnId: string): void {
+  kanbanBoards.update((current) =>
+    current.map((b) =>
+      b.id === boardId
+        ? { ...b, columns: b.columns.filter((c) => c.id !== columnId) }
+        : b
+    )
+  );
   debouncedSave();
 }
 

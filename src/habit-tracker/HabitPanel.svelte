@@ -26,6 +26,8 @@
   $: dateStr = extractDateStr(currentDate);
   $: activeHabits = $habits.filter((h) => {
     if (h.archived) return false;
+    // Workout-streak habit is always visible (display-only, auto-completed).
+    if (h.projectId === "workout-streak" || h.locked) return true;
     const m = moment(dateStr, "YYYY-MM-DD");
     if (h.frequency === "weekly" && h.customDays && h.customDays.length > 0) {
       const dayOfWeek = m.day(); // 0=Sun
