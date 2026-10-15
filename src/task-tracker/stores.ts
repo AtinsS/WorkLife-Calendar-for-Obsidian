@@ -10,7 +10,6 @@ import { loadTaskData, saveTaskData, generateId } from "./storage";
 import { startTimer, resumeTimer, stopTimer, addTimeLog } from "./TimerManager";
 import { settings } from "../ui/stores";
 import { tRaw } from "../i18n";
-import { habits as habitsStore, setHabitProgress } from "../habit-tracker/stores";
 
 let pluginInstance: CalendarPlugin | null = null;
 let saveTimeout: number | null = null;
@@ -242,8 +241,6 @@ export function addTask(
 }
 
 export function updateTask(id: string, changes: Partial<ITask>): void {
-  const before = get(tasks).find((t) => t.id === id);
-  const wasDone = before?.completed === true;
   // Keep completed in sync when only status flips to/from done.
   const patch: Partial<ITask> = { ...changes };
   if (patch.status !== undefined && patch.completed === undefined) {
@@ -264,8 +261,6 @@ export function updateTask(id: string, changes: Partial<ITask>): void {
     if (completedCount > threshold - 20) {
       autoCleanupCompleted();
     }
-    const after = allTasks.find((t) => t.id === id);
-    maybeSyncWorkoutStreakOnDone(after, wasDone);
   }
 }
 
@@ -353,7 +348,6 @@ function startTaskTimer(id: string): void {
 function stopTaskTimerAndLog(id: string, status: TaskStatus): void {
   const allTasks = get(tasks);
   const task = allTasks.find((t) => t.id === id);
-  const wasDone = task?.completed === true;
   const log = stopTimer(id);
   if (log && task) {
     log.taskTitle = task.title;
@@ -383,8 +377,6 @@ function stopTaskTimerAndLog(id: string, status: TaskStatus): void {
       )
     );
   }
-  const after = get(tasks).find((t) => t.id === id);
-  maybeSyncWorkoutStreakOnDone(after, wasDone);
 }
 
 function pauseTaskTimer(id: string): void {
@@ -435,8 +427,6 @@ function pauseTaskTimer(id: string): void {
 }
 
 function setTaskStatus(id: string, status: TaskStatus): void {
-  const before = get(tasks).find((t) => t.id === id);
-  const wasDone = before?.completed === true;
   tasks.update((current) =>
     current.map((t) =>
       t.id === id
@@ -452,55 +442,6 @@ function setTaskStatus(id: string, status: TaskStatus): void {
         : t
     )
   );
-  const after = get(tasks).find((t) => t.id === id);
-  maybeSyncWorkoutStreakOnDone(after, wasDone);
-}
-
-/** Workout session = kind=workout on the task or on its recurring parent. */
-export function isWorkoutSession(task: ITask | undefined): boolean {
-  if (!task) return false;
-  if (task.kind === "workout" || task.workoutDayKey) return true;
-  if (task.isRecurringInstance && task.parentTaskId) {
-    const parent = get(tasks).find((t) => t.id === task.parentTaskId);
-    return parent?.kind === "workout" || !!parent?.workoutDayKey;
-  }
-  return false;
-}
-
-/** Habit used for workout streaks (settings id, else projectId workout-streak). */
-export function resolveWorkoutStreakHabitId(): string | null {
-  const fromSettings = get(settings).workoutHabitId;
-  if (fromSettings) return fromSettings;
-  const fallback = get(habitsStore).find(
-    (h) => !h.archived && h.projectId === "workout-streak",
-  );
-  return fallback?.id ?? null;
-}
-
-/** Date key (YYYY-MM-DD) for the streak log — always the current day. */
-export function workoutStreakDateKey(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/**
- * Tick the linked streak habit when a workout session is completed.
- * Completes the habit for the current day (not the task's scheduled date).
- */
-function syncWorkoutStreak(): void {
-  const habitId = resolveWorkoutStreakHabitId();
-  if (!habitId) return;
-  setHabitProgress(habitId, workoutStreakDateKey(), 2);
-}
-
-/**
- * Fire streak side-effect when a task flips to done from any path
- * (timer stop, status set, updateTask completed flag).
- */
-function maybeSyncWorkoutStreakOnDone(after: ITask | undefined, wasDone: boolean): void {
-  if (!after || wasDone || !after.completed) return;
-  if (!isWorkoutSession(after)) return;
-  syncWorkoutStreak();
 }
 
 export function updateTaskStatus(

@@ -11834,6 +11834,9 @@ html.wl-keyboard-open .wf-dialog-container:has(> .wf-dialog-content.kbm-modal) {
     gap: 6px;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    /* Allow dropdowns to escape the scroll clip on phones. */
+    overflow: visible;
+    flex-wrap: wrap;
   }
 
   .kanban-filters::-webkit-scrollbar {
@@ -11857,11 +11860,24 @@ html.wl-keyboard-open .wf-dialog-container:has(> .wf-dialog-content.kbm-modal) {
     margin: 8px;
   }
 
+  /* Compact icon button — not a full-width bar */
   .kanban-col-add {
-    min-height: 40px;
-    margin: 8px;
-    width: calc(100% - 16px);
-    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    min-width: 32px;
+    margin: 0;
+    flex-shrink: 0;
+    font-size: 18px;
+    border-radius: 8px;
+  }
+
+  /* Fixed so the menu is not clipped by .kanban-filters / view overflow */
+  .kanban-project-dropdown.is-fixed {
+    position: fixed;
+    z-index: 400;
+    max-width: min(280px, calc(100vw - 16px));
+    max-height: min(50vh, 320px);
   }
 }
 
@@ -11878,13 +11894,22 @@ html.wl-keyboard-open .wf-dialog-container:has(> .wf-dialog-content.kbm-modal) {
 
   .kanban-filters {
     padding: 6px 6px 0;
+    gap: 6px;
+    overflow: visible;
+    flex-wrap: wrap;
   }
 
-  /* Keep project picker menu on-screen */
   .kanban-project-dropdown {
-    left: 0;
-    right: auto;
-    max-width: calc(100vw - 24px);
+    left: 8px;
+    right: 8px;
+    max-width: calc(100vw - 16px);
+  }
+
+  .kanban-project-dropdown.is-fixed {
+    left: 8px;
+    right: 8px;
+    max-width: calc(100vw - 16px);
+    width: auto;
   }
 
   .kanban-card-actions {

@@ -192,8 +192,6 @@ export interface ISettings {
   aiWorkoutEnabled: boolean;
   /** Answers to the workout questionnaire (reused across plans). */
   workoutProfile?: import("./workout/types").WorkoutProfile;
-  /** Habit id used for workout streaks. */
-  workoutHabitId?: string;
 }
 
 export const defaultSettings = Object.freeze({

@@ -9,13 +9,6 @@ import {
   tasks as tasksStore,
 } from "../task-tracker/stores";
 import type { ITask } from "../task-tracker/types";
-import {
-  addHabit,
-  habits as habitsStore,
-  setHabitProgress,
-  updateHabit,
-} from "../habit-tracker/stores";
-import type { IHabit } from "../habit-tracker/types";
 import { formatExercise, type WorkoutDayPlan, type WorkoutPlan } from "./types";
 
 export interface CreateWorkoutPlanInput {
@@ -24,8 +17,6 @@ export interface CreateWorkoutPlanInput {
   startDate: Date;
   /** Optional project for all created tasks. */
   projectId: string | null;
-  /** Existing habit to mark on completion; created if missing. */
-  habitTitle: string;
   scheduledTime?: string;
   estimatedMinutes?: number;
   /** Output language for exercise line formatting. */
@@ -35,7 +26,6 @@ export interface CreateWorkoutPlanInput {
 export interface CreateWorkoutPlanResult {
   parentIds: string[];
   instanceCount: number;
-  habitId: string;
 }
 
 function pad(n: number): string {
@@ -65,33 +55,6 @@ export function exerciseTitles(day: WorkoutDayPlan, lang: "ru" | "en" = "en"): s
   return day.exercises.map((e) => formatExercise(e, lang));
 }
 
-function ensureWorkoutHabit(title: string, daysOfWeek: number[]): IHabit {
-  const all = get(habitsStore);
-  const existing = all.find(
-    (h) => !h.archived && (h.title === title || h.projectId === "workout-streak"),
-  );
-  if (existing) {
-    // Keep the streak habit display-only even if it was created before the lock flag.
-    if (!existing.locked) {
-      updateHabit(existing.id, { locked: true });
-      return { ...existing, locked: true };
-    }
-    return existing;
-  }
-  return addHabit({
-    title,
-    icon: "💪",
-    color: "#1b7942",
-    frequency: "weekly",
-    customDays: [...new Set(daysOfWeek)].sort((a, b) => a - b),
-    projectId: "workout-streak",
-    targetCount: 1,
-    archived: false,
-    sortOrder: 0,
-    locked: true,
-  });
-}
-
 function copyChecklistToInstances(parentId: string, titles: string[]): number {
   const all = get(tasksStore);
   const instances = all.filter((t) => t.isRecurringInstance && t.parentTaskId === parentId);
@@ -104,7 +67,7 @@ function copyChecklistToInstances(parentId: string, titles: string[]): number {
 }
 
 /**
- * Materialize a WorkoutPlan as recurring task series + streak habit.
+ * Materialize a WorkoutPlan as recurring task series.
  * Each plan day → one weekly series with `until` at plan end.
  */
 export function createWorkoutPlanTasks(input: CreateWorkoutPlanInput): CreateWorkoutPlanResult {
@@ -113,11 +76,6 @@ export function createWorkoutPlanTasks(input: CreateWorkoutPlanInput): CreateWor
   const untilUID = getDateUID(
     momentFn(toDateKey(untilDate), "YYYY-MM-DD"),
     "day",
-  );
-
-  const habit = ensureWorkoutHabit(
-    input.habitTitle,
-    plan.days.map((d) => d.dayOfWeek),
   );
 
   const parentIds: string[] = [];
@@ -160,17 +118,7 @@ export function createWorkoutPlanTasks(input: CreateWorkoutPlanInput): CreateWor
     instanceCount += copyChecklistToInstances(parent.id, titles);
   }
 
-  return { parentIds, instanceCount, habitId: habit.id };
-}
-
-/**
- * Mark the streak habit done for a completed workout session.
- * No-op if habit is missing or already logged for that day.
- */
-export function markWorkoutStreak(habitId: string, dateUID: string): void {
-  const m = /^day-(\d{4}-\d{2}-\d{2})/.exec(dateUID);
-  const dateKey = m ? m[1] : toDateKey(new Date());
-  setHabitProgress(habitId, dateKey, 2);
+  return { parentIds, instanceCount };
 }
 
 /** Parent series of a workout instance (or the task itself). */

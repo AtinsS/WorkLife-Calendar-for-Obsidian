@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { moment as obsMoment } from "obsidian";
   import type { App } from "obsidian";
   import { get } from "svelte/store";
@@ -104,10 +104,6 @@
     persistFilters();
   }
 
-  function toggleProjectPicker() {
-    showProjectPicker = !showProjectPicker;
-  }
-
   function selectProject(id: string | null) {
     projectFilterId = id;
     showProjectPicker = false;
@@ -167,19 +163,56 @@
     }).open();
   }
 
-  // Close project picker on outside click
-  function handleProjectPickerOutsideClick(e: MouseEvent) {
-    if (showProjectPicker) {
-      const target = e.target as HTMLElement;
-      if (!target.closest(".kanban-project-picker")) {
-        showProjectPicker = false;
-      }
+  // Close project/board pickers on outside click (document-level so mobile works
+  // even when the menu is position:fixed outside the filter bar).
+  function closePickersOnOutsideClick(e: MouseEvent) {
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+    if (showProjectPicker && !target.closest(".kanban-project-picker")) {
+      showProjectPicker = false;
     }
+    if (showBoardPicker && !target.closest(".kanban-board-picker")) {
+      showBoardPicker = false;
+    }
+  }
+
+  /** Keep dropdowns under their trigger on phones (filters overflow clips abspos). */
+  async function positionDropdown(trigger: HTMLElement): Promise<void> {
+    // Desktop keeps absolute placement inside the filter bar.
+    if (window.innerWidth > 768) return;
+    await tick();
+    const menu = trigger.parentElement?.querySelector<HTMLElement>(".kanban-project-dropdown");
+    if (!menu) return;
+    const rect = trigger.getBoundingClientRect();
+    menu.classList.add("is-fixed");
+    const menuH = menu.offsetHeight || 200;
+    const spaceBelow = window.innerHeight - rect.bottom - 12;
+    if (spaceBelow < Math.min(menuH, 180)) {
+      menu.style.top = `${Math.max(8, Math.round(rect.top - menuH - 6))}px`;
+    } else {
+      menu.style.top = `${Math.round(rect.bottom + 6)}px`;
+    }
+    const menuW = menu.offsetWidth || 160;
+    let left = Math.round(rect.right - menuW);
+    if (left < 8) left = 8;
+    if (left + menuW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - menuW - 8);
+    menu.style.left = `${left}px`;
+    menu.style.right = "auto";
+  }
+
+  function toggleBoardPicker(e: MouseEvent): void {
+    showProjectPicker = false;
+    showBoardPicker = !showBoardPicker;
     if (showBoardPicker) {
-      const target = e.target as HTMLElement;
-      if (!target.closest(".kanban-board-picker")) {
-        showBoardPicker = false;
-      }
+      positionDropdown(e.currentTarget as HTMLElement);
+    }
+  }
+
+  function toggleProjectPickerMenu(e: MouseEvent): void {
+    showBoardPicker = false;
+    showProjectPicker = !showProjectPicker;
+    if (showProjectPicker) {
+      positionDropdown(e.currentTarget as HTMLElement);
     }
   }
 
@@ -270,10 +303,15 @@
     carryOverOverdueTasks();
     refreshTimers();
     timerInterval = window.setInterval(refreshTimers, 1000);
-    return () => persistFilters();
+    document.addEventListener("click", closePickersOnOutsideClick, true);
+    return () => {
+      persistFilters();
+      document.removeEventListener("click", closePickersOnOutsideClick, true);
+    };
   });
   onDestroy(() => {
     if (timerInterval !== null) { window.clearInterval(timerInterval); timerInterval = null; }
+    document.removeEventListener("click", closePickersOnOutsideClick, true);
   });
 
   function getProject(task: ITask): IProject | null {
@@ -404,7 +442,7 @@
 </script>
 
 <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
-<div class="kanban-filters" on:click|stopPropagation={handleProjectPickerOutsideClick} on:keydown|stopPropagation>
+<div class="kanban-filters" on:click|stopPropagation on:keydown|stopPropagation>
   <button class="kanban-filter-btn" class:active={filterMode === "today"} on:click={() => setFilter("today")}>
     📅 {$t("schedule.today")}
   </button>
@@ -418,7 +456,7 @@
     on:change={(e) => { filterDateStr = e.currentTarget.value; filterMode = "date"; persistFilters(); }}
   />
   <div class="kanban-project-picker kanban-board-picker">
-    <button class="kanban-filter-btn kanban-project-btn" class:active={activeBoardId !== DEFAULT_KANBAN_BOARD_ID} on:click|stopPropagation={() => { showBoardPicker = !showBoardPicker; showProjectPicker = false; }}>
+    <button class="kanban-filter-btn kanban-project-btn" class:active={activeBoardId !== DEFAULT_KANBAN_BOARD_ID} on:click|stopPropagation={toggleBoardPicker}>
       <span>{activeBoard?.icon || "🗂"}</span>
       <span>{activeBoard?.name || $t("kanban.title")}</span>
       {#if isDefaultBoard}<span class="kanban-default-star" title={$t("kanban.defaultBoard")}>★</span>{/if}
@@ -450,7 +488,7 @@
     {/if}
   </div>
   <div class="kanban-project-picker">
-    <button class="kanban-filter-btn kanban-project-btn" class:active={projectFilterId !== null} on:click|stopPropagation={toggleProjectPicker}>
+    <button class="kanban-filter-btn kanban-project-btn" class:active={projectFilterId !== null} on:click|stopPropagation={toggleProjectPickerMenu}>
       {#if projectFilterId}
         {@const proj = $projects.find(p => p.id === projectFilterId)}
         <span style="color: {proj?.color || 'inherit'}">{proj?.icon || '📁'}</span>

@@ -54,20 +54,17 @@ function weekDayOrder(): number[] {
 export interface WorkoutPlanModalOptions {
   saveOptions: (changes: {
     workoutProfile?: WorkoutProfile;
-    workoutHabitId?: string;
   }) => Promise<void>;
 }
 
 export class WorkoutPlanModal extends CustomModal {
   private saveOptions: (changes: {
     workoutProfile?: WorkoutProfile;
-    workoutHabitId?: string;
   }) => Promise<void>;
   private profile: WorkoutProfile;
   private weeks = 4;
   private startDate = toDateInput(new Date());
   private projectId: string | null = null;
-  private habitTitle = tRaw("workout.habitTitleDefault");
   private plan: WorkoutPlan | null = null;
   private busy = false;
   private previewEl: HTMLElement | null = null;
@@ -329,17 +326,6 @@ export class WorkoutPlanModal extends CustomModal {
       this.projectId = projSel.value || null;
     });
 
-    const habitField = planRow.createDiv({ cls: "wo-field wo-field-mini" });
-    habitField.createDiv({ cls: "wo-field-label", text: tRaw("workout.habitTitle") });
-    const habitInp = habitField.createEl("input", {
-      type: "text",
-      cls: "wo-input",
-    });
-    habitInp.value = this.habitTitle;
-    habitInp.addEventListener("change", () => {
-      this.habitTitle = habitInp.value.trim() || tRaw("workout.habitTitleDefault");
-    });
-
     this.statusEl = root.createDiv({ cls: "workout-status" });
     this.previewEl = root.createDiv({ cls: "workout-preview" });
 
@@ -532,13 +518,11 @@ export class WorkoutPlanModal extends CustomModal {
         plan: this.plan,
         startDate: start,
         projectId: this.projectId,
-        habitTitle: this.habitTitle,
         estimatedMinutes: this.profile.sessionMinutes,
         lang: get(locale) === "en" ? "en" : "ru",
       });
       await this.saveOptions({
         workoutProfile: this.profile,
-        workoutHabitId: result.habitId,
       });
       new Notice(
         tRaw("workout.created", {

@@ -21,7 +21,7 @@
   import type { IHabit } from "../habit-tracker/types";
   import { getDateUID } from "obsidian-daily-notes-interface";
   import { getCurrentMonthKey, financeData, ensureGoalsRollover, getArchivedGoals, deleteArchivedGoal, updateMonthData } from "../finance/storage";
-  import { generateGoalId, isGoalComplete, resolveGoalAdjustment, type GoalAdjustMode, type MonthGoal } from "../finance/types";
+  import { isGoalComplete, type MonthGoal } from "../finance/types";
   import { settings } from "../ui/stores";
   import { t } from "../i18n";
 
@@ -152,28 +152,13 @@
   $: goalsProgress = goalsTotalTarget > 0 ? Math.min(100, Math.round((goalsTotalCurrent / goalsTotalTarget) * 100)) : 0;
   $: goalsDoneCount = monthGoals.filter((g) => isGoalComplete(g)).length;
 
-  // Goal CRUD
+  // Goal deposit-only (goals are created/edited in the finance view)
   function goalPercent(goal: MonthGoal): number {
     return goal.targetAmount > 0 ? Math.min(100, Math.round((goal.currentAmount / goal.targetAmount) * 100)) : 0;
   }
 
   function formatMoney(amount: number): string {
     return (amount || 0).toLocaleString($t("locale.numberLocale"));
-  }
-
-  function addGoal() {
-    const newGoal: MonthGoal = {
-      id: generateGoalId(),
-      icon: "🎯",
-      name: $t("finance.newGoal"),
-      currentAmount: 0,
-      targetAmount: 0,
-      broughtForward: 0,
-    };
-    updateMonthData(monthKey, {
-      monthGoals: [...(monthData?.monthGoals || []), newGoal],
-    });
-    openEditGoal(newGoal);
   }
 
   function updateGoal(id: string, changes: Partial<MonthGoal>) {
@@ -193,64 +178,28 @@
     }
   }
 
-  // Goal modal
+  // Deposit modal
   let showGoalModal = false;
   let editingGoal: MonthGoal | null = null;
-  let goalIconInput = "🎯";
-  let goalNameInput = "";
-  let goalCurrentInput = "";
-  let goalTargetInput = "";
-  let goalAdjustMode: GoalAdjustMode = "amount";
-  let goalAdjustInput = "";
+  let goalDepositInput = "";
 
-  // Remainder available for % deposits: planned income − main plan − this month's goal deposits
-  $: goalAdjustBalance = (() => {
-    const d = monthData;
-    if (!d) return 0;
-    const main = (d.mainAccountCategories || []).reduce((s, c) => s + (c.amount || 0), 0);
-    const contributed = (d.monthGoals || []).reduce((s, g) => {
-      const brought = g.broughtForward ?? 0;
-      return s + Math.max(0, (g.currentAmount || 0) - brought);
-    }, 0);
-    return Math.max(0, d.monthlyIncome ?? 0) - main - contributed;
-  })();
-
-  function openEditGoal(goal: MonthGoal) {
+  function openDepositGoal(goal: MonthGoal) {
     editingGoal = goal;
-    goalIconInput = goal.icon || "🎯";
-    goalNameInput = goal.name || "";
-    goalCurrentInput = String(goal.currentAmount ?? 0);
-    goalTargetInput = String(goal.targetAmount ?? 0);
-    goalAdjustMode = "amount";
-    goalAdjustInput = "";
+    goalDepositInput = "";
     showGoalModal = true;
   }
 
-  function applyGoalAdjustToForm(direction: "deposit" | "withdraw") {
-    const raw = parseFloat(String(goalAdjustInput).replace(",", ".")) || 0;
-    const current = Math.max(0, parseFloat(goalCurrentInput) || 0);
-    const delta = resolveGoalAdjustment(raw, goalAdjustMode, direction, {
-      balance: goalAdjustBalance,
-      currentAmount: current,
-    });
-    if (delta === 0) return;
-    goalCurrentInput = String(Math.max(0, current + delta));
-    goalAdjustInput = "";
-  }
-
-  function saveGoalEdit() {
+  function applyGoalDeposit() {
     if (!editingGoal) return;
-    const current = Math.max(0, parseFloat(goalCurrentInput) || 0);
-    const target = Math.max(0, parseFloat(goalTargetInput) || 0);
+    const raw = parseFloat(String(goalDepositInput).replace(",", ".")) || 0;
+    if (raw <= 0) return;
     updateGoal(editingGoal.id, {
-      icon: goalIconInput.trim() || "🎯",
-      name: goalNameInput.trim() || $t("finance.newGoal"),
-      currentAmount: current,
-      targetAmount: target,
+      currentAmount: Math.max(0, (editingGoal.currentAmount || 0) + raw),
       broughtForward: editingGoal.broughtForward ?? 0,
     });
     showGoalModal = false;
     editingGoal = null;
+    goalDepositInput = "";
   }
 
   // Archive state
@@ -551,7 +500,6 @@
           {:else if monthGoals.length === 1}
             <span class="dash-widget__count" class:done={isGoalComplete(monthGoals[0])}>{goalPercent(monthGoals[0])}%</span>
           {/if}
-          <button class="dash-widget__add-btn" on:click|stopPropagation={addGoal} title={$t("finance.addGoal")}>+</button>
           {#if monthGoals.length > 1}<span class="dash-widget__chevron" class:open={goalsExpanded}>›</span>{/if}
         </div>
         {#if goalsExpanded && monthGoals.length > 1}
@@ -569,11 +517,16 @@
                   <div class="dash-goal-bar"><div class="dash-goal-bar-fill" class:complete={done} style="width:{pct}%"></div></div>
                 </div>
                 <div class="dash-goal-actions">
-                  <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => openEditGoal(goal)} title={$t("common.edit")}>✎</button>
+                  <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => openDepositGoal(goal)} title={$t("finance.deposit")}>+</button>
                   <button class="dash-btn dash-btn--sm dash-btn--danger" on:click|stopPropagation={() => removeGoal(goal.id)} title={$t("common.delete")}>✕</button>
                 </div>
               </div>
             {/each}
+          </div>
+        {/if}
+        {#if monthGoals.length === 1}
+          <div class="dash-goal-actions dash-goal-actions--single">
+            <button class="dash-btn dash-btn--sm" on:click|stopPropagation={() => openDepositGoal(monthGoals[0])} title={$t("finance.deposit")}>+ {$t("finance.deposit")}</button>
           </div>
         {/if}
       </div>
@@ -739,69 +692,23 @@
   </div>
 {/if}
 
-<!-- Edit goal modal -->
+<!-- Deposit to goal modal -->
 {#if showGoalModal && editingGoal}
   <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
   <div class="dash-popup-overlay" role="dialog" aria-modal="true" on:click={(e) => closeModal(e, () => { showGoalModal = false; editingGoal = null; })} on:keydown={(e) => { if (e.key === 'Escape') { showGoalModal = false; editingGoal = null; } }}>
     <div class="dash-popup">
-      <h3 class="dash-popup__title">{$t("dashboard.monthGoal")}</h3>
-      <label class="dash-popup__label">
-        {$t("dashboard.icon")}
-        <input class="dash-popup__input" type="text" bind:value={goalIconInput} maxlength="4" />
-      </label>
-      <label class="dash-popup__label">
-        {$t("dashboard.name")}
-        <input class="dash-popup__input" type="text" bind:value={goalNameInput} placeholder={$t("finance.newGoal")} />
-      </label>
+      <h3 class="dash-popup__title">{editingGoal.icon || "🎯"} {editingGoal.name}</h3>
       <div class="dash-popup__row">
-        <label class="dash-popup__label dash-popup__label--half">
-          {$t("finance.amountPlaceholder")}
-          <input class="dash-popup__input" type="number" min="0" bind:value={goalCurrentInput} placeholder={$t("finance.amountPlaceholder")} />
-        </label>
-        <label class="dash-popup__label dash-popup__label--half">
-          {$t("finance.goalPlaceholder")}
-          <input class="dash-popup__input" type="number" min="0" bind:value={goalTargetInput} placeholder={$t("finance.goalPlaceholder")} />
-        </label>
+        <span class="dash-goal-amt">{formatMoney(editingGoal.currentAmount)} / {formatMoney(editingGoal.targetAmount)} {$t("locale.currencySymbol")}</span>
       </div>
-
-      <div class="goal-adjust">
-        <div class="goal-adjust__header">
-          <span class="goal-adjust__title">{$t("finance.depositThisMonth")}</span>
-          <div class="goal-adjust__mode" role="group">
-            <button type="button" class="goal-adjust__mode-btn" class:active={goalAdjustMode === "amount"} on:click={() => goalAdjustMode = "amount"}>
-              {$t("finance.amount")}
-            </button>
-            <button type="button" class="goal-adjust__mode-btn" class:active={goalAdjustMode === "percent"} on:click={() => goalAdjustMode = "percent"}>
-              %
-            </button>
-          </div>
-        </div>
-        <div class="goal-adjust__row">
-          <input
-            class="dash-popup__input goal-adjust__input"
-            type="number"
-            min="0"
-            bind:value={goalAdjustInput}
-            placeholder={goalAdjustMode === "amount" ? $t("locale.currencySymbol") : "0%"}
-            on:keydown={(e) => { if (e.key === "Enter") applyGoalAdjustToForm("deposit"); }}
-          />
-          <button type="button" class="goal-adjust__btn goal-adjust__btn--deposit" on:click={() => applyGoalAdjustToForm("deposit")}>
-            + {$t("finance.deposit")}
-          </button>
-          <button type="button" class="goal-adjust__btn goal-adjust__btn--withdraw" on:click={() => applyGoalAdjustToForm("withdraw")}>
-            − {$t("finance.withdraw")}
-          </button>
-        </div>
-        {#if goalAdjustMode === "percent"}
-          <div class="goal-adjust__hint">
-            {$t("finance.deposit")}: % {$t("finance.remainder").toLowerCase()} · {$t("finance.withdraw")}: % {$t("finance.amountPlaceholder").toLowerCase()}
-          </div>
-        {/if}
-      </div>
-
+      <label class="dash-popup__label">
+        {$t("finance.deposit")}
+        <input class="dash-popup__input" type="number" min="0" bind:value={goalDepositInput} placeholder={$t("locale.currencySymbol")}
+          on:keydown={(e) => { if (e.key === "Enter") applyGoalDeposit(); }} />
+      </label>
       <div class="dash-popup__actions">
         <button class="dash-btn dash-btn--cancel" on:click={() => { showGoalModal = false; editingGoal = null; }}>{$t("common.cancel")}</button>
-        <button class="dash-btn dash-btn--save" on:click={saveGoalEdit}>{$t("common.save")}</button>
+        <button class="dash-btn dash-btn--save" on:click={applyGoalDeposit}>{$t("finance.deposit")}</button>
       </div>
     </div>
   </div>
@@ -1285,6 +1192,11 @@
   @media (max-width: 768px) {
     .dash-goal-actions { opacity: 0.55; }
   }
+  .dash-goal-actions--single {
+    opacity: 1;
+    padding: 0 12px 10px;
+    justify-content: flex-end;
+  }
 
   /* Card drag & drop */
   .dashboard-card[draggable="true"] {
@@ -1494,100 +1406,6 @@
     flex: 1;
     min-width: 0;
     margin-bottom: 12px;
-  }
-
-  .goal-adjust {
-    border: 1px solid rgba(255,255,255,0.07);
-    border-radius: 10px;
-    padding: 10px;
-    margin-bottom: 14px;
-    background: rgba(255,255,255,0.02);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .goal-adjust__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-  }
-
-  .goal-adjust__title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted);
-  }
-
-  .goal-adjust__mode {
-    display: inline-flex;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-
-  .goal-adjust__mode-btn {
-    padding: 4px 10px;
-    font-size: 11px;
-    font-weight: 600;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    cursor: pointer;
-  }
-
-  .goal-adjust__mode-btn + .goal-adjust__mode-btn {
-    border-left: 1px solid rgba(255,255,255,0.08);
-  }
-
-  .goal-adjust__mode-btn.active {
-    background: var(--interactive-accent);
-    color: var(--text-on-accent);
-  }
-
-  .goal-adjust__row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .goal-adjust__input {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .goal-adjust__btn {
-    padding: 8px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    border-radius: 8px;
-    border: 1px solid transparent;
-    cursor: pointer;
-    white-space: nowrap;
-    transition: filter 0.15s, transform 0.12s;
-  }
-
-  .goal-adjust__btn:active {
-    transform: scale(0.97);
-  }
-
-  .goal-adjust__btn--deposit {
-    background: rgba(61, 214, 140, 0.16);
-    color: #3dd68c;
-    border-color: rgba(61, 214, 140, 0.3);
-  }
-
-  .goal-adjust__btn--withdraw {
-    background: rgba(231, 76, 60, 0.12);
-    color: #e74c3c;
-    border-color: rgba(231, 76, 60, 0.28);
-  }
-
-  .goal-adjust__hint {
-    font-size: 11px;
-    color: var(--text-faint);
-    line-height: 1.4;
   }
 
   .dash-popup__input {
