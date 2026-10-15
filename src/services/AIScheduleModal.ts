@@ -8,9 +8,20 @@ import { tasks } from "../task-tracker/stores";
 import type { ITask } from "../task-tracker/types";
 import { streamOllamaChat, resolveModel } from "./OllamaService";
 import { errorMessage } from "../utils/sanitize";
+import {
+  applyScheduleOps,
+  buildRecsToOpsSystem,
+  buildRecsToOpsUser,
+  buildScheduleOpsContext,
+  buildScheduleOpsSystem,
+  describeOp,
+  parseScheduleOps,
+  type ScheduleOpsPlan,
+} from "./aiScheduleOps";
 
-type PeriodKey = "view" | "week" | "lastWeek" | "month" | "last7" | "last30";
-type ActionKey = "summary" | "load";
+type PeriodKey = "day" | "view" | "week" | "lastWeek" | "month" | "last7" | "last30";
+type AnalysisKind = "summary" | "load";
+type UIMode = "analyze" | "command";
 
 const MAX_TASKS = 200;
 
@@ -58,6 +69,18 @@ function periodRange(
   const today = startOfDay(now);
 
   switch (key) {
+    case "day": {
+      // Prefer the calendar day the user is looking at; otherwise today.
+      let day = today;
+      if (viewStart) {
+        const vs = startOfDay(viewStart);
+        const ve = viewEnd ? startOfDay(viewEnd) : vs;
+        const isSingleDay =
+          vs.getTime() === ve.getTime() || addDays(vs, 1).getTime() === ve.getTime();
+        if (isSingleDay) day = vs;
+      }
+      return { start: day, end: day, label: fmtDate(day) };
+    }
     case "view": {
       const start = viewStart ? startOfDay(viewStart) : today;
       // FullCalendar end is exclusive — step back one day for inclusive range
@@ -166,7 +189,7 @@ function collectPeriodTasks(start: Date, end: Date): { stats: PeriodStats; list:
   };
 }
 
-function buildSystem(action: ActionKey, lang: string): string {
+function buildSystem(action: "summary" | "load", lang: string): string {
   const isRu = lang !== "en";
   if (action === "summary") {
     return isRu
@@ -201,7 +224,9 @@ Write in English. No fluff. Facts from the task list only.`;
 ## Оценка
 - перегруз / норма / недозагруз (1–2 предложения)
 ## Рекомендации
-- 2–4 практических совета (что сдвинуть, где разгрузить)
+- 2–4 практических совета, которые можно ПРИМЕНИТЬ к расписанию
+- называй задачи точными заголовками из списка
+- формулируй как действие: «сдвинь … на день», «закрой …», «перенеси … на завтра»
 Пиши на русском. Опирайся на цифры из данных.`
     : `You are a workload analyst. Assess load over the period from the task list (times, durations, statuses, per day).
 Markdown format:
@@ -212,14 +237,18 @@ Markdown format:
 ## Verdict
 - overloaded / balanced / light (1–2 sentences)
 ## Recommendations
-- 2–4 practical tips (what to move, where to lighten)
+- 2–4 practical tips that can be APPLIED to the schedule
+- name tasks by their exact titles from the list
+- phrase as actions: "move … by a day", "complete …", "reschedule … to tomorrow"
 Write in English. Ground claims in the numbers.`;
 }
 
 export class AIScheduleModal extends CustomModal {
   private periodKey: PeriodKey = "view";
-  private action: ActionKey = "summary";
+  private mode: UIMode = "analyze";
+  private analysisKind: AnalysisKind = "load";
   private resultText = "";
+  private analysisText = "";
   private isRunning = false;
   private abort: AbortController | null = null;
 
@@ -232,11 +261,40 @@ export class AIScheduleModal extends CustomModal {
   private runBtn: HTMLButtonElement | null = null;
   private stopBtn: HTMLButtonElement | null = null;
   private saveBtn: HTMLButtonElement | null = null;
+  private copyBtn: HTMLButtonElement | null = null;
+  private applyBtn: HTMLButtonElement | null = null;
+  private applyRecsBtn: HTMLButtonElement | null = null;
+  private backBtn: HTMLButtonElement | null = null;
+  private analyzePanel: HTMLElement | null = null;
+  private commandPanel: HTMLElement | null = null;
+  private periodField: HTMLElement | null = null;
+  private metaStrip: HTMLElement | null = null;
+  private tabAnalyzeBtn: HTMLButtonElement | null = null;
+  private tabCommandBtn: HTMLButtonElement | null = null;
+  private promptEl: HTMLTextAreaElement | null = null;
+  private pendingOps: ScheduleOpsPlan | null = null;
+  private showingOps = false;
+  /** Persists workout profile (same as the standalone workout command). */
+  private saveOptions?: (changes: { workoutProfile?: unknown }) => Promise<void>;
 
-  constructor(app: App, viewStart?: Date | null, viewEnd?: Date | null) {
+  constructor(
+    app: App,
+    viewStart?: Date | null,
+    viewEnd?: Date | null,
+    opts?: { saveOptions?: (changes: { workoutProfile?: unknown }) => Promise<void> },
+  ) {
     super(app);
     this.viewStart = viewStart ?? null;
     this.viewEnd = viewEnd ?? null;
+    this.saveOptions = opts?.saveOptions;
+    // Day view → default to the single-day period
+    if (viewStart && viewEnd) {
+      const vs = startOfDay(viewStart);
+      const ve = startOfDay(viewEnd);
+      if (vs.getTime() === ve.getTime() || addDays(vs, 1).getTime() === ve.getTime()) {
+        this.periodKey = "day";
+      }
+    }
   }
 
   onOpen(): void {
@@ -251,13 +309,39 @@ export class AIScheduleModal extends CustomModal {
     headText.createEl("h2", { text: tRaw("schedule.aiActionsTitle"), cls: "ai-sch-title" });
     headText.createDiv({ text: tRaw("schedule.aiActionsSub"), cls: "ai-sch-subtitle" });
 
-    // ── Controls panel ──
-    const panel = this.contentEl.createDiv({ cls: "ai-sch-panel" });
+    // ── Mode tabs (segmented) ──
+    const tabs = this.contentEl.createDiv({ cls: "ai-sch-tabs", attr: { role: "tablist" } });
+    this.tabAnalyzeBtn = tabs.createEl("button", {
+      cls: "ai-sch-tab is-active",
+      text: tRaw("schedule.aiTabAnalyze"),
+      attr: { type: "button", role: "tab", "aria-selected": "true" },
+    });
+    this.tabCommandBtn = tabs.createEl("button", {
+      cls: "ai-sch-tab",
+      text: tRaw("schedule.aiTabCommand"),
+      attr: { type: "button", role: "tab", "aria-selected": "false" },
+    });
+    this.tabAnalyzeBtn.addEventListener("click", () => this.setMode("analyze"));
+    this.tabCommandBtn.addEventListener("click", () => this.setMode("command"));
 
-    const periodField = panel.createDiv({ cls: "ai-sch-field" });
-    periodField.createEl("label", { text: tRaw("schedule.aiPeriod"), cls: "ai-sch-field-label" });
-    const periodSel = periodField.createEl("select", { cls: "ai-sch-select" });
+    // Quick launcher for the workout planner
+    const woRow = this.contentEl.createDiv({ cls: "ai-wo-launch" });
+    const woBtn = woRow.createEl("button", {
+      cls: "ai-sch-btn ai-sch-btn-ghost ai-wo-launch-btn",
+      text: `💪 ${tRaw("schedule.aiWorkoutOpen")}`,
+      attr: { type: "button" },
+    });
+    woBtn.addEventListener("click", () => void this.openWorkoutPlan());
+
+    // ── Analyze controls: period + analysis kind ──
+    this.analyzePanel = this.contentEl.createDiv({ cls: "ai-sch-panel" });
+    const panel = this.analyzePanel;
+
+    this.periodField = panel.createDiv({ cls: "ai-sch-field" });
+    this.periodField.createEl("label", { text: tRaw("schedule.aiPeriod"), cls: "ai-sch-field-label" });
+    const periodSel = this.periodField.createEl("select", { cls: "ai-sch-select" });
     const periods: Array<[PeriodKey, string]> = [
+      ["day", tRaw("schedule.aiPeriodDay")],
       ["view", tRaw("schedule.aiPeriodView")],
       ["week", tRaw("schedule.aiPeriodWeek")],
       ["lastWeek", tRaw("schedule.aiPeriodLastWeek")],
@@ -274,74 +358,250 @@ export class AIScheduleModal extends CustomModal {
       this.refreshStats();
     });
 
-    const actionField = panel.createDiv({ cls: "ai-sch-field" });
-    actionField.createEl("label", { text: tRaw("schedule.aiAction"), cls: "ai-sch-field-label" });
-    const actionSel = actionField.createEl("select", { cls: "ai-sch-select" });
-    const actions: Array<[ActionKey, string]> = [
-      ["summary", tRaw("schedule.aiActionSummary")],
-      ["load", tRaw("schedule.aiActionLoad")],
-    ];
-    for (const [val, label] of actions) {
-      const opt = actionSel.createEl("option", { value: val, text: label });
-      if (val === this.action) opt.selected = true;
-    }
-    actionSel.addEventListener("change", () => {
-      this.action = actionSel.value as ActionKey;
+    // Analysis kind: two compact chips (clearer than a select)
+    const kindField = panel.createDiv({ cls: "ai-sch-field" });
+    kindField.createEl("label", {
+      text: tRaw("schedule.aiAnalysisKind"),
+      cls: "ai-sch-field-label",
+    });
+    const kindRow = kindField.createDiv({ cls: "ai-sch-seg" });
+    const kindLoad = kindRow.createEl("button", {
+      cls: "ai-sch-seg-btn is-active",
+      text: tRaw("schedule.aiActionLoad"),
+      attr: { type: "button" },
+    });
+    const kindSum = kindRow.createEl("button", {
+      cls: "ai-sch-seg-btn",
+      text: tRaw("schedule.aiActionSummary"),
+      attr: { type: "button" },
+    });
+    kindLoad.addEventListener("click", () => {
+      this.analysisKind = "load";
+      kindLoad.addClass("is-active");
+      kindSum.removeClass("is-active");
+      this.syncFooter();
+    });
+    kindSum.addEventListener("click", () => {
+      this.analysisKind = "summary";
+      kindSum.addClass("is-active");
+      kindLoad.removeClass("is-active");
+      this.syncFooter();
     });
 
-    // Range + live stats
-    this.rangeLabelEl = this.contentEl.createDiv({ cls: "ai-sch-range" });
-    this.statsEl = this.contentEl.createDiv({ cls: "ai-sch-chips" });
+    // ── Command controls: free-text instruction ──
+    this.commandPanel = this.contentEl.createDiv({
+      cls: "ai-sch-panel ai-sch-command-panel mcp-hidden",
+    });
+    const promptField = this.commandPanel.createDiv({ cls: "ai-sch-field ai-sch-prompt" });
+    const promptLabelRow = promptField.createDiv({ cls: "ai-sch-field-label-row" });
+    promptLabelRow.createEl("label", {
+      text: tRaw("schedule.aiPromptLabel"),
+      cls: "ai-sch-field-label",
+    });
+    promptLabelRow.createSpan({
+      text: tRaw("schedule.aiPromptHint"),
+      cls: "ai-sch-field-hint",
+    });
+    this.promptEl = promptField.createEl("textarea", {
+      cls: "ai-sch-prompt-input",
+      attr: {
+        rows: "3",
+        placeholder: tRaw("schedule.aiPromptPlaceholder"),
+        spellcheck: "false",
+      },
+    });
+    this.promptEl.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+        e.preventDefault();
+        void this.run();
+      }
+    });
+
+    // ── Meta strip: range + live stats (analyze only) ──
+    this.metaStrip = this.contentEl.createDiv({ cls: "ai-sch-meta" });
+    this.rangeLabelEl = this.metaStrip.createDiv({ cls: "ai-sch-range" });
+    this.statsEl = this.metaStrip.createDiv({ cls: "ai-sch-chips" });
 
     // Status line
     this.statusEl = this.contentEl.createDiv({ cls: "ai-sch-status" });
     this.statusEl.createSpan({ cls: "ai-sch-spinner", attr: { "aria-hidden": "true" } });
     this.statusEl.createSpan({ cls: "ai-sch-status-text", text: tRaw("schedule.aiReady") });
 
-    // Scan shell + readable output (not an input — full document body)
+    // Output stage
     const scanShell = this.contentEl.createDiv({ cls: "ai-sch-scan" });
     this.outputEl = scanShell.createDiv({ cls: "ai-sch-output" });
-    this.outputEl.createDiv({
-      cls: "ai-sch-output-placeholder",
-      text: tRaw("schedule.aiPlaceholder"),
-    });
+    this.renderEmptyState();
 
-    // Footer actions
+    // Footer: secondary left, primary right
     const btnRow = this.contentEl.createDiv({ cls: "ai-sch-actions" });
-    this.runBtn = btnRow.createEl("button", {
-      cls: "ai-sch-btn ai-sch-btn-primary",
-      text: `⚡ ${tRaw("schedule.aiRun")}`,
-      attr: { type: "button" },
-    });
-    this.runBtn.addEventListener("click", () => void this.run());
+    const left = btnRow.createDiv({ cls: "ai-sch-actions-left" });
+    const right = btnRow.createDiv({ cls: "ai-sch-actions-right" });
 
-    this.stopBtn = btnRow.createEl("button", {
+    this.stopBtn = left.createEl("button", {
       cls: "ai-sch-btn",
       text: tRaw("schedule.aiStop"),
       attr: { type: "button", disabled: "true" },
     });
     this.stopBtn.addEventListener("click", () => this.abort?.abort());
 
-    const copyBtn = btnRow.createEl("button", {
+    this.copyBtn = left.createEl("button", {
       cls: "ai-sch-btn ai-sch-btn-ghost",
       text: tRaw("schedule.aiCopy"),
       attr: { type: "button" },
     });
-    copyBtn.addEventListener("click", () => {
+    this.copyBtn.addEventListener("click", () => {
       const text = this.resultText || this.outputEl?.textContent || "";
       if (!text.trim()) return;
       void navigator.clipboard.writeText(text);
       new Notice(tRaw("schedule.aiDone"));
     });
 
-    this.saveBtn = btnRow.createEl("button", {
+    this.saveBtn = left.createEl("button", {
       cls: "ai-sch-btn ai-sch-btn-ghost",
       text: tRaw("schedule.aiSaveNote"),
       attr: { type: "button", disabled: "true" },
     });
     this.saveBtn.addEventListener("click", () => void this.saveNote());
 
+    this.backBtn = left.createEl("button", {
+      cls: "ai-sch-btn mcp-hidden",
+      text: tRaw("schedule.aiOpsBack"),
+      attr: { type: "button" },
+    });
+    this.backBtn.addEventListener("click", () => this.backFromOps());
+
+    this.applyRecsBtn = right.createEl("button", {
+      cls: "ai-sch-btn ai-sch-btn-accent",
+      text: tRaw("schedule.aiApplyRecs"),
+      attr: { type: "button", disabled: "true" },
+    });
+    this.applyRecsBtn.addEventListener("click", () => void this.runRecsToOps());
+
+    this.applyBtn = right.createEl("button", {
+      cls: "ai-sch-btn ai-sch-btn-primary mcp-hidden",
+      text: tRaw("schedule.aiOpsApply"),
+      attr: { type: "button", disabled: "true" },
+    });
+    this.applyBtn.addEventListener("click", () => this.applyOps());
+
+    this.runBtn = right.createEl("button", {
+      cls: "ai-sch-btn ai-sch-btn-primary",
+      text: `⚡ ${tRaw("schedule.aiRun")}`,
+      attr: { type: "button" },
+    });
+    this.runBtn.addEventListener("click", () => void this.run());
+
+    this.syncMode();
     this.refreshStats();
+  }
+
+  private renderEmptyState(): void {
+    const el = this.outputEl;
+    if (!el) return;
+    el.empty();
+    const empty = el.createDiv({ cls: "ai-sch-empty" });
+    empty.createDiv({
+      cls: "ai-sch-empty-icon",
+      text: this.mode === "command" ? "⚡" : "📊",
+    });
+    empty.createDiv({
+      cls: "ai-sch-empty-title",
+      text:
+        this.mode === "command"
+          ? tRaw("schedule.aiEmptyCmdTitle")
+          : tRaw("schedule.aiEmptyAnTitle"),
+    });
+    empty.createDiv({
+      cls: "ai-sch-empty-hint",
+      text:
+        this.mode === "command"
+          ? tRaw("schedule.aiEmptyCmdHint")
+          : tRaw("schedule.aiEmptyAnHint"),
+    });
+  }
+
+  /** Analyze vs command: panels + which footer buttons make sense. */
+  private setMode(mode: UIMode): void {
+    if (this.mode === mode) return;
+    this.mode = mode;
+    this.tabAnalyzeBtn?.classList.toggle("is-active", mode === "analyze");
+    this.tabCommandBtn?.classList.toggle("is-active", mode === "command");
+    this.tabAnalyzeBtn?.setAttribute("aria-selected", mode === "analyze" ? "true" : "false");
+    this.tabCommandBtn?.setAttribute("aria-selected", mode === "command" ? "true" : "false");
+    // Leaving a mode resets its output/ops state
+    this.showingOps = false;
+    this.pendingOps = null;
+    this.resultText = "";
+    this.analysisText = "";
+    this.renderEmptyState();
+    this.setStatus(tRaw("schedule.aiReady"));
+    this.syncMode();
+    this.refreshStats();
+    if (mode === "command") {
+      window.setTimeout(() => this.promptEl?.focus(), 50);
+    }
+  }
+
+  private async openWorkoutPlan(): Promise<void> {
+    const opts = get(settings) as {
+      ollamaEnabled?: boolean;
+      aiWorkoutEnabled?: boolean;
+    };
+    if (!opts.ollamaEnabled) {
+      new Notice(tRaw("schedule.aiNeedOllama"));
+      return;
+    }
+    if (opts.aiWorkoutEnabled === false) {
+      new Notice(tRaw("schedule.aiWorkoutDisabled"));
+      return;
+    }
+    try {
+      const { WorkoutPlanModal } = await import("../workout/WorkoutPlanModal");
+      new WorkoutPlanModal(this.app, {
+        saveOptions: async (changes) => {
+          if (this.saveOptions) {
+            await this.saveOptions(changes);
+            return;
+          }
+          // Fallback: merge profile into the settings store
+          const { settings: settingsStore } = await import("../ui/stores");
+          settingsStore.update((cur) => ({
+            ...cur,
+            workoutProfile: changes.workoutProfile as never,
+          }));
+        },
+      }).open();
+    } catch (e) {
+      new Notice(errorMessage(e));
+    }
+  }
+
+  private syncMode(): void {
+    const isAnalyze = this.mode === "analyze";
+    this.analyzePanel?.toggleClass("mcp-hidden", !isAnalyze);
+    this.commandPanel?.toggleClass("mcp-hidden", isAnalyze);
+    this.metaStrip?.classList.toggle("mcp-hidden", !isAnalyze);
+    this.syncFooter();
+  }
+
+  /** Footer visibility: analyze / command / ops-preview. */
+  private syncFooter(): void {
+    const ops = this.showingOps;
+    const isAnalyze = this.mode === "analyze";
+
+    this.runBtn?.classList.toggle("mcp-hidden", ops);
+    this.stopBtn?.classList.toggle("mcp-hidden", ops);
+    this.copyBtn?.classList.toggle("mcp-hidden", ops || !isAnalyze);
+    this.saveBtn?.classList.toggle("mcp-hidden", ops || !isAnalyze);
+    this.applyRecsBtn?.classList.toggle("mcp-hidden", ops || !isAnalyze);
+    this.backBtn?.classList.toggle("mcp-hidden", !ops);
+    this.applyBtn?.classList.toggle("mcp-hidden", !ops);
+
+    if (this.applyBtn) this.applyBtn.disabled = !(this.pendingOps?.operations.length);
+    // "What was done" is retrospective — no apply-recommendations path
+    const recsAllowed = isAnalyze && this.analysisKind === "load" && !!this.analysisText.trim();
+    if (this.applyRecsBtn) this.applyRecsBtn.disabled = !recsAllowed;
+    if (this.saveBtn) this.saveBtn.disabled = !this.analysisText.trim();
   }
 
   private setStatus(text: string, kind: "idle" | "busy" | "error" | "ok" = "idle"): void {
@@ -408,11 +668,7 @@ export class AIScheduleModal extends CustomModal {
     const el = this.outputEl;
     if (!el) return;
     if (!md.trim()) {
-      el.empty();
-      el.createDiv({
-        cls: "ai-sch-output-placeholder",
-        text: tRaw("schedule.aiPlaceholder"),
-      });
+      this.renderEmptyState();
       return;
     }
     el.empty();
@@ -632,9 +888,16 @@ export class AIScheduleModal extends CustomModal {
       ollamaEnabled?: boolean;
       ollamaUrl?: string;
       ollamaModel?: string;
+      ollamaModelMode?: "single" | "dual";
+      ollamaModelExtract?: string;
     };
     if (!opts.ollamaEnabled) {
       new Notice(tRaw("schedule.aiNeedOllama"));
+      return;
+    }
+
+    if (this.mode === "command") {
+      await this.runOps(opts);
       return;
     }
 
@@ -647,9 +910,12 @@ export class AIScheduleModal extends CustomModal {
 
     this.isRunning = true;
     this.abort = new AbortController();
+    this.showingOps = false;
+    this.pendingOps = null;
+    this.analysisText = "";
     if (this.runBtn) this.runBtn.disabled = true;
     if (this.stopBtn) this.stopBtn.disabled = false;
-    if (this.saveBtn) this.saveBtn.disabled = true;
+    this.syncFooter();
     this.setStatus(tRaw("schedule.aiWorking"), "busy");
     this.setScanning(true);
     this.renderOutput("");
@@ -662,7 +928,7 @@ export class AIScheduleModal extends CustomModal {
         opts.ollamaUrl || "http://localhost:11434",
         resolveModel("reason", opts),
         [
-          { role: "system", content: buildSystem(this.action, lang) },
+          { role: "system", content: buildSystem(this.analysisKind, lang) },
           { role: "user", content: this.buildUserPrompt() },
         ],
         {
@@ -673,6 +939,7 @@ export class AIScheduleModal extends CustomModal {
             if (now - lastPaint < 40) return;
             lastPaint = now;
             this.resultText = full;
+            this.analysisText = full;
             this.renderOutput(full);
             this.setStatus(`${tRaw("schedule.aiWorking")} · ${full.length}`, "busy");
           },
@@ -680,9 +947,9 @@ export class AIScheduleModal extends CustomModal {
       );
 
       this.resultText = result.trim();
+      this.analysisText = this.resultText;
       this.renderOutput(this.resultText);
       this.setStatus(tRaw("schedule.aiDone"), "ok");
-      if (this.saveBtn) this.saveBtn.disabled = !this.resultText;
     } catch (e) {
       if ((e as Error)?.name === "AbortError") {
         this.setStatus(tRaw("ai.summaryCancelled"));
@@ -697,7 +964,232 @@ export class AIScheduleModal extends CustomModal {
       this.setScanning(false);
       if (this.runBtn) this.runBtn.disabled = false;
       if (this.stopBtn) this.stopBtn.disabled = true;
+      this.syncFooter();
     }
+  }
+
+  /**
+   * Second pass: analysis text → ops plan → preview.
+   * Mutations only after the user hits Apply.
+   */
+  private async runRecsToOps(): Promise<void> {
+    if (this.isRunning || !this.analysisText.trim()) return;
+    // Retrospective "what was done" has no applyable recommendations
+    if (this.analysisKind !== "load") return;
+
+    const opts = get(settings) as {
+      ollamaEnabled?: boolean;
+      ollamaUrl?: string;
+      ollamaModel?: string;
+      ollamaModelMode?: "single" | "dual";
+      ollamaModelExtract?: string;
+    };
+    if (!opts.ollamaEnabled) {
+      new Notice(tRaw("schedule.aiNeedOllama"));
+      return;
+    }
+
+    this.isRunning = true;
+    this.abort = new AbortController();
+    if (this.runBtn) this.runBtn.disabled = true;
+    if (this.stopBtn) this.stopBtn.disabled = false;
+    if (this.applyRecsBtn) this.applyRecsBtn.disabled = true;
+    this.setStatus(tRaw("schedule.aiOpsPlanning"), "busy");
+    this.setScanning(true);
+
+    try {
+      const raw = await streamOllamaChat(
+        opts.ollamaUrl || "http://localhost:11434",
+        resolveModel("extract", opts),
+        [
+          { role: "system", content: buildRecsToOpsSystem() },
+          { role: "user", content: buildRecsToOpsUser(this.analysisText) },
+        ],
+        {
+          signal: this.abort.signal,
+          format: "json",
+          temperature: 0.1,
+        },
+      );
+
+      const plan = parseScheduleOps(raw);
+      this.pendingOps = plan;
+      this.showingOps = true;
+      this.renderOpsPreview(plan);
+      this.syncFooter();
+      if (plan.operations.length === 0) {
+        this.setStatus(tRaw("schedule.aiOpsEmpty"), "idle");
+      } else {
+        this.setStatus(
+          tRaw("schedule.aiOpsReady", { count: String(plan.operations.length) }),
+          "ok",
+        );
+      }
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") {
+        this.setStatus(tRaw("ai.summaryCancelled"));
+      } else {
+        const msg = errorMessage(e);
+        this.setStatus(tRaw("ai.error", { error: msg }), "error");
+        new Notice(tRaw("ai.error", { error: msg }));
+      }
+    } finally {
+      this.isRunning = false;
+      this.abort = null;
+      this.setScanning(false);
+      if (this.runBtn) this.runBtn.disabled = false;
+      if (this.stopBtn) this.stopBtn.disabled = true;
+      this.syncFooter();
+    }
+  }
+
+  /** Leave ops preview → back to analysis text. */
+  private backFromOps(): void {
+    this.showingOps = false;
+    this.pendingOps = null;
+    if (this.analysisText.trim()) {
+      this.resultText = this.analysisText;
+      this.renderOutput(this.analysisText);
+      this.setStatus(tRaw("schedule.aiDone"), "ok");
+    } else {
+      this.renderOutput("");
+      this.setStatus(tRaw("schedule.aiReady"));
+    }
+    this.syncFooter();
+  }
+
+  /** NL command → structured ops plan → preview (no mutations until Apply). */
+  private async runOps(opts: {
+    ollamaUrl?: string;
+    ollamaModel?: string;
+    ollamaModelMode?: "single" | "dual";
+    ollamaModelExtract?: string;
+  }): Promise<void> {
+    const instruction = (this.promptEl?.value || "").trim();
+    if (!instruction) {
+      this.setStatus(tRaw("schedule.aiPromptEmpty"), "error");
+      return;
+    }
+
+    this.isRunning = true;
+    this.abort = new AbortController();
+    if (this.runBtn) this.runBtn.disabled = true;
+    if (this.stopBtn) this.stopBtn.disabled = false;
+    this.pendingOps = null;
+    this.showingOps = false;
+    this.setStatus(tRaw("schedule.aiOpsPlanning"), "busy");
+    this.setScanning(true);
+    this.renderOutput("");
+    this.syncFooter();
+
+    try {
+      const raw = await streamOllamaChat(
+        opts.ollamaUrl || "http://localhost:11434",
+        resolveModel("extract", opts),
+        [
+          { role: "system", content: buildScheduleOpsSystem() },
+          {
+            role: "user",
+            content: `${buildScheduleOpsContext()}\n\nUser instruction:\n${instruction}`,
+          },
+        ],
+        {
+          signal: this.abort.signal,
+          format: "json",
+          temperature: 0.1,
+        },
+      );
+
+      const plan = parseScheduleOps(raw);
+      this.pendingOps = plan;
+      this.showingOps = true;
+      this.resultText = plan.summary || "";
+      this.renderOpsPreview(plan);
+      this.syncFooter();
+      if (plan.operations.length === 0) {
+        this.setStatus(tRaw("schedule.aiOpsEmpty"), "idle");
+      } else {
+        this.setStatus(
+          tRaw("schedule.aiOpsReady", { count: String(plan.operations.length) }),
+          "ok",
+        );
+      }
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") {
+        this.setStatus(tRaw("ai.summaryCancelled"));
+      } else {
+        const msg = errorMessage(e);
+        this.setStatus(tRaw("ai.error", { error: msg }), "error");
+        new Notice(tRaw("ai.error", { error: msg }));
+      }
+    } finally {
+      this.isRunning = false;
+      this.abort = null;
+      this.setScanning(false);
+      if (this.runBtn) this.runBtn.disabled = false;
+      if (this.stopBtn) this.stopBtn.disabled = true;
+      this.syncFooter();
+    }
+  }
+
+  private renderOpsPreview(plan: ScheduleOpsPlan): void {
+    const el = this.outputEl;
+    if (!el) return;
+    el.empty();
+
+    const card = el.createDiv({
+      cls: plan.operations.length
+        ? "ai-sch-ops-card"
+        : "ai-sch-ops-card is-empty",
+    });
+    const head = card.createDiv({ cls: "ai-sch-ops-head" });
+    head.createDiv({ cls: "ai-sch-ops-badge", text: tRaw("schedule.aiOpsBadge") });
+    head.createDiv({
+      cls: "ai-sch-ops-summary",
+      text: plan.summary || tRaw("schedule.aiOpsPreview"),
+    });
+
+    if (plan.operations.length === 0) {
+      card.createDiv({
+        cls: "ai-sch-empty-hint",
+        text: tRaw("schedule.aiOpsEmpty"),
+      });
+      return;
+    }
+
+    const list = get(tasks);
+    const ul = card.createEl("ul", { cls: "ai-sch-ops-list" });
+    plan.operations.forEach((op, i) => {
+      const li = ul.createEl("li", { cls: "ai-sch-ops-item" });
+      li.createDiv({ cls: "ai-sch-ops-num", text: String(i + 1) });
+      li.createDiv({ cls: "ai-sch-ops-text", text: describeOp(op, list) });
+    });
+  }
+
+  private applyOps(): void {
+    const plan = this.pendingOps;
+    if (!plan || plan.operations.length === 0) return;
+    const { applied, skipped, warnings } = applyScheduleOps(plan.operations);
+    this.pendingOps = null;
+    this.showingOps = false;
+    this.applyBtn?.classList.add("mcp-hidden");
+    this.backBtn?.classList.add("mcp-hidden");
+    this.setStatus(tRaw("schedule.aiOpsApplied", { count: String(applied) }), "ok");
+    new Notice(tRaw("schedule.aiOpsApplied", { count: String(applied) }));
+    for (const w of warnings) {
+      new Notice(w, 8000);
+    }
+    if (skipped > 0) {
+      new Notice(tRaw("schedule.aiOpsSkipped", { count: String(skipped) }));
+    }
+    // In analyze mode return to the analysis text after apply
+    if (this.mode === "analyze" && this.analysisText.trim()) {
+      this.resultText = this.analysisText;
+      this.renderOutput(this.analysisText);
+    } else {
+      this.renderOutput("");
+    }
+    this.syncFooter();
   }
 
   private async saveNote(): Promise<void> {
@@ -706,9 +1198,9 @@ export class AIScheduleModal extends CustomModal {
 
     const { start, end } = this.currentRange();
     const kind =
-      this.action === "summary"
-        ? tRaw("schedule.aiActionSummary")
-        : tRaw("schedule.aiActionLoad");
+      this.analysisKind === "load"
+        ? tRaw("schedule.aiActionLoad")
+        : tRaw("schedule.aiActionSummary");
     const title = `${kind} ${fmtDate(start)}–${fmtDate(end)}`;
     const path = normalizePath(`${title}.md`);
 

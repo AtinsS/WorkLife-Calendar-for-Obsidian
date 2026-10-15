@@ -7,65 +7,16 @@ import { get } from "svelte/store";
 import { streamOllamaChat, resolveModel } from "./OllamaService";
 import { errorMessage } from "../utils/sanitize";
 import { renderMarkdown } from "../ui/markdown";
+import {
+  buildSummarySystem,
+  normalizeSummaryStyle,
+  summaryStyleLabel,
+  type SummaryStyle,
+} from "./summaryStyle";
 
 const MAX_NOTES = 40;
 const MAX_CHARS_PER_NOTE = 6000;
 const MAX_TOTAL_CHARS = 48000;
-
-const SUMMARY_BASE = `You are a careful note summarizer. Write ONE unified markdown summary of the ENTIRE set of notes as a single document.
-Do NOT create a separate section per source file.
-Do NOT list notes one by one.
-Synthesize common themes, decisions, facts, and takeaways across all sources.
-Return ONLY markdown (no code fences around the whole answer).
-Write body text in the SAME language as the source notes.
-Use the exact section headings provided below (do not translate or bilingualize them).
-Preserve important names, dates, numbers.`;
-
-type SummaryStyle = "brief" | "detailed" | "bullets" | "executive";
-
-function buildSummarySystem(style: SummaryStyle, extra?: string): string {
-  const h = {
-    overview: tRaw("ai.summaryHeadings.overview"),
-    keyIdeas: tRaw("ai.summaryHeadings.keyIdeas"),
-    takeaways: tRaw("ai.summaryHeadings.takeaways"),
-    tldr: tRaw("ai.summaryHeadings.tldr"),
-    facts: tRaw("ai.summaryHeadings.facts"),
-    risks: tRaw("ai.summaryHeadings.risks"),
-  };
-  const blocks: Record<SummaryStyle, string> = {
-    brief: `Style: BRIEF.
-# <short shared title>
-2–4 sentences covering the whole corpus in one flow.`,
-    detailed: `Style: DETAILED (still one shared summary).
-# <short shared title>
-## ${h.overview}
-2–4 sentences about the whole set.
-## ${h.keyIdeas}
-- bullets synthesizing topics across notes
-## ${h.takeaways}
-- bullets
-Do not split sections by source note.`,
-    bullets: `Style: BULLETS ONLY (one shared list).
-# <short shared title>
-- short factual bullets merging themes from all notes
-- no per-file blocks, no long prose`,
-    executive: `Style: EXECUTIVE SUMMARY (one shared brief).
-# <short shared title>
-## ${h.tldr}
-1–2 sentences on the whole set.
-## ${h.facts}
-- decisions, numbers, dates, owners from any notes
-## ${h.risks}
-- open questions, blockers (if any)
-Never separate by note.`,
-  };
-  let sys = `${SUMMARY_BASE}\n\n${blocks[style] || blocks.detailed}`;
-  const extraTrim = (extra || "").trim();
-  if (extraTrim) {
-    sys += `\n\nExtra user instructions (follow them):\n${extraTrim}`;
-  }
-  return sys;
-}
 
 export function collectMarkdownFiles(root: TFolder, depth = 0, maxDepth = 3): TFile[] {
   const out: TFile[] = [];
@@ -111,6 +62,12 @@ export class AISummaryModal extends CustomModal {
   private isGenerating = false;
   private abort: AbortController | null = null;
 
+  private style: SummaryStyle = "detailed";
+  private customStyle = "";
+  private styleSel: HTMLSelectElement | null = null;
+  private customStyleWrap: HTMLElement | null = null;
+  private customStyleEl: HTMLTextAreaElement | null = null;
+
   private titleEl: HTMLInputElement | null = null;
   private textareaEl: HTMLTextAreaElement | null = null;
   private previewEl: HTMLElement | null = null;
@@ -152,6 +109,53 @@ export class AISummaryModal extends CustomModal {
         label: this.sourcesLabel,
       }),
     });
+
+    // Style picker (defaults from settings, overridable per run)
+    const opts = get(settings) as {
+      aiSummaryStyle?: SummaryStyle;
+      aiSummaryCustomStyle?: string;
+    };
+    this.style = normalizeSummaryStyle(opts.aiSummaryStyle);
+    this.customStyle = opts.aiSummaryCustomStyle || "";
+
+    const styleRow = this.contentEl.createDiv({ cls: "ai-summary-style-row" });
+    styleRow.createEl("label", {
+      cls: "ai-summary-title-label",
+      text: tRaw("settings.ai.summaryStyle"),
+    });
+    this.styleSel = styleRow.createEl("select", { cls: "ai-summary-style-select" });
+    for (const s of ["brief", "detailed", "bullets", "executive", "custom"] as SummaryStyle[]) {
+      const opt = this.styleSel.createEl("option", {
+        value: s,
+        text: summaryStyleLabel(s),
+      });
+      if (s === this.style) opt.selected = true;
+    }
+    this.styleSel.addEventListener("change", () => {
+      this.style = normalizeSummaryStyle(this.styleSel?.value);
+      this.syncCustomStyle();
+    });
+
+    this.customStyleWrap = this.contentEl.createDiv({
+      cls: "ai-summary-custom-style mcp-hidden",
+    });
+    this.customStyleWrap.createEl("label", {
+      cls: "ai-summary-title-label",
+      text: tRaw("settings.ai.summaryStyleCustom"),
+    });
+    this.customStyleEl = this.customStyleWrap.createEl("textarea", {
+      cls: "ai-summary-custom-style-input",
+      attr: {
+        rows: "3",
+        placeholder: tRaw("settings.ai.summaryStyleCustomPlaceholder"),
+        spellcheck: "false",
+      },
+    });
+    this.customStyleEl.value = this.customStyle;
+    this.customStyleEl.addEventListener("input", () => {
+      this.customStyle = this.customStyleEl?.value || "";
+    });
+    this.syncCustomStyle();
 
     const titleRow = this.contentEl.createDiv({ cls: "ai-summary-title-row" });
     titleRow.createEl("label", {
@@ -327,13 +331,16 @@ export class AISummaryModal extends CustomModal {
     return parts.join("\n");
   }
 
+  private syncCustomStyle(): void {
+    this.customStyleWrap?.classList.toggle("mcp-hidden", this.style !== "custom");
+  }
+
   private async generate(): Promise<void> {
     if (this.isGenerating || this.files.length === 0) return;
     const opts = get(settings) as {
       ollamaEnabled?: boolean;
       ollamaUrl?: string;
       ollamaModel?: string;
-      aiSummaryStyle?: SummaryStyle;
       aiSummaryPrompt?: string;
     };
     if (!opts.ollamaEnabled) {
@@ -357,14 +364,11 @@ export class AISummaryModal extends CustomModal {
       this.setStatus(tRaw("ai.summaryStreaming"), false, true);
       this.setProgress(0);
 
-      const style: SummaryStyle =
-        opts.aiSummaryStyle === "brief" ||
-        opts.aiSummaryStyle === "bullets" ||
-        opts.aiSummaryStyle === "executive"
-          ? opts.aiSummaryStyle
-          : "detailed";
-
-      const system = buildSummarySystem(style, opts.aiSummaryPrompt);
+      const system = buildSummarySystem({
+        style: this.style,
+        extraPrompt: opts.aiSummaryPrompt,
+        customStyle: this.customStyle,
+      });
       const expectedChars = 1200;
       let lastPaint = 0;
       let chars = 0;

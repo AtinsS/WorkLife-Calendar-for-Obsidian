@@ -393,6 +393,15 @@ export default class CalendarPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "ai-ask-question",
+      name: tRaw("ai.contextMenuAsk"),
+      checkCallback: (checking: boolean) => {
+        if (checking) return this.options.ollamaEnabled === true;
+        void import("./services/AIAskModal").then(({ openAiAsk }) => openAiAsk(this.app));
+      },
+    });
+
     // Remove orphaned ribbon icons from previous instance (hot-reload safety)
     document.querySelectorAll("[data-mcp-ribbon]").forEach(el => el.remove());
 
@@ -491,6 +500,17 @@ export default class CalendarPlugin extends Plugin {
           });
         }
 
+        // Live chat in the context of this note / folder
+        aiActions.push({
+          title: tRaw("ai.contextMenuAsk"),
+          icon: "lucide-message-circle-question",
+          onClick: () => {
+            void import("./services/AIAskModal").then(({ openAiAskFor }) =>
+              openAiAskFor(this.app, file),
+            );
+          },
+        });
+
         addAiMenuItems(menu, aiActions);
       })
     );
@@ -502,12 +522,12 @@ export default class CalendarPlugin extends Plugin {
         on: (name: string, cb: (...args: never[]) => void) => unknown;
       }).on("files-menu", (menu: Menu, files: (TFile | TFolder)[]) => {
         if (!this.options.ollamaEnabled) return;
-        if (this.options.aiSummaryEnabled === false) return;
         if (window.innerWidth <= 768) return;
         const mdFiles = files.filter((f): f is TFile => f instanceof TFile && f.extension === "md");
         if (mdFiles.length < 2) return;
-        addAiMenuItems(menu, [
-          {
+        const multiActions: AiMenuAction[] = [];
+        if (this.options.aiSummaryEnabled !== false) {
+          multiActions.push({
             title: tRaw("ai.contextMenuSummaryMany", { count: String(mdFiles.length) }),
             icon: "lucide-files",
             onClick: () => {
@@ -515,8 +535,22 @@ export default class CalendarPlugin extends Plugin {
               const label = tRaw("ai.summarySelection", { count: String(mdFiles.length) });
               new AISummaryModal(this.app, mdFiles.slice(0, 40), folderPath, label).open();
             },
+          });
+        }
+        multiActions.push({
+          title: tRaw("ai.contextMenuAsk"),
+          icon: "lucide-message-circle-question",
+          onClick: () => {
+            void import("./services/AIAskModal").then(({ openAiAsk }) =>
+              openAiAsk(
+                this.app,
+                mdFiles.slice(0, 12),
+                tRaw("ai.summarySelection", { count: String(mdFiles.length) }),
+              ),
+            );
           },
-        ]);
+        });
+        addAiMenuItems(menu, multiActions);
       })
     );
 

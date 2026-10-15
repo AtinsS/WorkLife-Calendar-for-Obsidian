@@ -48,7 +48,7 @@ Many workflows share the same problem: tasks live in one place, the calendar in 
 | **⚖️ Habits & Health** | Habit tracker with streaks, weight graph |
 | **💰 Finances** | Budget plan, savings jar, income, expenses, MD / Excel summaries |
 | **📊 Analytics** | Charts by projects, income, and habits |
-| **🤖 Local AI (Ollama)** | Task extraction, summaries, expense breakdown, workout plans |
+| **🤖 Local AI (Ollama)** | Task extraction, summaries, schedule commands, AI chat, free-slot planning, expense breakdown, workout plans |
 | **🔔 Notifications** | Desktop reminders + phone push via ntfy.sh |
 
 ---
@@ -153,10 +153,17 @@ Runs entirely on your computer — data never leaves it.
 **What it can do:**
 
 - **Tasks** — extract tasks from a note (right-click on a `.md` file), break a task into subtasks, generate a description, smart input ("Create several tasks named 'Call', repeat every Thursday, project 'Work'").
-- **Notes** — summary of a folder or selected notes.
-- **Schedule** — summary for a period and workload assessment.
+- **Notes** — summary of a folder or selected notes (styles: Brief / Detailed / Bullets / Executive / **Custom**).
+- **Schedule (AI actions)** — period summary, workload assessment with **Apply recommendations** (preview → confirm), and **natural-language commands** ("move project *Home* tasks by a day", "create *Buy milk* next Thursday for 1 hour"). Mutations always go through an **operations plan** you approve.
+- **AI chat (Ask AI)** — live brainstorming in the context of a note or a group of notes (right-click → *AI tools*, or the command palette). Copy answer / copy chat / append to note / save chat as a note.
 - **Finances** — expense breakdown from text, budget forecast, allocation rules, advice in MD/Excel summary.
 - **Workout plan** — questionnaire → plan → tasks and workout streak. No equipment — bodyweight only; static exercises (plank, etc.) always include hold time.
+
+### Smart time slots
+
+When you create a task with a **date and duration** but no clock time (e.g. *"Buy milk next Thursday, 1 hour"*), the plugin places it in the **first free slot** (09:00–21:00, 30-min grid), avoiding existing blocks. The free time is shown **before you confirm** (Quick Add chips / AI review cards). If the day is full, a warning is shown and the task is created without a time.
+
+Works in **Quick Add** and in **AI schedule commands**.
 
 ### Summary Styles
 
@@ -166,8 +173,18 @@ Runs entirely on your computer — data never leaves it.
 | **Detailed** | Overview → Key Ideas → Conclusions (bullet points) | Main format: to understand the material |
 | **Bullet Points** | Bulleted list only, no prose | Skimming, getting into a topic |
 | **For Management** | Essence → Facts & Figures → Risks & Questions | Report for a meeting, status, forwarding to management |
+| **Custom** | Your own rules (settings or per-run in the summary modal) | Company house style, fixed section list, language, tone |
 
 All styles produce **one common summary** across all notes at once, without "per-file" sections. Names, dates, and figures are preserved. The **"Additional Instructions"** field is appended to the prompt: for example, "highlight only actions and dates".
+
+### Schedule AI actions (modal)
+
+| Tab | What it does |
+| :--- | :--- |
+| **Analyze** | Period (day / week / month / …) + *What was done* or *Assess workload*. After workload analysis you can **Apply recommendations** — the model turns tips into operations, you review the plan, then apply. |
+| **Command** | Natural language → operations plan (`move`, `setStatus`, `setTime`, `create`, `delete`, …) → preview → **Apply**. |
+
+Every mutation is previewed first. Recommended tips from "What was done" are not auto-applied (that view is retrospective).
 
 ### Models: One or Two
 
@@ -176,10 +193,10 @@ All styles produce **one common summary** across all notes at once, without "per
 
 ### Privacy
 
-- Requests go only to your Ollama (`localhost:11434`).
-- Only the **text of the specific action** is sent to the model (note for summary, task title, amounts for advice).
-- Passwords, tokens, and sync settings are **not transmitted**.
-- ⚠️ The address field also accepts a cloud endpoint — in that case, data will go to an external server. For personal data, use only `localhost`.
+- Requests go only to the Ollama server you configure (default `http://localhost:11434`).
+- Only the **content needed for the current AI action** is sent: note/summary text, task titles and times, amounts, chat questions.
+- Passwords, tokens, and the whole vault are **not** transmitted.
+- ⚠️ The address field also accepts a remote endpoint (LAN / SSH / cloud). Then those payloads go to **another machine**. For personal data, keep `localhost`.
 - On mobile, AI is hidden; it works on desktop only.
 
 **Settings:** *Settings → AI (Ollama)* — enable, address, models, action toggles, privacy.

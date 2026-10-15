@@ -106,6 +106,8 @@ For each task detect:
 - title: short actionable title in the user's language. Strip dates, times, @project, priority markers, durations, "в заметке X" / [[X]], recurrence phrases. Keep the action verb/object. No trailing punctuation junk.
 - date: absolute YYYY-MM-DD when the user names a day (today/tomorrow/weekday/date), else null. "в понедельник" = next Monday on/after today.
 - scheduledTime / endTime: HH:MM (24h). Ranges "14-15", "14:00-15:00", "с 14 до 15" → both. "в 9" → 09:00. Else null.
+  When the user names a date but NO clock time, leave scheduledTime null (the app will place it in a free slot).
+  When the user gives a duration ("на 1 час") but no time, set estimatedMinutes and leave scheduledTime null.
 - priority: high | medium | low. (! or !! = high, ~ = medium, - = low; also "важно/срочно/urgent" → high). Default medium.
 - projectName: match the user's @token to Known projects when possible; else the token after @; else null.
 - isWorkTask: true if work-related (созвон, встреча, отчёт, клиент, дедлайн, ТЗ, спринт, рабочий, работа, презентация, смета, invoice, meeting, report, client, deadline) OR if rate/payment is given

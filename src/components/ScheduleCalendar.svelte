@@ -1842,7 +1842,9 @@
     const start = view?.activeStart ?? null;
     const end = view?.activeEnd ?? null;
     const { AIScheduleModal } = await import("../services/AIScheduleModal");
-    new AIScheduleModal(appInst, start, end).open();
+    new AIScheduleModal(appInst, start, end, {
+      saveOptions: (changes) => plugin.writeOptions(changes as Record<string, unknown>),
+    }).open();
   }
 </script>
 

@@ -14,6 +14,7 @@ import type CalendarPlugin from "./main";
 import { fetchWeekWeather, getWeatherAttribution, type WeatherProvider } from "./services/weatherService";
 import { initLocale, tRaw } from "./i18n";
 import { testOllamaConnection, testOllamaModel } from "./services/OllamaService";
+import { normalizeSummaryStyle, summaryStyleDesc } from "./services/summaryStyle";
 import { checkForPluginUpdate, fetchLatestRelease, updatePluginNow, compareVersions, pluginUpdateInfo } from "./services/updateCheck";
 
 export interface ISettings {
@@ -185,7 +186,9 @@ export interface ISettings {
   /** Предварительное согласование AI-задач перед добавлением */
   aiConfirmBeforeAdd: boolean;
   /** Стиль саммари заметок */
-  aiSummaryStyle?: "brief" | "detailed" | "bullets" | "executive";
+  aiSummaryStyle?: "brief" | "detailed" | "bullets" | "executive" | "custom";
+  /** Пользовательский стиль (когда aiSummaryStyle === "custom") */
+  aiSummaryCustomStyle?: string;
   /** Доп. инструкции к промпту саммари */
   aiSummaryPrompt?: string;
   /** AI workout plan generator */
@@ -2441,14 +2444,23 @@ export class CalendarSettingsTab extends PluginSettingTab {
           dropdown.addOption("detailed", tRaw("settings.ai.summaryStyleDetailed"));
           dropdown.addOption("bullets", tRaw("settings.ai.summaryStyleBullets"));
           dropdown.addOption("executive", tRaw("settings.ai.summaryStyleExecutive"));
+          dropdown.addOption("custom", tRaw("settings.ai.summaryStyleCustom"));
           const raw = this.plugin.options.aiSummaryStyle;
           dropdown.setValue(
-            raw === "brief" || raw === "bullets" || raw === "executive" ? raw : "detailed",
+            raw === "brief" ||
+              raw === "bullets" ||
+              raw === "executive" ||
+              raw === "custom"
+              ? raw
+              : "detailed",
           );
           dropdown.onChange(async (value: string) => {
             await this.plugin.writeOptions({
               aiSummaryStyle:
-                value === "brief" || value === "bullets" || value === "executive"
+                value === "brief" ||
+                value === "bullets" ||
+                value === "executive" ||
+                value === "custom"
                   ? value
                   : "detailed",
             });
@@ -2457,18 +2469,24 @@ export class CalendarSettingsTab extends PluginSettingTab {
         });
 
       // One-line explanation of the chosen style
-      const style = this.plugin.options.aiSummaryStyle === "brief"
-        || this.plugin.options.aiSummaryStyle === "bullets"
-        || this.plugin.options.aiSummaryStyle === "executive"
-        ? this.plugin.options.aiSummaryStyle
-        : "detailed";
-      const styleDescMap: Record<string, string> = {
-        brief: tRaw("settings.ai.summaryStyleBriefDesc"),
-        detailed: tRaw("settings.ai.summaryStyleDetailedDesc"),
-        bullets: tRaw("settings.ai.summaryStyleBulletsDesc"),
-        executive: tRaw("settings.ai.summaryStyleExecutiveDesc"),
-      };
-      this.note(actionsNotes, styleDescMap[style] || "");
+      const style = normalizeSummaryStyle(this.plugin.options.aiSummaryStyle);
+      this.note(actionsNotes, summaryStyleDesc(style));
+
+      if (style === "custom") {
+        new Setting(actionsNotes)
+          .setName(tRaw("settings.ai.summaryStyleCustom"))
+          .setDesc(tRaw("settings.ai.summaryStyleCustomDesc"))
+          .addTextArea((area) => {
+            area
+              .setPlaceholder(tRaw("settings.ai.summaryStyleCustomPlaceholder"))
+              .setValue(this.plugin.options.aiSummaryCustomStyle || "")
+              .onChange(async (value) => {
+                await this.plugin.writeOptions({ aiSummaryCustomStyle: value });
+              });
+            area.inputEl.rows = 3;
+            area.inputEl.addClass("mcp-input-xl");
+          });
+      }
 
       new Setting(actionsNotes)
         .setName(tRaw("settings.ai.summaryPrompt"))
@@ -2499,14 +2517,19 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addCompactToggle(actionsSchedule, "aiScheduleActionsEnabled", "scheduleActionsEnabled", "scheduleActionsEnabledDesc");
 
     // ── 5. Privacy ───────────────────────────────────────────────────────
+    const url = (this.plugin.options.ollamaUrl || "http://localhost:11434").toLowerCase();
+    const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     const privacy = this.section(container, {
       title: tRaw("settings.ai.sectionPrivacy"),
       desc: tRaw("settings.ai.dataSentDesc"),
       icon: "shield",
-      tone: "warning",
+      tone: isLocal ? "default" : "warning",
     });
-    this.note(privacy, tRaw("settings.ai.cloudWarningDesc"));
-    this.note(privacy, `${tRaw("settings.ai.dataSentTitle")}: ${tRaw("settings.ai.dataSentDesc")}`);
+    if (!isLocal) {
+      this.note(privacy, `${tRaw("settings.ai.cloudWarning")}: ${tRaw("settings.ai.cloudWarningDesc")}`);
+    } else {
+      this.note(privacy, tRaw("settings.ai.dataSentTitle") + ": " + tRaw("settings.ai.dataSentDesc"));
+    }
 
     // ── 6. How-to ────────────────────────────────────────────────────────
     const howToCard = this.section(container, {
@@ -2540,9 +2563,18 @@ export class CalendarSettingsTab extends PluginSettingTab {
         toggle.setValue(current !== false);
         toggle.onChange(async (value) => {
           await this.plugin.writeOptions({ [key]: value });
-          opts?.onAfter?.();
+          if (opts?.onAfter) this.softRefresh();
         });
       });
+  }
+
+  /** Re-render the AI tab without jumping to top (toggles used to "restart" the section). */
+  private softRefresh(): void {
+    const scroller =
+      this.containerEl.closest(".vertical-tab-content") ?? this.containerEl.parentElement;
+    const top = scroller ? scroller.scrollTop : 0;
+    this.render();
+    if (scroller) scroller.scrollTop = top;
   }
 
   /** Model dropdown + "Find models" button. */

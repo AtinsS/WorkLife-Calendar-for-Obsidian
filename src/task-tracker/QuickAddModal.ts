@@ -1,4 +1,4 @@
-import { App, Modal } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import type { Moment } from "moment";
 import { getDateUID } from "obsidian-daily-notes-interface";
 import { get } from "svelte/store";
@@ -16,6 +16,14 @@ import {
   type AiQuickTaskDraft,
   computeEndTimeFromMinutes,
 } from "../services/aiQuickAdd";
+import {
+  resolveCreateTimesForDate,
+  dateStrFromUID,
+  busySlotsForDate,
+  findFreeSlot,
+  slotOverlaps,
+  type BusySlot,
+} from "../services/aiScheduleOps";
 import type { RecurrenceConfig } from "./types";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { FolderSuggestModal } from "../modals/FolderSuggestModal";
@@ -117,6 +125,21 @@ export function parseQuickInput(raw: string): ParsedResult {
     { re: /(?:^|\s)(послезавтра|day after tomorrow|dat)(?:\s|$)/gi, resolve: () => ({ date: now.clone().add(2, "day"), label: loc === "en" ? "day after tomorrow" : "послезавтра" }) },
     // +N days
     { re: /\+(\d{1,3})(?:\s|$)/g, resolve: (m) => { const d = parseInt(m[1]); return d > 0 && d <= 365 ? { date: now.clone().add(d, "day"), label: `+${d}` } : null; } },
+    // "следующий/next" + weekday → strictly the following week
+    {
+      re: new RegExp(
+        `(?:^|\\s)(?:следующ\\w*|next|будущ\\w*)\\s+(${Object.keys(dayMap).join("|")})(?:\\s|$)`,
+        "gi",
+      ),
+      resolve: (m) => {
+        const key = m[1].toLowerCase();
+        const num = dayMap[key];
+        if (num === undefined) return null;
+        const momentDay = num === 7 ? 0 : num;
+        const target = now.clone().day(momentDay).add(1, "week");
+        return { date: target, label: m[0].trim() };
+      },
+    },
     // weekday names
     { re: new RegExp(`(?:^|\\s)(${Object.keys(dayMap).join("|")})(?:\\s|$)`, "gi"), resolve: (m) => {
       const key = m[1].toLowerCase();
@@ -268,6 +291,74 @@ function priorityGlyph(prio: "low" | "medium" | "high"): string {
 function formatTime(time: string): string {
   const [h, m] = time.split(":");
   return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
+}
+
+/** "на 1 час", "1 hour", "2 ч", "30 минут" → minutes. */
+function parseDurationFromText(text: string): number | null {
+  const m =
+    /(?:на\s+)?(\d{1,3})\s*(?:ч|час[а-я]*|h|hr|hours?)(?:\s|\b)/i.exec(text) ||
+    /(?:на\s+)?(\d{1,3})\s*(?:м(?:ин)?|минут[а-я]*|min(?:ute)?s?)(?:\s|\b)/i.exec(text);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  // first regex is hours, second is minutes
+  const isHours = /(?:на\s+)?\d{1,3}\s*(?:ч|час|h|hr|hour)/i.test(m[0]);
+  const mins = isHours ? n * 60 : n;
+  return Math.max(15, Math.min(8 * 60, mins));
+}
+
+/**
+ * Fill drafts with free slots (and sequential occupancy) so the UI can show
+ * the planned time BEFORE the user confirms.
+ */
+function enrichDraftsWithFreeSlots(drafts: AiQuickTaskDraft[]): AiQuickTaskDraft[] {
+  const busyByDate = new Map<string, BusySlot[]>();
+  const loadBusy = (dateStr: string): BusySlot[] => {
+    let arr = busyByDate.get(dateStr);
+    if (!arr) {
+      arr = busySlotsForDate(dateStr);
+      busyByDate.set(dateStr, arr);
+    }
+    return arr;
+  };
+
+  return drafts.map((d) => {
+    const dateStr = d.date || fmtToday();
+    const dur = d.estimatedMinutes || 60;
+    const busy = loadBusy(dateStr);
+    const rawStart = (d.scheduledTime || "").trim();
+
+    if (rawStart && !slotOverlaps(busy, rawStart, d.endTime, dur)) {
+      const end =
+        d.endTime ||
+        computeEndTimeFromMinutes(rawStart, dur);
+      busy.push({ scheduledTime: rawStart, endTime: end, estimatedTime: dur });
+      return {
+        ...d,
+        estimatedMinutes: d.estimatedMinutes ?? dur,
+        endTime: end,
+      };
+    }
+
+    const slot = findFreeSlot(busy, dur);
+    if (!slot) return { ...d, estimatedMinutes: d.estimatedMinutes ?? dur };
+    busy.push({
+      scheduledTime: slot.scheduledTime,
+      endTime: slot.endTime,
+      estimatedTime: dur,
+    });
+    return {
+      ...d,
+      scheduledTime: slot.scheduledTime,
+      endTime: slot.endTime,
+      estimatedMinutes: dur,
+    };
+  });
+}
+
+function fmtToday(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
 /** Split free text into task lines (newlines, bullets, numbered lists, ";"). */
@@ -927,6 +1018,21 @@ export class QuickAddModal extends Modal {
     const parsed = parseQuickInput(raw);
     parseEl.removeClass("mcp-hidden");
 
+    // Duration + free-slot preview (even when the user did not type a clock time)
+    const durationMin = parseDurationFromText(raw) ?? undefined;
+    const dateStr = parsed.date
+      ? `${parsed.date.year()}-${String(parsed.date.month() + 1).padStart(2, "0")}-${String(parsed.date.date()).padStart(2, "0")}`
+      : null;
+    let previewStart = parsed.scheduledTime ? formatTime(parsed.scheduledTime) : null;
+    let previewEnd = parsed.endTime ? formatTime(parsed.endTime) : null;
+    if (!previewStart && dateStr) {
+      const slot = findFreeSlot(busySlotsForDate(dateStr), durationMin || 60);
+      if (slot) {
+        previewStart = slot.scheduledTime;
+        previewEnd = slot.endTime;
+      }
+    }
+
     // Chips for recognized tokens
     const chips: Array<{ cls: string; text: string }> = [];
     if (parsed.priority) {
@@ -935,11 +1041,17 @@ export class QuickAddModal extends Modal {
     if (parsed.dateLabel) {
       chips.push({ cls: "qa2-chip-date", text: `📅 ${parsed.dateLabel}` });
     }
-    if (parsed.scheduledTime) {
-      const range = parsed.endTime
-        ? `${formatTime(parsed.scheduledTime)}–${formatTime(parsed.endTime)}`
-        : formatTime(parsed.scheduledTime);
-      chips.push({ cls: "qa2-chip-time", text: `🕐 ${range}` });
+    if (previewStart) {
+      const range = previewEnd
+        ? `${previewStart}–${previewEnd}`
+        : previewStart;
+      const free = !parsed.scheduledTime ? ` · ${tRaw("tasks.quickAdd.freeSlotChip")}` : "";
+      chips.push({ cls: "qa2-chip-time", text: `🕐 ${range}${free}` });
+    }
+    if (durationMin && !previewStart) {
+      chips.push({ cls: "qa2-chip-time", text: `⏱ ${durationMin}m` });
+    } else if (durationMin && !parsed.scheduledTime) {
+      chips.push({ cls: "qa2-chip-time", text: `⏱ ${durationMin}m` });
     }
     if (parsed.projectName) {
       chips.push({ cls: "qa2-chip-project", text: `@${parsed.projectName}` });
@@ -1491,6 +1603,8 @@ export class QuickAddModal extends Modal {
 
   /** Preview panel: show how AI parsed each task, let the user approve. */
   private showReviewPanel(drafts: AiQuickTaskDraft[]): void {
+    // Fill free slots up-front so the review shows the planned times
+    const planned = enrichDraftsWithFreeSlots(drafts);
     // Hide input area actions; show review card list
     this.closeReviewPanel();
     const root = this.contentEl.createDiv({ cls: "qa2-review" });
@@ -1500,9 +1614,9 @@ export class QuickAddModal extends Modal {
     root.createDiv({ text: tRaw("tasks.quickAdd.reviewHint"), cls: "qa2-review-hint" });
 
     const list = root.createDiv({ cls: "qa2-review-list" });
-    const selected: boolean[] = drafts.map(() => true);
+    const selected: boolean[] = planned.map(() => true);
 
-    drafts.forEach((d, i) => {
+    planned.forEach((d, i) => {
       const card = list.createDiv({ cls: "qa2-review-card" });
       const head = card.createDiv({ cls: "qa2-review-card-head" });
       const check = head.createEl("input", {
@@ -1573,13 +1687,13 @@ export class QuickAddModal extends Modal {
     const countBtn = actions.createEl("button", {
       cls: "qa2-btn qa2-btn-primary",
       text: tRaw("tasks.quickAdd.reviewSelected", {
-        count: String(drafts.length),
+        count: String(planned.length),
       }),
       attr: { type: "button" },
     });
     this.updateReviewCount(countBtn, selected);
     countBtn.addEventListener("click", () => {
-      const chosen = drafts.filter((_, i) => selected[i]);
+      const chosen = planned.filter((_, i) => selected[i]);
       for (const draft of chosen) this.createTaskFromDraft(draft);
       this.closeReviewPanel();
       this.close();
@@ -1758,9 +1872,29 @@ export class QuickAddModal extends Modal {
 
     const description = (this.descEl?.value || draft?.description || "").trim();
 
-    let estimatedTime = draft?.estimatedMinutes ?? undefined;
+    let estimatedTime = draft?.estimatedMinutes ?? parseDurationFromText(this.inputValue()) ?? undefined;
     if (estimatedTime === undefined && scheduledTime && endTime) {
       estimatedTime = minutesBetween(scheduledTime, endTime);
+    }
+
+    // Classic AI/quick add: place in a free / non-overlapping slot
+    {
+      const dateStr = dateStrFromUID(dateUID);
+      if (dateStr) {
+        const resolved = resolveCreateTimesForDate({
+          dateStr,
+          scheduledTime,
+          endTime,
+          estimatedMinutes: estimatedTime || 60,
+        });
+        if (resolved) {
+          scheduledTime = resolved.scheduledTime;
+          endTime = resolved.endTime;
+          estimatedTime = resolved.estimatedMinutes;
+        } else {
+          new Notice(tRaw("tasks.quickAdd.noFreeSlot", { date: dateStr }));
+        }
+      }
     }
 
     try {
@@ -1818,6 +1952,25 @@ export class QuickAddModal extends Modal {
     let estimatedTime = draft.estimatedMinutes ?? undefined;
     if (estimatedTime === undefined && scheduledTime && endTime) {
       estimatedTime = minutesBetween(scheduledTime, endTime);
+    }
+    // Place in a free / non-overlapping slot
+    {
+      const dateStr = dateStrFromUID(dateUID);
+      if (dateStr) {
+        const resolved = resolveCreateTimesForDate({
+          dateStr,
+          scheduledTime,
+          endTime,
+          estimatedMinutes: estimatedTime || 60,
+        });
+        if (resolved) {
+          scheduledTime = resolved.scheduledTime;
+          endTime = resolved.endTime;
+          estimatedTime = resolved.estimatedMinutes;
+        } else {
+          new Notice(tRaw("tasks.quickAdd.noFreeSlot", { date: dateStr }));
+        }
+      }
     }
     // Derive end when model gave only start + duration
     if (!endTime && scheduledTime && estimatedTime && estimatedTime > 0) {
