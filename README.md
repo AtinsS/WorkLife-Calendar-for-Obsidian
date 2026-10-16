@@ -1,6 +1,6 @@
 # WorkLife Calendar for Obsidian
 
-> **Forget the chaos.** A smart calendar, task tracker, time tracking, habit control, and finances — all in one beautiful and connected space.
+> **Say goodbye to chaos.** A smart calendar, task tracker, time tracker, habit tracker, and finance manager—all in one beautiful, connected workspace.
 
 <div align="center">
 
@@ -15,285 +15,289 @@
 
 [**Русский README**](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/blob/master/README.RU.md)
 
-![alt text](image-3.png)
+![WorkLife Calendar](image-2.png)
 
-## 💡 Why This Plugin Exists
+## 💡 Why this plugin exists
 
-Many workflows share the same problem: tasks live in one place, the calendar in another, time tracking in a third, and finances and reports are assembled manually in spreadsheets. As a result, the same data has to be entered several times.
+Many workflows have the same problem: tasks live in one place, the calendar in another, time tracking in a third, while finances and reports are managed manually in spreadsheets. As a result, the same data has to be entered multiple times.
 
-**This plugin solves exactly that problem.** It doesn't just add another calendar or tracker. It connects planning, execution, and analysis into a single system:
+**This plugin solves that problem.** It doesn’t just add another calendar or task tracker. It connects planning, execution, and analysis in one system:
 
-- One task affects the calendar.
-- The calendar affects time tracking.
-- Time affects income calculation.
-- Income generates automatic analytics.
-
----
-
-## 🚀 Who This Is For
-
-- **Freelancers and developers** who want to automatically calculate the cost of their work by the hour.
-- **Students and researchers** who need to keep deadlines, projects, and daily habits in mind.
-- **Anyone who is tired** of a dozen scattered apps and wants to bring order into a single Obsidian window.
+- A task affects your calendar.
+- Your calendar feeds into time tracking.
+- Tracked time is used to calculate income.
+- Income powers automatic analytics.
 
 ---
 
-## ✨ What's Inside
+## 🚀 Who it’s for
 
-| Block | What You Get |
+- **Freelancers and developers** who want to automatically calculate the value of their work by the hour.
+- **Students and researchers** who need to keep track of deadlines, projects, and daily habits.
+- **Anyone tired** of juggling a dozen disconnected apps and ready to get organized in one Obsidian workspace.
+
+---
+
+## ✨ What’s included
+
+| Feature | What you get |
 | :--- | :--- |
-| **📅 Schedule** | Day / week / month calendar, Drag & Drop, weather in the grid |
-| **✅ Tasks** | Quick natural-language adding, kanban, repeats, live timer |
-| **⏱ Time & Income** | Work timer → hours × rate → automatic earnings |
-| **⚖️ Habits & Health** | Habit tracker with streaks, weight graph |
-| **💰 Finances** | Budget plan, savings jar, income, expenses, MD / Excel summaries |
-| **📊 Analytics** | Charts by projects, income, and habits |
-| **🤖 Local AI (Ollama)** | Task extraction, summaries, schedule commands, AI chat, free-slot planning, expense breakdown, workout plans |
-| **🔔 Notifications** | Desktop reminders + phone push via ntfy.sh |
+| **📅 Schedule** | Day / week / month calendar, drag and drop, weather in the calendar grid |
+| **✅ Tasks** | Quick natural-language entry, Kanban, recurring tasks, live timer |
+| **⏱ Time & income** | Work timer → hours × rate → automatic earnings |
+| **⚖️ Habits & health** | Habit streaks, weight chart |
+| **💰 Finances** | Budget planning, savings goals, income, expenses, Markdown / Excel summaries |
+| **📊 Analytics** | Charts for projects, income, and habits |
+| **🤖 Local AI (Ollama)** | Task extraction, summaries, schedule commands, AI chat, free time slots, expense analysis, workout plans, brainstorming in the context of a note |
+| **🔔 Notifications** | Desktop reminders + phone push notifications via ntfy.sh |
+
+> [!NOTE] 🎁 Bonus
+> The `theme` folder includes a theme! Make Obsidian look even better.
 
 ---
 
 ## 📦 Installation
 
-### Community Plugins (recommended)
+### Community plugins (recommended)
 
-1. Open **Settings → Community Plugins** in Obsidian.
+1. Open **Settings → Community plugins** in Obsidian.
 2. Click **Browse** and search for **WorkLife Calendar**.
 3. Click **Install**, then **Enable**.
 
 ### Via BRAT
 
 1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin.
-2. Open BRAT settings → **Add Beta Plugin**.
-3. Paste the link: `https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian`
+2. Open **BRAT settings → Add Beta Plugin**.
+3. Paste this link: `https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian`
 4. Click **Add Plugin**.
 
-### Manually
+### Manual installation
 
 1. Download the release archive or clone the repository.
 2. Copy `main.js`, `manifest.json`, and `styles.css`.
-3. Place them in the `.obsidian/plugins/worklife-calendar/` folder (create it if it doesn't exist).
-4. Enable the plugin in *Settings → Community Plugins*.
+3. Place them in `.obsidian/plugins/worklife-calendar/` (create the folder if it doesn’t exist).
+4. Enable the plugin in *Settings → Community plugins*.
 
-> [!NOTE]
-> Requires Obsidian **1.13.0+**. Works on desktop and mobile devices (AI — desktop only).
+> [!WARNING] Requirements
+> Obsidian **1.13.0+** is required. Works on desktop and mobile (AI is desktop-only).
 
 ---
 
-## 🧭 Quick Start
+## 🧭 Quick start
 
-1. **Tasks** — open *Tasks* or click **"Quick add task"** and write as you would: *"submit report on Friday @Work !urgent"*.
-2. **Finances** — the *Finances* section: tabs **Budget / Savings / Income / Expenses**. Add your first expense on the "Expenses" tab.
-3. **Summary** — at the end of the month, select **Markdown** or **Excel** and click **"Summary"** — get a ready-made report.
+1. **Tasks** — open *Tasks* or click **“Quick Add Task”**, then type naturally: *“Submit report on Friday @Work !urgent”*.
+2. **Finances** — open the *Finances* section. It has four tabs: **Budget / Savings / Income / Expenses**. Add your first expense in the **Expenses** tab.
+3. **Monthly summary** — at the end of the month, select **Markdown** or **Excel** and click **“Summary”** to generate a report.
 
 > [!TIP]
-> Configure **Finances → Currency Symbol** and **Summary Folder** — it takes a minute and immediately brings order to your reports.
+> Set your **Finances → Currency symbol** and **Summary folder** in the settings. It takes a minute and keeps your reports organized.
 
 ---
 
 ## ☕ Support
 
-If the plugin saves you time and helps with your work, you can support development:
+If the plugin saves you time and helps with your work, you can support its development:
 
 - ⭐ Star the repository.
-- [☕ Buy the author a coffee and a bun](https://boosty.to/atins/donate).
+- [☕ Buy the author a coffee and a pastry](https://boosty.to/atins/donate).
 
 ---
 
 <details>
-<summary><h3>✨ Detailed Features (expand)</h3></summary>
+<summary><h3>✨ Detailed features (expand)</h3></summary>
 
-## 📅 Smart Planning
+## 📅 Smart planning
 
-- Understands human language. Just write: *"! tomorrow 14:00 submit project @Work"* — and the plugin will set the date, time, project, and priority itself.
-- AI helps create multiple tasks from a single prompt.
-- Visual calendar (day / week / month) with Drag & Drop. Drag a task with your mouse to change its time.
-- Weather right in the calendar grid helps you plan days more conveniently.
+- Understands natural language. Just type *“! tomorrow 14:00 submit project @Work”* and the plugin will automatically set the date, time, project, and priority.
+- AI can help create multiple tasks from a single prompt.
+- Visual day / week / month calendar with drag and drop. Drag a task to change its time.
+- Weather in the calendar grid helps you plan your days.
 
-## ✅ Focus & Task Management
+## ✅ Focus and task management
 
-- Kanban board and lists: 5 statuses (To Do → In Progress → On Hold → Done → Not Completed).
-- Live timer: start time tracking right from the task card. The timer won't reset when Obsidian restarts. (The timer starts when a task moves to the **"In Progress"** status; can be disabled in settings.)
-- Recurring tasks: set it once — daily, weekly, or monthly.
-- Move overdue tasks to the next day (can be disabled).
-- Work tasks with hourly or daily rates — earnings are calculated automatically.
+- Kanban board and lists with five statuses: To Do → In Progress → On Hold → Done → Not Done.
+- Live timer: track time right from a task card. The timer won’t reset if you restart Obsidian. (The timer starts when a task moves to **In Progress**; you can disable this in settings.)
+- Recurring tasks: set them up once to repeat daily, weekly, or monthly.
+- Automatically move overdue tasks to the next day (can be disabled).
+- Work tasks with hourly or daily rates—the plugin calculates earnings automatically.
 
-## ⚖️ Balance: Habits & Health
+## ⚖️ Balance: habits and health
 
-- Habit tracker with progress charts and "streaks" (completion series).
-- Weight control: daily entry and a clear graph of progress toward your goal.
+- Habit tracker with progress charts and streaks.
+- Weight tracking: log your weight daily and view a chart showing progress toward your goal.
 
 ## 💰 Finances
 
-A single **Finances** block with four tabs — plan and actual are kept separate:
+A unified **Finances** section with four tabs—planned and actual figures are kept separate:
 
-| Tab | What's Inside |
+| Tab | What’s included |
 | :--- | :--- |
-| **Budget** | Monthly plan (approximate figures only): planned income, where to allocate, "where to save", rules. **Does not affect** actuals |
-| **Savings** | Savings goals; deposits — actual expenses |
-| **Income** | Earnings from tasks (hours × rate or daily rate), additional income sources, categories |
-| **Expenses** | Actual spending, categories, text-based expense list breakdown (manually or via AI), contributions to savings |
+| **Budget** | Monthly plan (estimates only): planned income, how to allocate it, how much to save, and rules. **Does not affect** actual figures |
+| **Savings** | Savings goals; contributions are recorded as actual expenses |
+| **Income** | Earnings from tasks (hours × rate or daily rate), additional income sources, and categories |
+| **Expenses** | Actual spending, expense categories, text-based expense analysis (manual or AI-assisted), and savings contributions |
 
-**What else it can do:**
+**Additional features:**
 
-- **Automatic income calculation** — time from the timer × your hourly or daily rate.
-- **Monthly summary** — a dropdown **Markdown / Excel** + **"Summary"** button:
-  - **Markdown** — a note with totals, expenses by category, savings contributions;
-  - **Excel (.xls)** — 7 sheets: summary, income, expenses, by category, by day, savings, budget plan; with AI advice enabled — a "Advice" sheet.
-- **Currency** — symbol is chosen in settings: ₽, $, €, £, ₸, ₴, ₺, ¥, ₮, ₾, ₿, or custom text.
-- **Analytics dashboard** — charts by projects, income, and habits.
+- **Automatic income calculation** — tracked time × your hourly or daily rate.
+- **Monthly summaries** — select **Markdown / Excel** from the dropdown and click **“Summary”**:
+  - **Markdown** — a note with totals, expenses by category, and savings contributions.
+  - **Excel (.xls)** — seven sheets: summary, income, expenses, by category, by day, savings, and budget plan. With AI tips enabled, an additional **Tips** sheet is included.
+- **Currency** — choose a symbol in settings: ₽, $, €, £, ₸, ₴, ₺, ¥, ₮, ₾, ₿, or enter your own text.
+- **Analytics dashboard** — charts for projects, income, and habits.
 
 ## 🤖 Local AI (Ollama)
 
-Runs entirely on your computer — data never leaves it.
+Runs entirely on your computer—your data isn’t sent anywhere.
 
 > [!IMPORTANT] Requirements
 > You need [Ollama](https://ollama.com) and at least one model. For example: `ollama pull llama3.1` or `ollama pull qwen2.5:7b`.
 
 **What it can do:**
 
-- **Tasks** — extract tasks from a note (right-click on a `.md` file), break a task into subtasks, generate a description, smart input ("Create several tasks named 'Call', repeat every Thursday, project 'Work'").
-- **Notes** — summary of a folder or selected notes (styles: Brief / Detailed / Bullets / Executive / **Custom**).
-- **Schedule (AI actions)** — period summary, workload assessment with **Apply recommendations** (preview → confirm), and **natural-language commands** ("move project *Home* tasks by a day", "create *Buy milk* next Thursday for 1 hour"). Mutations always go through an **operations plan** you approve.
-- **AI chat (Ask AI)** — live brainstorming in the context of a note or a group of notes (right-click → *AI tools*, or the command palette). Copy answer / copy chat / append to note / save chat as a note.
-- **Finances** — expense breakdown from text, budget forecast, allocation rules, advice in MD/Excel summary.
-- **Workout plan** — questionnaire → plan → tasks and workout streak. No equipment — bodyweight only; static exercises (plank, etc.) always include hold time.
+- **Tasks** — extract tasks from a note (right-click a `.md` file), break tasks into subtasks, generate descriptions, and use smart input (for example, “Create several tasks titled ‘Call’, repeat every Thursday, project ‘Work’”).
+- **Notes** — summarize a folder or selected notes in these styles: Concise / Detailed / Bullet Points / For Managers / **Custom**.
+- **Schedule (AI Actions)** — summarize a period, assess workload with **“Apply Recommendations”** (preview → confirmation), and process natural-language commands (“move tasks in the ‘Home’ project by one day,” “create ‘Buy milk’ next Thursday for 1 hour”). Changes always go through an **operation plan** that you confirm.
+- **AI chat (Ask AI)** — brainstorm in the context of a note or group of notes (right-click → *AI Tools* or use the command palette). Copy a response or chat, add it to a note, and save chat history.
+- **Finances** — analyze expenses from text, forecast budgets, create allocation rules, and provide tips in Markdown / Excel summaries.
+- **Workout plans** — questionnaire → plan → tasks and workout streaks. If you have no equipment, the plan uses bodyweight exercises only; static exercises (such as planks) always include a hold duration.
 
-### Smart time slots
+### Smart free time slots
 
-When you create a task with a **date and duration** but no clock time (e.g. *"Buy milk next Thursday, 1 hour"*), the plugin places it in the **first free slot** (09:00–21:00, 30-min grid), avoiding existing blocks. The free time is shown **before you confirm** (Quick Add chips / AI review cards). If the day is full, a warning is shown and the task is created without a time.
+When you create a task with a **date and duration** but no time—for example, *“Buy milk next Thursday, 1 hour”*—the plugin schedules it in the **first available slot** (09:00–21:00, in 30-minute intervals), avoiding conflicts. The time is shown **before confirmation** in quick-add chips or AI review cards. If the day is fully booked, you’ll see a warning and the task will be created without a time.
 
-Works in **Quick Add** and in **AI schedule commands**.
+Available in **Quick Add** and **AI schedule commands**.
 
-### Summary Styles
+### Summary styles
 
-| Style | Format | When to Use |
+| Style | Format | Best for |
 | :--- | :--- | :--- |
-| **Brief** | Heading + 2–4 sentences covering everything in one flow | Quickly refresh your memory on what the collection is about |
-| **Detailed** | Overview → Key Ideas → Conclusions (bullet points) | Main format: to understand the material |
-| **Bullet Points** | Bulleted list only, no prose | Skimming, getting into a topic |
-| **For Management** | Essence → Facts & Figures → Risks & Questions | Report for a meeting, status, forwarding to management |
-| **Custom** | Your own rules (settings or per-run in the summary modal) | Company house style, fixed section list, language, tone |
+| **Concise** | A heading plus 2–4 sentences covering everything in one continuous summary | Quickly refreshing your memory about a collection of notes |
+| **Detailed** | Overview → Key ideas → Conclusions (bullet points) | Understanding the material in depth |
+| **Bullet Points** | A bulleted list only, with no prose | Skimming or getting a quick introduction to a topic |
+| **For Managers** | Main points → Facts and figures → Risks and questions | Meeting reports, status updates, and management briefings |
+| **Custom** | Your own formatting rules (in settings or when generating a summary in the modal) | Corporate style, a fixed list of sections, language, or tone |
 
-All styles produce **one common summary** across all notes at once, without "per-file" sections. Names, dates, and figures are preserved. The **"Additional Instructions"** field is appended to the prompt: for example, "highlight only actions and dates".
+All styles create **one unified summary** of all notes, without separate sections for each file. Names, dates, and figures are preserved. The **Additional instructions** field is appended to the prompt—for example, “highlight only actions and dates.”
 
-### Schedule AI actions (modal)
+### AI actions in the schedule
 
 | Tab | What it does |
 | :--- | :--- |
-| **Analyze** | Period (day / week / month / …) + *What was done* or *Assess workload*. After workload analysis you can **Apply recommendations** — the model turns tips into operations, you review the plan, then apply. |
-| **Command** | Natural language → operations plan (`move`, `setStatus`, `setTime`, `create`, `delete`, …) → preview → **Apply**. |
+| **Analysis** | Choose a period (day / week / month / etc.) and select *What’s done* or *Assess workload*. After the workload assessment, click **“Apply Recommendations”** to turn suggestions into operations, review the plan, and confirm. |
+| **Command** | Enter a natural-language command → get an operation plan (`move`, `setStatus`, `setTime`, `create`, `delete`, etc.) → preview → click **Apply**. |
 
-Every mutation is previewed first. Recommended tips from "What was done" are not auto-applied (that view is retrospective).
+Every change is shown in advance. Recommendations from **What’s done** are not applied; that view is retrospective.
 
-### Models: One or Two
+### One or two models
 
-- **One — for everything** — simple option, everything through one model.
-- **Two — by role** — **main** (summaries, forecasts, advice, workout plans) and **for parsing** (expenses, quick input, subtasks). You can set a fast small model for parsing — responses will come faster.
+- **One model for everything** — the simplest option.
+- **Two models by role** — one **primary model** for summaries, forecasts, tips, and workout plans, and one **parsing model** for expenses, quick entry, and subtasks. You can use a fast, lightweight model for parsing to get quicker responses.
 
 ### Privacy
 
-- Requests go only to the Ollama server you configure (default `http://localhost:11434`).
-- Only the **content needed for the current AI action** is sent: note/summary text, task titles and times, amounts, chat questions.
-- Passwords, tokens, and the whole vault are **not** transmitted.
-- ⚠️ The address field also accepts a remote endpoint (LAN / SSH / cloud). Then those payloads go to **another machine**. For personal data, keep `localhost`.
-- On mobile, AI is hidden; it works on desktop only.
+- Requests go to the Ollama server you configure (by default, `http://localhost:11434`).
+- The model receives **only the content needed for the current action**: note or summary text, task titles and times, amounts, or chat questions.
+- Passwords, tokens, and your entire vault are **not** sent.
+- ⚠️ The address field accepts remote endpoints (LAN / SSH / cloud), in which case the data goes to **another machine**. Keep it set to `localhost` for personal data.
+- AI is hidden on mobile and works only on desktop.
 
-**Settings:** *Settings → AI (Ollama)* — enable, address, models, action toggles, privacy.
+**Settings:** *Settings → AI (Ollama)* — enable AI, configure the address and models, toggle actions, and manage privacy settings.
 
-## 🔔 Notifications That Won't Let You Oversleep
+## 🔔 Notifications that help you stay on top of things
 
-- Desktop reminders N minutes before start.
-- Duplication to your phone (via ntfy.sh) so you know about a deadline even if Obsidian is closed.
+- Desktop reminders N minutes before an event.
+- Phone notifications via ntfy.sh, so you can receive deadline reminders even when Obsidian is closed.
 
 </details>
 
 <details>
-<summary><h3>🔗 Sync & Integrations (expand)</h3></summary>
+<summary><h3>🔗 Sync and integrations (expand)</h3></summary>
 
-### Data Storage Format
+### Data storage format
 
-The plugin stores data in JSON format in the `calendar-data/` folder at the vault root. When the **"Sync to vault root"** feature is enabled, it becomes the primary data storage format, providing fast loading and synchronization via:
+The plugin stores data as JSON files in the `calendar-data/` folder at the root of your vault. When **“Sync to vault root”** is enabled, this becomes the primary data storage format and supports fast loading and syncing via:
+
 - **Obsidian Sync** / **Remotely Save***
 - **Syncthing**
 
-> [!WARNING] Financial Data
-> If you track finances in the plugin and use cloud synchronization, income and expense data will be stored in plain text in the cloud. It is recommended to use abstract project names or exclude the `calendar-data/` folder from synchronization.
+> [!WARNING] Financial data
+> If you track finances in the plugin and use cloud sync, your income and expense data will be stored unencrypted in the cloud. Consider using generic project names or excluding the `calendar-data/` folder from sync.
 
-### External Calendars (Google Calendar and others)
+### External calendars (Google Calendar and others)
 
 1. Create a [GitHub Personal Access Token](https://github.com/settings/tokens) (classic) with the `gist` scope.
-2. Paste the token into the plugin settings and click **"Sync"**.
-3. The plugin will create a Gist with an `.ics` file and provide a link.
-4. Add this link to your calendar via the "Subscribe by URL" feature.
+2. Paste the token into the plugin settings and click **“Sync”**.
+3. The plugin will create a Gist containing an `.ics` file and provide a link.
+4. Add that link to your calendar using its **Subscribe by URL** feature.
 
-Optionally, **auto-sync** — the Gist updates when tasks change.
+Optionally, enable **auto-sync** to update the Gist whenever tasks change.
 
 </details>
 
 <details>
 <summary><h3>🔔 Notifications (expand)</h3></summary>
 
-The plugin has a built-in notification system so you don't miss anything important.
+The plugin includes a notification system to help you stay on top of important things.
 
-| Type | When It Triggers |
+| Type | When it triggers |
 | :--- | :--- |
-| **Local (browser)** | N minutes before start, when overdue, when time limit is exceeded, on the deadline day. |
-| **To smartphone (ntfy.sh)** | Duplicates notifications to your phone. Works even when Obsidian is closed. |
+| **Local (browser)** | N minutes before an event, when a task is overdue, when a time limit is exceeded, or on a deadline day |
+| **On your phone (ntfy.sh)** | Push notifications delivered to your phone |
 
-### Setting Up ntfy.sh
+### Setting up ntfy.sh
 
-An easy way to get notifications on your phone:
+A simple way to receive notifications on your phone:
 
 1. Install the [ntfy.sh](https://ntfy.sh/) app on your phone.
-2. In the plugin settings, enable **ntfy.sh** and set a topic.
+2. Enable **ntfy.sh** in the plugin settings and set a topic.
 3. Subscribe to that topic in the app.
 
-Also available: **delayed push** (queued when Obsidian opens — arrive on time even if it's closed) and **daily digest**.
+You can also enable **scheduled push notifications** (queued when Obsidian opens so they arrive on time, even when it’s closed) and a **daily summary**.
 
 > [!CAUTION] Security
-> Use a unique topic (for example, a generated UUID like `a7f9b2c4-8e1d-4f3a-9c5b-2d6e8f0a1b3c`) so no one else can subscribe to your notifications. The plugin sends only triggers ("Overdue: Task Name"), not financial data or full texts.
+> Use a unique topic, such as a randomly generated UUID like `a7f9b2c4-8e1d-4f3a-9c5b-2d6e8f0a1b3c`, so no one else can subscribe to your notifications. The plugin sends only notification triggers (for example, “Overdue: Task title”), not financial data or full text.
 
 </details>
 
 <details>
-<summary><h3>🧭 Widgets in Notes (expand)</h3></summary>
+<summary><h3>🧭 Widgets in notes (expand)</h3></summary>
 
 ### Dashboard
 
-Insert a code block into any note — get a widget panel (tasks / habits / goals):
+Insert this code block into any note to add a widget panel (tasks / habits / goals):
 
 ````markdown
 ```dashboard
 ```
 ````
 
-Or right-click on the page → **"Insert dashboard"**.
+Or right-click the page and select **“Insert Dashboard”**.
 
-Dashboard widgets (tasks / habits / goals) are configured in *Settings → Dashboard*.
+Dashboard widgets (tasks / habits / goals) can be configured in *Settings → Dashboard*.
 
 ### Greeting
 
-Insert a greeting with quick navigation, note search, and weight input:
+Insert a greeting with quick navigation, note search, and weight entry:
 
 ````markdown
 ```hello
 ```
 ````
 
-Or right-click on the page → **"Insert greeting"**.
+Or right-click the page and select **“Insert Greeting”**.
 
-In the greeting, you can show quick weight input and note search — both toggled in *Settings → Dashboard → Greeting Buttons*. The order of navigation buttons is configurable.
+Quick weight entry and note search can be shown in the greeting and toggled under *Settings → Dashboard → Greeting Buttons*. You can also customize the order of navigation buttons.
 
 </details>
 
 ---
 
-## 🐛 Issues & Bug Reports
+## 🐛 Issues and bug reports
 
-Found a bug or have a feature suggestion? Open an issue on GitHub:
+Found a bug or have a feature request? Open an issue on GitHub:
 
-**[Open Issue](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/issues)**
+**[Open an Issue](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/issues)**
 
 When reporting a bug, please include:
 
@@ -301,18 +305,18 @@ When reporting a bug, please include:
 - Plugin version
 - Steps to reproduce
 - Expected and actual behavior
-- Console errors (if any): *Ctrl+Shift+I → Console tab*
+- Console errors, if any: *Ctrl+Shift+I → Console tab*
 
 ---
 
-## Credits & License
+## Credits and license
 
-The project is based on [obsidian-calendar-plugin](https://github.com/liamcain/obsidian-calendar-plugin) by [Liam Cain](https://github.com/liamcain) (MIT) and significantly extended.
+This project is based on [obsidian-calendar-plugin](https://github.com/liamcain/obsidian-calendar-plugin) by [Liam Cain](https://github.com/liamcain) (MIT) and has been significantly expanded.
 
-Third-party libraries included in `main.js` are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Third-party libraries bundled in `main.js` are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 <div align="center">
-  <sub>Crafted with attention to detail for the Obsidian community</sub><br>
+  <sub>Made with attention to detail for the Obsidian community</sub><br>
   <sub>Author: <a href="https://github.com/AtinsS">@AtinsS</a></sub><br>
   <sub>License: <a href="https://opensource.org/licenses/MIT">MIT</a></sub>
 </div>
