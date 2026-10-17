@@ -12533,24 +12533,39 @@ input.ai-task-time-input.ai-task-time-input {
 
 .ai-analysis-stream {
   max-height: 140px;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 10px 12px;
-  font-family: var(--font-monospace);
-  font-size: 11px;
-  line-height: 1.5;
   color: rgba(220, 230, 240, 0.8);
-  white-space: pre-wrap;
-  word-break: break-word;
   position: relative;
   min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.ai-analysis-stream:not(:empty)::after {
-  content: "в– ";
-  display: inline-block;
-  margin-left: 1px;
-  color: #5f99e1;
-  animation: ai-caret 0.9s steps(1) infinite;
+/* Empty result: AI found no tasks — red panel, no loader */
+.ai-analysis-panel.ai-analysis-empty {
+  border-color: rgba(255, 82, 82, 0.55);
+  background: rgba(255, 82, 82, 0.12);
+  box-shadow:
+    0 0 0 1px rgba(255, 82, 82, 0.12),
+    0 2px 12px rgba(255, 82, 82, 0.12);
+}
+
+.ai-analysis-panel.ai-analysis-empty .ai-analysis-header {
+  border-bottom-color: rgba(255, 82, 82, 0.2);
+  background: rgba(255, 82, 82, 0.12);
+}
+
+.ai-analysis-panel.ai-analysis-empty .ai-analysis-label {
+  color: #ff8a80;
+}
+
+.ai-analysis-panel.ai-analysis-empty .ai-analysis-stream {
+  min-height: 0;
+  padding: 8px 12px 12px;
+  color: #ff8a80;
+  font-size: 12.5px;
 }
 
 @keyframes ai-caret {
@@ -12913,6 +12928,38 @@ input.ai-task-time-input.ai-task-time-input {
   min-height: 0;
 }
 
+/* Detached chat window (popout leaf) — fill the pane */
+.ai-ask-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 12px 14px 10px;
+  overflow: hidden;
+}
+
+.ai-ask-view .ai-ask-window {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+.ai-ask-view .ai-ask-messages {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+}
+
+.ai-ask-view .ai-ask-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 2px 2px;
+}
+
+.ai-ask-view .ai-ask-bar-btn {
+  flex: 0 0 auto;
+}
+
 .ai-ask-head {
   display: flex;
   align-items: center;
@@ -13180,22 +13227,68 @@ input.ai-task-time-input.ai-task-time-input {
   height: 4px;
 }
 
-.ai-ask-msg-typing {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px 2px;
-  color: var(--text-faint);
-  letter-spacing: 0.18em;
-  animation: ai-ask-pulse 1.1s ease-in-out infinite;
+/* AI loading spinner — two orbital rings in theme accent colors */
+.ai-typing-loader {
+  --color-1: var(--mcp-accent, var(--accent-color, var(--interactive-accent, #7c5cfc)));
+  --color-2: color-mix(in srgb, var(--mcp-accent, var(--accent-color, var(--interactive-accent, #7c5cfc))) 55%, #fff);
+  --size: 1px;
+
+  position: relative;
+  display: inline-block;
+  margin: 8px 4px;
+  transform: rotateZ(45deg);
+  perspective: calc(1000 * var(--size));
+  border-radius: 50%;
+  width: calc(48 * var(--size));
+  height: calc(48 * var(--size));
+  color: var(--color-1);
 }
 
-@keyframes ai-ask-pulse {
+.ai-typing-loader:before,
+.ai-typing-loader:after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: inherit;
+  height: inherit;
+  border-radius: 50%;
+  transform: rotateX(70deg);
+  animation: 1s ai-typing-spin linear infinite;
+}
+
+.ai-typing-loader:after {
+  color: var(--color-2);
+  transform: rotateY(70deg);
+  animation-delay: 0.4s;
+}
+
+@keyframes ai-typing-spin {
   0%,
   100% {
-    opacity: 0.35;
+    box-shadow: 0.2em 0 0 0 currentcolor;
+  }
+  12% {
+    box-shadow: 0.2em 0.2em 0 0 currentcolor;
+  }
+  25% {
+    box-shadow: 0 0.2em 0 0 currentcolor;
+  }
+  37% {
+    box-shadow: -0.2em 0.2em 0 0 currentcolor;
   }
   50% {
-    opacity: 1;
+    box-shadow: -0.2em 0 0 0 currentcolor;
+  }
+  62% {
+    box-shadow: -0.2em -0.2em 0 0 currentcolor;
+  }
+  75% {
+    box-shadow: 0 -0.2em 0 0 currentcolor;
+  }
+  87% {
+    box-shadow: 0.2em -0.2em 0 0 currentcolor;
   }
 }
 
@@ -13251,10 +13344,25 @@ input.ai-task-time-input.ai-task-time-input {
   .ai-ask-msg {
     animation: none;
   }
-  .ai-ask-msg-typing {
-    animation: none;
+  .ai-typing-loader {
     opacity: 0.7;
   }
+  .ai-typing-loader:before,
+  .ai-typing-loader:after {
+    animation: none;
+  }
+}
+
+.ai-summary-typing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 160px;
+  padding: 16px;
+}
+
+.ai-summary-typing.ai-hidden {
+  display: none;
 }
 
 .ai-summary-sources {

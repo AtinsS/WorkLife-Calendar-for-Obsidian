@@ -2,6 +2,7 @@ import type { App } from "obsidian";
 import { Notice, normalizePath, TFile } from "obsidian";
 import { CustomModal } from "../ui/CustomModal";
 import { renderMarkdown, appendMarkdownToNote, datedNotePath } from "../ui/markdown";
+import { showTypingDots } from "../ui/typingDots";
 import { tRaw } from "../i18n";
 import {
   forecastBalance,
@@ -30,7 +31,6 @@ export class AIFinanceModal extends CustomModal {
   private streamEl: HTMLElement | null = null;
   private suggestion: DistributionSuggestion | null = null;
   private forecastText = "";
-  private lastPaint = 0;
 
   constructor(app: App, mode: AIFinanceMode, cb: AIFinanceCallbacks) {
     super(app);
@@ -173,6 +173,8 @@ export class AIFinanceModal extends CustomModal {
     box.querySelectorAll(".aif-stream, .ai-finance-stream, .aif-result-actions, .ai-finance-apply, .ai-finance-note-btn").forEach((el) => el.remove());
     const out = box.createDiv({ cls: "ai-finance-stream ai-md aif-stream" });
     this.streamEl = out;
+    // Animation only while generating — full text is painted when the run ends
+    showTypingDots(out);
     return out;
   }
 
@@ -191,15 +193,11 @@ export class AIFinanceModal extends CustomModal {
     this.setBusy(true);
     this.abort = new AbortController();
     this.forecastText = "";
-    this.setStatus(tRaw("ai.finance.working"), false, true);
+    this.setStatus("");
     const out = this.beginStream(box);
     try {
       await forecastBalance(this.cb.getSummary(), this.abort.signal, (full) => {
         this.forecastText = full;
-        const now = Date.now();
-        if (now - this.lastPaint < 40) return;
-        this.lastPaint = now;
-        this.paintMarkdown(out, full);
       });
       this.paintMarkdown(out, this.forecastText.trim());
       this.setStatus("");
@@ -220,7 +218,7 @@ export class AIFinanceModal extends CustomModal {
     if (!box) return;
     this.setBusy(true);
     this.abort = new AbortController();
-    this.setStatus(tRaw("ai.finance.working"), false, true);
+    this.setStatus("");
     try {
       this.suggestion = await suggestDistribution(this.cb.getSummary(), this.abort.signal);
       this.setStatus("");

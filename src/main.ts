@@ -20,6 +20,7 @@ import {
   VIEW_TYPE_KANBAN,
   VIEW_TYPE_HABIT_PANEL,
   VIEW_TYPE_WEATHER_DETAIL,
+  VIEW_TYPE_AI_ASK,
 } from "./constants";
 import { settings } from "./ui/stores";
 import { installKeyboardOpenWatcher } from "./ui/keyboardViewport";
@@ -43,6 +44,7 @@ import FinancialAnalyticsView from "./views/FinancialAnalyticsView";
 import KanbanView from "./views/KanbanView";
 import HabitPanelView from "./views/HabitPanelView";
 import WeatherDetailView from "./views/WeatherDetailView";
+import AIAskView from "./views/AIAskView";
 import { initTaskStores, reloadTaskStores, immediateSave as immediateTaskSave } from "./task-tracker/stores";
 import { cleanupTimers } from "./task-tracker/TimerManager";
 import { initHabitStores, reloadHabitStores, immediateSave as immediateHabitSave } from "./habit-tracker/stores";
@@ -318,6 +320,11 @@ export default class CalendarPlugin extends Plugin {
     safeRegisterView(
       VIEW_TYPE_WEATHER_DETAIL,
       (leaf: WorkspaceLeaf) => new WeatherDetailView(leaf, this)
+    );
+
+    safeRegisterView(
+      VIEW_TYPE_AI_ASK,
+      (leaf: WorkspaceLeaf) => new AIAskView(leaf)
     );
 
     this.addCommand({

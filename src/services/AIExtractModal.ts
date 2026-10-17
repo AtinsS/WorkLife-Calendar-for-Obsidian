@@ -6,6 +6,7 @@ import {
   CustomModal,
   guardTyping,
 } from "../ui/CustomModal";
+import { showTypingDots } from "../ui/typingDots";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { tRaw } from "../i18n";
 import { errorMessage } from "../utils/sanitize";
@@ -172,7 +173,7 @@ export class AIExtractModal extends CustomModal {
   private setAnalyzing(active: boolean, label?: string): void {
     this.isAnalyzing = active;
     if (active) {
-      this.analysisPanelEl?.removeClass("ai-hidden");
+      this.analysisPanelEl?.removeClass("ai-hidden", "ai-analysis-empty");
       this.analysisPanelEl?.addClass("ai-analysis-active");
       this.analysisSpinnerEl?.removeClass("ai-hidden");
       const labelEl = this.analysisPanelEl?.querySelector(".ai-analysis-label");
@@ -215,20 +216,29 @@ export class AIExtractModal extends CustomModal {
     }
   }
 
-  private appendStreamDelta(delta: string): void {
-    if (!this.analysisStreamEl) return;
-    // Keep the raw model stream visible with a soft typing feel
-    this.analysisStreamEl.textContent = (this.analysisStreamEl.textContent ?? "") + delta;
-    this.analysisStreamEl.scrollTop = this.analysisStreamEl.scrollHeight;
-  }
-
   private resetAnalysisStream(): void {
-    if (this.analysisStreamEl) this.analysisStreamEl.textContent = "";
+    if (this.analysisStreamEl) {
+      this.analysisStreamEl.textContent = "";
+      showTypingDots(this.analysisStreamEl);
+    }
     if (this.analysisPanelEl) this.analysisPanelEl.removeClass("ai-hidden");
   }
 
   private hideAnalysisPanel(): void {
     if (this.analysisPanelEl) this.analysisPanelEl.addClass("ai-hidden");
+  }
+
+  /** Empty result: red panel, no loader — only the "not found" message. */
+  private showNoTasksResult(): void {
+    if (this.analysisStreamEl) this.analysisStreamEl.empty();
+    this.analysisSpinnerEl?.addClass("ai-hidden");
+    if (this.analysisPanelEl) {
+      this.analysisPanelEl.removeClass("ai-analysis-active");
+      this.analysisPanelEl.addClass("ai-analysis-empty");
+      this.analysisPanelEl.removeClass("ai-hidden");
+    }
+    const labelEl = this.analysisPanelEl?.querySelector(".ai-analysis-label");
+    if (labelEl) labelEl.textContent = tRaw("ai.noTasksHint");
   }
 
   private async runExtraction(): Promise<void> {
@@ -261,7 +271,6 @@ export class AIExtractModal extends CustomModal {
         contextSize,
         {
           signal: this.extractAbort.signal,
-          onDelta: (delta) => this.appendStreamDelta(delta),
           onProgress: (stage) => {
             if (stage === "connecting") {
               this.setAnalyzing(true, tRaw("ai.stages.connecting"));
@@ -281,6 +290,7 @@ export class AIExtractModal extends CustomModal {
       if (this.tasks.length === 0) {
         this.askReady = false;
         this.setAnalyzing(false);
+        this.showNoTasksResult();
         this.showStatus(tRaw("ai.noTasksHint"), "info");
         return;
       }

@@ -777,7 +777,6 @@ export class TaskModal extends CustomModal {
       deadline: this.deadlineDateUID || undefined,
       deadlineTime: this.deadlineTime || undefined,
     };
-    console.debug("[TaskModal] submitData:", JSON.stringify(submitData));
     const subtasks = this.subtaskTitles.map((t) => t.trim()).filter(Boolean);
     if (this.task) {
       this.onSubmit(submitData);

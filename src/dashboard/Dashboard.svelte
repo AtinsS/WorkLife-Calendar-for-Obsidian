@@ -1402,12 +1402,6 @@
     gap: 10px;
   }
 
-  .dash-popup__label--half {
-    flex: 1;
-    min-width: 0;
-    margin-bottom: 12px;
-  }
-
   .dash-popup__input {
     padding: 8px 12px;
     border: 1px solid var(--background-modifier-border);

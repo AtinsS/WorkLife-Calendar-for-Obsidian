@@ -7,6 +7,7 @@ import { get } from "svelte/store";
 import { streamOllamaChat, resolveModel } from "./OllamaService";
 import { errorMessage } from "../utils/sanitize";
 import { renderMarkdown } from "../ui/markdown";
+import { showTypingDots } from "../ui/typingDots";
 import {
   buildSummarySystem,
   normalizeSummaryStyle,
@@ -71,6 +72,7 @@ export class AISummaryModal extends CustomModal {
   private titleEl: HTMLInputElement | null = null;
   private textareaEl: HTMLTextAreaElement | null = null;
   private previewEl: HTMLElement | null = null;
+  private typingHostEl: HTMLElement | null = null;
   private modeBtn: HTMLButtonElement | null = null;
   private statusEl: HTMLElement | null = null;
   private progressEl: HTMLElement | null = null;
@@ -199,6 +201,7 @@ export class AISummaryModal extends CustomModal {
       this.syncCreateBtn();
     });
     this.previewEl = scanShell.createDiv({ cls: "ai-summary-preview ai-hidden" });
+    this.typingHostEl = scanShell.createDiv({ cls: "ai-summary-typing ai-hidden" });
 
     const footer = this.contentEl.createDiv({ cls: "ai-summary-footer" });
     this.modeBtn = footer.createEl("button", {
@@ -235,6 +238,7 @@ export class AISummaryModal extends CustomModal {
     this.titleEl = null;
     this.textareaEl = null;
     this.previewEl = null;
+    this.typingHostEl = null;
     this.modeBtn = null;
     this.statusEl = null;
     this.progressEl = null;
@@ -361,7 +365,7 @@ export class AISummaryModal extends CustomModal {
       this.setProgress(null);
 
       const notes = await this.readSources();
-      this.setStatus(tRaw("ai.summaryStreaming"), false, true);
+      this.setStatus("", false, true);
       this.setProgress(0);
 
       const system = buildSummarySystem({
@@ -370,8 +374,13 @@ export class AISummaryModal extends CustomModal {
         customStyle: this.customStyle,
       });
       const expectedChars = 1200;
-      let lastPaint = 0;
       let chars = 0;
+
+      // Animation only while generating — text appears when the run finishes
+      this.textareaEl?.addClass("ai-hidden");
+      this.previewEl?.addClass("ai-hidden");
+      this.typingHostEl?.removeClass("ai-hidden");
+      if (this.typingHostEl) showTypingDots(this.typingHostEl);
 
       const result = await streamOllamaChat(
         opts.ollamaUrl || "http://localhost:11434",
@@ -390,32 +399,17 @@ export class AISummaryModal extends CustomModal {
         {
           signal: this.abort.signal,
           temperature: 0.3,
-          onProgress: () => {
-            this.setStatus(tRaw("ai.summaryStreaming"), false, true);
-          },
           onDelta: (full) => {
             chars = full.length;
-            const now = Date.now();
-            // Paint often for a "typing" feel, but not every token
-            if (now - lastPaint < 40) return;
-            lastPaint = now;
-            this.summaryText = full;
-            if (this.textareaEl) {
-              this.textareaEl.value = full;
-              this.textareaEl.scrollTop = this.textareaEl.scrollHeight;
-            }
             this.setProgress(Math.min(0.92, chars / expectedChars));
-            this.setStatus(
-              `${tRaw("ai.summaryStreaming")} · ${chars}`,
-              false,
-              true,
-            );
           },
         },
       );
 
       this.summaryText = result.trim();
+      this.typingHostEl?.addClass("ai-hidden");
       if (this.textareaEl) {
+        this.textareaEl.removeClass("ai-hidden");
         this.textareaEl.value = this.summaryText;
         this.textareaEl.scrollTop = this.textareaEl.scrollHeight;
       }
@@ -437,6 +431,8 @@ export class AISummaryModal extends CustomModal {
     } catch (e) {
       const msg = errorMessage(e);
       this.clearProgress();
+      this.typingHostEl?.addClass("ai-hidden");
+      this.textareaEl?.removeClass("ai-hidden");
       if (msg.includes("aborted") || this.abort?.signal.aborted) {
         this.setStatus(tRaw("ai.summaryCancelled"));
       } else {
@@ -445,6 +441,7 @@ export class AISummaryModal extends CustomModal {
     } finally {
       this.isGenerating = false;
       this.contentEl.removeClass("scanning");
+      this.typingHostEl?.addClass("ai-hidden");
       if (this.generateBtn) this.generateBtn.disabled = false;
       this.syncCreateBtn();
       this.abort = null;

@@ -2,6 +2,7 @@ import type { App } from "obsidian";
 import { Notice, normalizePath, TFile as TFileClass } from "obsidian";
 import { get } from "svelte/store";
 import { CustomModal } from "../ui/CustomModal";
+import { showTypingDots } from "../ui/typingDots";
 import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
 import { tasks } from "../task-tracker/stores";
@@ -520,6 +521,13 @@ export class AIScheduleModal extends CustomModal {
     });
   }
 
+  /** Thinking dots while the model runs — full text appears only when done. */
+  private renderTyping(): void {
+    const el = this.outputEl;
+    if (!el) return;
+    showTypingDots(el);
+  }
+
   /** Analyze vs command: panels + which footer buttons make sense. */
   private setMode(mode: UIMode): void {
     if (this.mode === mode) return;
@@ -916,12 +924,11 @@ export class AIScheduleModal extends CustomModal {
     if (this.runBtn) this.runBtn.disabled = true;
     if (this.stopBtn) this.stopBtn.disabled = false;
     this.syncFooter();
-    this.setStatus(tRaw("schedule.aiWorking"), "busy");
+    this.setStatus("");
     this.setScanning(true);
-    this.renderOutput("");
+    this.renderTyping();
 
     const lang = tRaw("locale.momentLocale") === "ru" ? "ru" : "en";
-    let lastPaint = 0;
 
     try {
       const result = await streamOllamaChat(
@@ -935,13 +942,8 @@ export class AIScheduleModal extends CustomModal {
           signal: this.abort.signal,
           temperature: 0.3,
           onDelta: (full) => {
-            const now = Date.now();
-            if (now - lastPaint < 40) return;
-            lastPaint = now;
             this.resultText = full;
             this.analysisText = full;
-            this.renderOutput(full);
-            this.setStatus(`${tRaw("schedule.aiWorking")} · ${full.length}`, "busy");
           },
         },
       );
@@ -953,10 +955,12 @@ export class AIScheduleModal extends CustomModal {
     } catch (e) {
       if ((e as Error)?.name === "AbortError") {
         this.setStatus(tRaw("ai.summaryCancelled"));
+        this.renderEmptyState();
       } else {
         const msg = errorMessage(e);
         this.setStatus(tRaw("ai.error", { error: msg }), "error");
         new Notice(tRaw("ai.error", { error: msg }));
+        this.renderEmptyState();
       }
     } finally {
       this.isRunning = false;
@@ -996,6 +1000,7 @@ export class AIScheduleModal extends CustomModal {
     if (this.applyRecsBtn) this.applyRecsBtn.disabled = true;
     this.setStatus(tRaw("schedule.aiOpsPlanning"), "busy");
     this.setScanning(true);
+    this.renderTyping();
 
     try {
       const raw = await streamOllamaChat(
@@ -1028,10 +1033,12 @@ export class AIScheduleModal extends CustomModal {
     } catch (e) {
       if ((e as Error)?.name === "AbortError") {
         this.setStatus(tRaw("ai.summaryCancelled"));
+        this.renderEmptyState();
       } else {
         const msg = errorMessage(e);
         this.setStatus(tRaw("ai.error", { error: msg }), "error");
         new Notice(tRaw("ai.error", { error: msg }));
+        this.renderEmptyState();
       }
     } finally {
       this.isRunning = false;
@@ -1079,7 +1086,7 @@ export class AIScheduleModal extends CustomModal {
     this.showingOps = false;
     this.setStatus(tRaw("schedule.aiOpsPlanning"), "busy");
     this.setScanning(true);
-    this.renderOutput("");
+    this.renderTyping();
     this.syncFooter();
 
     try {
@@ -1117,10 +1124,12 @@ export class AIScheduleModal extends CustomModal {
     } catch (e) {
       if ((e as Error)?.name === "AbortError") {
         this.setStatus(tRaw("ai.summaryCancelled"));
+        this.renderEmptyState();
       } else {
         const msg = errorMessage(e);
         this.setStatus(tRaw("ai.error", { error: msg }), "error");
         new Notice(tRaw("ai.error", { error: msg }));
+        this.renderEmptyState();
       }
     } finally {
       this.isRunning = false;

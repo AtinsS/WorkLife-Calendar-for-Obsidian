@@ -141,9 +141,8 @@ export class AIExpenseParseModal extends CustomModal {
     this.abort = new AbortController();
     if (this.runBtn) {
       this.runBtn.disabled = true;
-      this.runBtn.textContent = tRaw("ai.finance.working");
     }
-    this.setStatus(tRaw("ai.finance.working"), false, true);
+    this.setStatus("");
     try {
       this.parsed = await parseExpensesFromText(
         text,
