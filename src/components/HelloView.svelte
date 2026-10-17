@@ -246,7 +246,8 @@
   $: dayNames = $tArray("common.weekdays.long");
   $: monthName = monthNames[now.month()] || "";
   $: year = now.format("YYYY");
-  $: dateDisplay = `${now.date()} ${monthName} ${year}, ${dayNames[now.day()] || ""}`;
+  // moment day(): 0=Sun..6=Sat; weekdays.long is Monday-first → shift by +6
+  $: dateDisplay = `${now.date()} ${monthName} ${year}, ${dayNames[(now.day() + 6) % 7] || ""}`;
 
   // Weather animation class
   $: weatherAnim = (() => {
