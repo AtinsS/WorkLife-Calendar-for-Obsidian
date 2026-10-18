@@ -43,6 +43,12 @@ export interface ISettings {
 
   // Hello view settings
   userName?: string;
+  /** How the AI assistant is named in chat / prompts */
+  aiName?: string;
+  /** Free-form info about the user for AI context */
+  userAbout?: string;
+  /** How the AI should talk to the user (tone / style rules) */
+  aiTone?: string;
   helloShowTasksBtn?: boolean;
   helloShowAnalyticsBtn?: boolean;
   helloShowFinanceBtn?: boolean;
@@ -91,6 +97,8 @@ export interface ISettings {
   ntfyDailyDigestEnabled: boolean;
   /** Digest delivery time, "HH:mm". Default 06:00. */
   ntfyDigestTime: string;
+  /** Send the digest as a delayed ntfy push (arrives even if Obsidian is closed). */
+  ntfyDigestDelayed?: boolean;
 
   /** Daily GitHub release check → notice when plugin update is available */
   checkPluginUpdates: boolean;
@@ -120,6 +128,16 @@ export interface ISettings {
   accentColor?: string;
   glassBgColor?: string;
   glassOpacity?: number;
+  /** Panel corner radius in px (maps --mcp-radius*) */
+  panelRadius?: number;
+  /** Backdrop blur in px (maps --mcp-blur) */
+  panelBlur?: number;
+  /** Extra panel padding scale: 0 = compact, 100 = airy */
+  panelDensity?: number;
+  /** Chat bubble background (user) */
+  chatUserBg?: string;
+  /** Chat bubble background (assistant) */
+  chatBotBg?: string;
 
   // Overdue task carry-over
   carryOverOverdue?: boolean;
@@ -175,6 +193,8 @@ export interface ISettings {
   ollamaContextSize: number;
   /** Извлечение задач из заметок (ПКМ → заметка) */
   aiExtractEnabled: boolean;
+  /** Живой чат «Задать вопрос ИИ» */
+  aiChatEnabled?: boolean;
   /** Саммари заметок (ПКМ → папка / выделение) */
   aiSummaryEnabled: boolean;
   /** Разбить задачу на подзадачи (ПКМ → задача) */
@@ -253,6 +273,7 @@ export const defaultSettings = Object.freeze({
   ntfyScheduledEnabled: false,
   ntfyDailyDigestEnabled: false,
   ntfyDigestTime: "06:00",
+  ntfyDigestDelayed: true,
 
   checkPluginUpdates: true,
 
@@ -267,6 +288,11 @@ export const defaultSettings = Object.freeze({
   accentColor: "#5f99e1",
   glassBgColor: "#1e2332",
   glassOpacity: 55,
+  panelRadius: 16,
+  panelBlur: 0,
+  panelDensity: 50,
+  chatUserBg: "#16161f",
+  chatBotBg: "#22222b",
 
   carryOverOverdue: true,
   autoStartTimerOnWork: true,
@@ -312,6 +338,7 @@ export const defaultSettings = Object.freeze({
   ollamaModelExtract: "",
   ollamaContextSize: 0,
   aiExtractEnabled: true,
+  aiChatEnabled: true,
   aiSummaryEnabled: true,
   aiSubtasksEnabled: true,
   aiScheduleActionsEnabled: true,
@@ -363,6 +390,45 @@ export function applyGlassBgColor(hex: string, opacity?: number): void {
     "--mcp-glass-highlight",
     `rgba(${r + 5}, ${g + 5}, ${b + 5}, ${Math.max(0.01, alpha * 0.05)})`,
   );
+}
+
+/** Panel shape: radius / blur / density — applied to every glass panel & modal. */
+export function applyPanelShape(options: {
+  panelRadius?: number;
+  panelBlur?: number;
+  panelDensity?: number;
+}): void {
+  const root = document.documentElement;
+  const radius = options.panelRadius ?? 16;
+  const blur = options.panelBlur ?? 0;
+  const density = options.panelDensity ?? 50;
+
+  root.style.setProperty("--mcp-radius", `${radius}px`);
+  root.style.setProperty("--mcp-radius-lg", `${Math.round(radius * 1.25)}px`);
+  root.style.setProperty("--mcp-radius-sm", `${Math.max(4, Math.round(radius * 0.75))}px`);
+  root.style.setProperty("--mcp-blur", blur > 0 ? `blur(${blur}px)` : "blur(0px)");
+  // Density 0..100 → padding scale 0.75..1.35 used by panel CSS
+  const padScale = 0.75 + (density / 100) * 0.6;
+  root.style.setProperty("--mcp-panel-pad-scale", String(Number(padScale.toFixed(2))));
+}
+
+/** Chat bubble backgrounds — hex → rgba vars used by .ai-ask-msg-body. */
+export function applyChatBubbleColors(userBg?: string, botBg?: string): void {
+  const root = document.documentElement;
+  const rgb = (hex: string): string => {
+    const h = hex.replace("#", "");
+    return `${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)}`;
+  };
+  if (userBg) {
+    const c = rgb(userBg);
+    root.style.setProperty("--mcp-chat-user-bg", `rgba(${c}, 0.92)`);
+    root.style.setProperty("--mcp-chat-user-border", `rgba(${c}, 1)`);
+  }
+  if (botBg) {
+    const c = rgb(botBg);
+    root.style.setProperty("--mcp-chat-bot-bg", `rgba(${c}, 0.88)`);
+    root.style.setProperty("--mcp-chat-bot-border", `rgba(${c}, 1)`);
+  }
 }
 
 export function applyAllColors(options: ISettings): void {
@@ -765,6 +831,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     });
     this.addAccentColorSetting(quick);
     this.addGlassBgColorSetting(quick);
+    this.addPanelShapeSettings(quick);
 
     const advanced = this.section(appearance, {
       title: tRaw("settings.appearance.sectionAdvanced"),
@@ -1319,6 +1386,95 @@ export class CalendarSettingsTab extends PluginSettingTab {
     }
   }
 
+  addPanelShapeSettings(container: HTMLElement): void {
+    const opts = this.plugin.options;
+    const radius = opts.panelRadius ?? 16;
+    const blur = opts.panelBlur ?? 0;
+    const density = opts.panelDensity ?? 50;
+
+    // ── Corner radius ──
+    new Setting(container)
+      .setName(`${tRaw("settings.appearance.panelRadius")} · ${radius}px`)
+      .setDesc(tRaw("settings.appearance.panelRadiusDesc"))
+      .addSlider((slider) => {
+        slider
+          .setLimits(0, 28, 2)
+          .setValue(radius)
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ panelRadius: value });
+            applyPanelShape({
+              panelRadius: value,
+              panelBlur: this.plugin.options.panelBlur,
+              panelDensity: this.plugin.options.panelDensity,
+            });
+            slider.sliderEl
+              .closest(".setting-item")
+              ?.querySelector(".setting-item-name")
+              ?.setText(`${tRaw("settings.appearance.panelRadius")} · ${value}px`);
+          });
+      });
+
+    // ── Blur ──
+    new Setting(container)
+      .setName(`${tRaw("settings.appearance.panelBlur")} · ${blur}px`)
+      .setDesc(tRaw("settings.appearance.panelBlurDesc"))
+      .addSlider((slider) => {
+        slider
+          .setLimits(0, 30, 2)
+          .setValue(blur)
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ panelBlur: value });
+            applyPanelShape({
+              panelRadius: this.plugin.options.panelRadius,
+              panelBlur: value,
+              panelDensity: this.plugin.options.panelDensity,
+            });
+            slider.sliderEl
+              .closest(".setting-item")
+              ?.querySelector(".setting-item-name")
+              ?.setText(`${tRaw("settings.appearance.panelBlur")} · ${value}px`);
+          });
+      });
+
+    // ── Density ──
+    new Setting(container)
+      .setName(`${tRaw("settings.appearance.panelDensity")} · ${density}`)
+      .setDesc(tRaw("settings.appearance.panelDensityDesc"))
+      .addSlider((slider) => {
+        slider
+          .setLimits(0, 100, 10)
+          .setValue(density)
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ panelDensity: value });
+            applyPanelShape({
+              panelRadius: this.plugin.options.panelRadius,
+              panelBlur: this.plugin.options.panelBlur,
+              panelDensity: value,
+            });
+            slider.sliderEl
+              .closest(".setting-item")
+              ?.querySelector(".setting-item-name")
+              ?.setText(`${tRaw("settings.appearance.panelDensity")} · ${value}`);
+          });
+      });
+
+    // Reset shape to defaults
+    new Setting(container)
+      .setName(tRaw("settings.appearance.resetShape"))
+      .setDesc(tRaw("settings.appearance.resetShapeDesc"))
+      .addButton((btn) =>
+        btn.setButtonText(tRaw("common.reset")).onClick(async () => {
+          await this.plugin.writeOptions({
+            panelRadius: 16,
+            panelBlur: 0,
+            panelDensity: 50,
+          });
+          applyPanelShape({ panelRadius: 16, panelBlur: 0, panelDensity: 50 });
+          this.softRefresh();
+        }),
+      );
+  }
+
   addAccentColorSetting(container: HTMLElement): void {
     const currentColor = this.plugin.options.accentColor || "#5f99e1";
 
@@ -1341,7 +1497,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           const defaultColor = "#5f99e1";
           await this.plugin.writeOptions({ accentColor: defaultColor });
           applyAccentColor(defaultColor);
-          this.render();
+          this.softRefresh();
         }),
     );
   }
@@ -1371,12 +1527,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
             glassOpacity: 55,
           });
           applyGlassBgColor(defaultColor, 55);
-          this.render();
+          this.softRefresh();
         }),
     );
 
     new Setting(container)
-      .setName(tRaw("settings.appearance.glassOpacity"))
+      .setName(`${tRaw("settings.appearance.glassOpacity")} · ${currentOpacity}%`)
       .setDesc(tRaw("settings.appearance.glassOpacityDesc", { value: currentOpacity }))
       .addSlider((slider) => {
         slider
@@ -1388,9 +1544,11 @@ export class CalendarSettingsTab extends PluginSettingTab {
               this.plugin.options.glassBgColor || "#1e2332",
               value,
             );
-            // Update description with current value
-            slider.sliderEl
-              .closest(".setting-item")
+            const item = slider.sliderEl.closest(".setting-item");
+            item
+              ?.querySelector(".setting-item-name")
+              ?.setText(`${tRaw("settings.appearance.glassOpacity")} · ${value}%`);
+            item
               ?.querySelector(".setting-item-description")
               ?.setText(tRaw("settings.appearance.glassOpacityDesc", { value }));
           });
@@ -2088,9 +2246,22 @@ export class CalendarSettingsTab extends PluginSettingTab {
         toggle.onChange(async (value) => {
           await this.plugin.writeOptions({ ntfyDailyDigestEnabled: value });
           if (value) {
-            this.plugin.notificationService?.scheduleNtfyDailyDigest();
+            void this.plugin.notificationService?.scheduleNtfyDailyDigest();
           } else {
             this.plugin.notificationService?.cancelScheduledDigest();
+          }
+        });
+      });
+
+    new Setting(ntfy)
+      .setName(tRaw("settings.notifications.ntfyDigestDelayed"))
+      .setDesc(tRaw("settings.notifications.ntfyDigestDelayedDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.ntfyDigestDelayed !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ ntfyDigestDelayed: value });
+          if (this.plugin.options.ntfyDailyDigestEnabled) {
+            void this.plugin.notificationService?.scheduleNtfyDailyDigest();
           }
         });
       });
@@ -2105,7 +2276,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
           const time = /^\d{2}:\d{2}$/.test(value) ? value : "06:00";
           await this.plugin.writeOptions({ ntfyDigestTime: time });
           if (this.plugin.options.ntfyDailyDigestEnabled) {
-            this.plugin.notificationService?.scheduleNtfyDailyDigest();
+            void this.plugin.notificationService?.scheduleNtfyDailyDigest();
           }
         });
       });
@@ -2428,6 +2599,43 @@ export class CalendarSettingsTab extends PluginSettingTab {
       this.note(actionsTasks, tRaw("settings.ai.quickAddHowTo"));
     }
 
+    // ── Chat ─────────────────────────────────────────────────────────────
+    const actionsChat = this.section(container, {
+      title: tRaw("settings.ai.sectionActionsChat"),
+      icon: "message-circle",
+    });
+    this.addCompactToggle(actionsChat, "aiChatEnabled", "chatEnabled", "chatEnabledDesc", {
+      onAfter: () => this.render(),
+    });
+    if (this.plugin.options.aiChatEnabled !== false) {
+      this.addChatSettings(actionsChat);
+    }
+
+    // Chat bubble colors — visible even when chat is off so appearance stays editable
+    new Setting(actionsChat)
+      .setName(tRaw("settings.ai.chatUserBg"))
+      .setDesc(tRaw("settings.ai.chatUserBgDesc"))
+      .addColorPicker((picker) => {
+        picker
+          .setValue(this.plugin.options.chatUserBg || "#16161f")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ chatUserBg: value });
+            applyChatBubbleColors(value, this.plugin.options.chatBotBg);
+          });
+      });
+
+    new Setting(actionsChat)
+      .setName(tRaw("settings.ai.chatBotBg"))
+      .setDesc(tRaw("settings.ai.chatBotBgDesc"))
+      .addColorPicker((picker) => {
+        picker
+          .setValue(this.plugin.options.chatBotBg || "#22222b")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ chatBotBg: value });
+            applyChatBubbleColors(this.plugin.options.chatUserBg, value);
+          });
+      });
+
     const actionsNotes = this.section(container, {
       title: tRaw("settings.ai.sectionActionsNotes"),
       icon: "file-text",
@@ -2521,14 +2729,13 @@ export class CalendarSettingsTab extends PluginSettingTab {
     const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     const privacy = this.section(container, {
       title: tRaw("settings.ai.sectionPrivacy"),
-      desc: tRaw("settings.ai.dataSentDesc"),
+      desc: isLocal ? undefined : tRaw("settings.ai.cloudWarningDesc"),
       icon: "shield",
       tone: isLocal ? "default" : "warning",
     });
+    this.note(privacy, `${tRaw("settings.ai.dataSentTitle")}: ${tRaw("settings.ai.dataSentDesc")}`);
     if (!isLocal) {
-      this.note(privacy, `${tRaw("settings.ai.cloudWarning")}: ${tRaw("settings.ai.cloudWarningDesc")}`);
-    } else {
-      this.note(privacy, tRaw("settings.ai.dataSentTitle") + ": " + tRaw("settings.ai.dataSentDesc"));
+      this.note(privacy, tRaw("settings.ai.cloudWarning"));
     }
 
     // ── 6. How-to ────────────────────────────────────────────────────────
@@ -2539,11 +2746,56 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.note(howToCard, tRaw("settings.ai.howToSteps"));
   }
 
+  /** Chat identity + tone — lives under AI settings (moved from General). */
+  private addChatSettings(container: HTMLElement): void {
+    new Setting(container)
+      .setName(tRaw("settings.general.aiName"))
+      .setDesc(tRaw("settings.general.aiNameDesc"))
+      .addText((text) => {
+        text
+          .setPlaceholder(tRaw("settings.general.aiNamePlaceholder"))
+          .setValue(this.plugin.options.aiName || "")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ aiName: value });
+          });
+        text.inputEl.addClass("mcp-input-lg");
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.general.userAbout"))
+      .setDesc(tRaw("settings.general.userAboutDesc"))
+      .addTextArea((area) => {
+        area
+          .setPlaceholder(tRaw("settings.general.userAboutPlaceholder"))
+          .setValue(this.plugin.options.userAbout || "")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ userAbout: value });
+          });
+        area.inputEl.rows = 3;
+        area.inputEl.addClass("mcp-input-lg");
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.general.aiTone"))
+      .setDesc(tRaw("settings.general.aiToneDesc"))
+      .addTextArea((area) => {
+        area
+          .setPlaceholder(tRaw("settings.general.aiTonePlaceholder"))
+          .setValue(this.plugin.options.aiTone || "")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ aiTone: value });
+          });
+        area.inputEl.rows = 3;
+        area.inputEl.addClass("mcp-input-lg");
+      });
+  }
+
   /** Small helper: toggle with short label, one-line desc. */
   private addCompactToggle(
     container: HTMLElement,
     key:
       | "aiExtractEnabled"
+      | "aiChatEnabled"
       | "aiSubtasksEnabled"
       | "aiWorkoutEnabled"
       | "aiQuickAddEnabled"

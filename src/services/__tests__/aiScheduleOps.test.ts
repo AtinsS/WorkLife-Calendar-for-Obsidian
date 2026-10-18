@@ -280,17 +280,27 @@ describe("resolveCreateTimes", () => {
     expect(r).toEqual({ scheduledTime: "10:00", endTime: "11:00", estimatedMinutes: 60 });
   });
 
-  it("picks free slot when no time given", () => {
+  it("leaves the task untimed when no time given", () => {
     const r = resolveCreateTimes({
       dateStr: "2026-07-16",
       estimatedMinutes: 60,
       busy,
     });
+    expect(r).toEqual({ scheduledTime: null, endTime: null, estimatedMinutes: 60 });
+  });
+
+  it("picks free slot when explicitly requested", () => {
+    const r = resolveCreateTimes({
+      dateStr: "2026-07-16",
+      estimatedMinutes: 60,
+      busy,
+      pickFreeSlot: true,
+    });
     expect(r).toEqual({ scheduledTime: "10:00", endTime: "11:00", estimatedMinutes: 60 });
   });
 });
 
-describe("create «Buy milk» next Thursday (1h) in a free slot", () => {
+describe("create «Buy milk» next Thursday (1h)", () => {
   /** Next Thursday on/after today (weekday 4). */
   function nextThursday(from = new Date()): string {
     const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
@@ -300,7 +310,7 @@ describe("create «Buy milk» next Thursday (1h) in a free slot", () => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
 
-  it("places a 60m task without overlap against existing blocks", () => {
+  it("creates an untimed task when no clock time is given", () => {
     const thu = nextThursday();
     tasks.set([
       makeTask({
@@ -319,7 +329,7 @@ describe("create «Buy milk» next Thursday (1h) in a free slot", () => {
       }),
     ]);
 
-    // Ops path: create without clock time — apply must pick a free hour
+    // Ops path: create without clock time — stays untimed (free slot only on request)
     applyScheduleOps([
       {
         type: "create",
@@ -334,6 +344,43 @@ describe("create «Buy milk» next Thursday (1h) in a free slot", () => {
     if (!created) return;
     expect(extractDateFromUID(created.dateUID)).toBe(thu);
     expect(created.estimatedTime).toBe(60);
+    expect(created.scheduledTime).toBeUndefined();
+    expect(created.endTime).toBeUndefined();
+  });
+
+  it("re-picks a free hour when the given time overlaps busy blocks", () => {
+    const thu = nextThursday();
+    tasks.set([
+      makeTask({
+        id: "busy1",
+        title: "Standup",
+        dateUID: `day-${thu}`,
+        scheduledTime: "09:00",
+        endTime: "10:00",
+      }),
+      makeTask({
+        id: "busy2",
+        title: "Call",
+        dateUID: `day-${thu}`,
+        scheduledTime: "11:30",
+        endTime: "12:30",
+      }),
+    ]);
+
+    applyScheduleOps([
+      {
+        type: "create",
+        title: "Купить молоко",
+        date: thu,
+        estimatedMinutes: 60,
+        scheduledTime: "09:30",
+        endTime: "10:30",
+      },
+    ]);
+
+    const created = get(tasks).find((t) => t.title === "Купить молоко");
+    expect(created).toBeTruthy();
+    if (!created) return;
     // 09:00–10:00 busy → next free snap is 10:00
     expect(created.scheduledTime).toBe("10:00");
     expect(created.endTime).toBe("11:00");

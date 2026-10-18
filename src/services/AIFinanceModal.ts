@@ -2,7 +2,7 @@ import type { App } from "obsidian";
 import { Notice, normalizePath, TFile } from "obsidian";
 import { CustomModal } from "../ui/CustomModal";
 import { renderMarkdown, appendMarkdownToNote, datedNotePath } from "../ui/markdown";
-import { showTypingDots } from "../ui/typingDots";
+import { mountTypingBlock } from "../ui/typingDots";
 import { tRaw } from "../i18n";
 import {
   forecastBalance,
@@ -28,6 +28,7 @@ export class AIFinanceModal extends CustomModal {
 
   private statusEl: HTMLElement | null = null;
   private resultEl: HTMLElement | null = null;
+  private modelCaptionEl: HTMLElement | null = null;
   private streamEl: HTMLElement | null = null;
   private suggestion: DistributionSuggestion | null = null;
   private forecastText = "";
@@ -110,6 +111,8 @@ export class AIFinanceModal extends CustomModal {
 
     this.statusEl = root.createDiv({ cls: "aif-status is-hidden" });
     this.statusEl.setCssStyles({ display: "none" });
+    // Model caption slot — sits ABOVE the answer field
+    this.modelCaptionEl = root.createDiv({ cls: "ai-model-caption-slot" });
     this.resultEl = root.createDiv({ cls: "aif-result" });
 
     if (this.mode === "forecast") this.renderForecast();
@@ -173,8 +176,8 @@ export class AIFinanceModal extends CustomModal {
     box.querySelectorAll(".aif-stream, .ai-finance-stream, .aif-result-actions, .ai-finance-apply, .ai-finance-note-btn").forEach((el) => el.remove());
     const out = box.createDiv({ cls: "ai-finance-stream ai-md aif-stream" });
     this.streamEl = out;
-    // Animation only while generating — full text is painted when the run ends
-    showTypingDots(out);
+    // Spinner centered in the field; model label lives ABOVE the field
+    mountTypingBlock(out, getFinanceAiConfig().model, this.modelCaptionEl);
     return out;
   }
 
@@ -218,12 +221,16 @@ export class AIFinanceModal extends CustomModal {
     if (!box) return;
     this.setBusy(true);
     this.abort = new AbortController();
-    this.setStatus("");
+    this.setStatus(tRaw("ai.finance.rulesHint"), false, true);
+    // Show typing animation while the model works (same as forecast)
+    this.beginStream(box);
     try {
       this.suggestion = await suggestDistribution(this.cb.getSummary(), this.abort.signal);
       this.setStatus("");
       this.paintRules();
     } catch {
+      this.streamEl = null;
+      box.querySelectorAll(".ai-finance-stream, .aif-stream").forEach((el) => el.remove());
       this.setStatus(tRaw("ai.finance.error"), true);
     } finally {
       this.setBusy(false);

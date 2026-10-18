@@ -33,6 +33,8 @@ export interface AiQuickTaskDraft {
   } | null;
   /** Checklist subtasks derived from nested bullets / explicit breakdown */
   subtasks?: string[] | null;
+  /** User explicitly asked to place the task into a free slot. */
+  pickFreeSlot?: boolean;
 }
 
 export interface AiQuickAddContext {
@@ -106,8 +108,9 @@ For each task detect:
 - title: short actionable title in the user's language. Strip dates, times, @project, priority markers, durations, "в заметке X" / [[X]], recurrence phrases. Keep the action verb/object. No trailing punctuation junk.
 - date: absolute YYYY-MM-DD when the user names a day (today/tomorrow/weekday/date), else null. "в понедельник" = next Monday on/after today.
 - scheduledTime / endTime: HH:MM (24h). Ranges "14-15", "14:00-15:00", "с 14 до 15" → both. "в 9" → 09:00. Else null.
-  When the user names a date but NO clock time, leave scheduledTime null (the app will place it in a free slot).
-  When the user gives a duration ("на 1 час") but no time, set estimatedMinutes and leave scheduledTime null.
+  When the user names a date but NO clock time, leave scheduledTime null. NEVER auto-place into a free slot.
+  Set pickFreeSlot=true ONLY when the user explicitly asks to pick a free slot («подбери свободный слот», "pick a free slot", «найди время»).
+  When the user gives a duration ("на 1 час") but no time, set estimatedMinutes and leave scheduledTime null (unless pickFreeSlot).
 - priority: high | medium | low. (! or !! = high, ~ = medium, - = low; also "важно/срочно/urgent" → high). Default medium.
 - projectName: match the user's @token to Known projects when possible; else the token after @; else null.
 - isWorkTask: true if work-related (созвон, встреча, отчёт, клиент, дедлайн, ТЗ, спринт, рабочий, работа, презентация, смета, invoice, meeting, report, client, deadline) OR if rate/payment is given
@@ -121,7 +124,7 @@ For each task detect:
 - subtasks: checklist items when the user nests bullets under a task, writes "steps:", "этапы:", "включает:", or clearly lists 2–6 concrete steps of one action. Each item is a short imperative string. Empty array when the task is atomic. Do NOT invent subtasks for simple one-shot tasks.
 
 Return shape:
-{"tasks":[{"title":"string","date":"YYYY-MM-DD|null","scheduledTime":"HH:MM|null","endTime":"HH:MM|null","priority":"medium","projectName":null,"isWorkTask":false,"noteName":null,"description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"rate":null,"paymentType":null,"recurrence":null,"subtasks":[]}]}
+{"tasks":[{"title":"string","date":"YYYY-MM-DD|null","scheduledTime":"HH:MM|null","endTime":"HH:MM|null","priority":"medium","projectName":null,"isWorkTask":false,"noteName":null,"description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"rate":null,"paymentType":null,"recurrence":null,"subtasks":[],"pickFreeSlot":false}]}
 
 Examples (dates are illustrative — always use Current date):
 
@@ -330,6 +333,7 @@ function draftsFromParsed(parsed: unknown): AiQuickTaskDraft[] {
       paymentType: normalizeAiPaymentType((t as { paymentType?: unknown }).paymentType),
       recurrence: normalizeAiRecurrence(rec),
       subtasks: normalizeAiSubtasks((t as { subtasks?: unknown }).subtasks),
+      pickFreeSlot: (t as { pickFreeSlot?: unknown }).pickFreeSlot === true,
     };
     const enriched = enrichDraftRate(draft, t as Record<string, unknown>);
     if (enriched.rate != null) enriched.isWorkTask = true;

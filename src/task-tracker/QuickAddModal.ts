@@ -22,6 +22,7 @@ import {
   busySlotsForDate,
   findFreeSlot,
   slotOverlaps,
+  wantsFreeSlotPlacement,
   type BusySlot,
 } from "../services/aiScheduleOps";
 import type { RecurrenceConfig } from "./types";
@@ -308,8 +309,9 @@ function parseDurationFromText(text: string): number | null {
 }
 
 /**
- * Fill drafts with free slots (and sequential occupancy) so the UI can show
- * the planned time BEFORE the user confirms.
+ * Fill drafts with free slots only when the user asked for it, so the UI can
+ * show the planned time BEFORE the user confirms. Without an explicit request
+ * tasks stay untimed.
  */
 function enrichDraftsWithFreeSlots(drafts: AiQuickTaskDraft[]): AiQuickTaskDraft[] {
   const busyByDate = new Map<string, BusySlot[]>();
@@ -338,6 +340,11 @@ function enrichDraftsWithFreeSlots(drafts: AiQuickTaskDraft[]): AiQuickTaskDraft
         estimatedMinutes: d.estimatedMinutes ?? dur,
         endTime: end,
       };
+    }
+
+    // No clock time and no free-slot request → leave untimed.
+    if (!rawStart && !d.pickFreeSlot) {
+      return { ...d, estimatedMinutes: d.estimatedMinutes ?? dur };
     }
 
     const slot = findFreeSlot(busy, dur);
@@ -375,6 +382,10 @@ export interface QuickAddPrefill {
   /** HH:MM from schedule selection / drag-create */
   scheduledTime?: string | null;
   endTime?: string | null;
+  /** Prefill the main input (e.g. title from chat selection) */
+  initialText?: string;
+  /** Open directly in AI (multi) mode instead of classic single */
+  initialMode?: Mode;
   /** Called after each created task (note sync, analytics, …) */
   onTaskCreated?: (task: ITask) => void;
   /** Override AI on/off for this modal instance (defaults to settings) */
@@ -473,6 +484,8 @@ export class QuickAddModal extends Modal {
   private modeBarEl: HTMLElement | null = null;
   private prefillTime: string | null;
   private prefillEndTime: string | null;
+  private initialText = "";
+  private startInMulti = false;
   private onTaskCreated: ((task: ITask) => void) | null;
   private descEl: HTMLTextAreaElement | null = null;
   private subtaskListEl: HTMLElement | null = null;
@@ -503,6 +516,9 @@ export class QuickAddModal extends Modal {
     this.prefillTime = prefill.scheduledTime ?? null;
     this.prefillEndTime = prefill.endTime ?? null;
     this.onTaskCreated = prefill.onTaskCreated ?? null;
+    this.initialText = prefill.initialText ?? "";
+    // Defer mode switch to onOpen — UI must exist before setMode()
+    if (prefill.initialMode === "multi") this.startInMulti = true;
     this.extra = emptyExtraForm(this.prefillTime, this.prefillEndTime);
   }
 
@@ -546,6 +562,9 @@ export class QuickAddModal extends Modal {
       placeholder: tRaw("tasks.quickAdd.placeholder"),
       attr: { spellcheck: "false", autocomplete: "off" },
     });
+    if (this.initialText) {
+      this.inputEl.value = this.initialText;
+    }
     this.projectSuggestEl = inputWrap.createDiv({ cls: "qa2-proj-suggest mcp-hidden" });
 
     // ── Live visual parse (single mode only) ──
@@ -696,6 +715,8 @@ export class QuickAddModal extends Modal {
 
     // ── Events ──
     this.bindInputEvents();
+    // Switch to AI mode after the full UI exists (initialMode: "multi")
+    if (this.startInMulti) this.setMode("multi");
     this.modalEl.addEventListener("keydown", (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -1018,14 +1039,14 @@ export class QuickAddModal extends Modal {
     const parsed = parseQuickInput(raw);
     parseEl.removeClass("mcp-hidden");
 
-    // Duration + free-slot preview (even when the user did not type a clock time)
+    // Duration preview. Free-slot preview only when the user asked for it.
     const durationMin = parseDurationFromText(raw) ?? undefined;
     const dateStr = parsed.date
       ? `${parsed.date.year()}-${String(parsed.date.month() + 1).padStart(2, "0")}-${String(parsed.date.date()).padStart(2, "0")}`
       : null;
     let previewStart = parsed.scheduledTime ? formatTime(parsed.scheduledTime) : null;
     let previewEnd = parsed.endTime ? formatTime(parsed.endTime) : null;
-    if (!previewStart && dateStr) {
+    if (!previewStart && dateStr && wantsFreeSlotPlacement(raw)) {
       const slot = findFreeSlot(busySlotsForDate(dateStr), durationMin || 60);
       if (slot) {
         previewStart = slot.scheduledTime;
@@ -1469,7 +1490,7 @@ export class QuickAddModal extends Modal {
     const all = get(projects);
     const matches = all
       .filter((p) => !query || p.name.toLowerCase().startsWith(query) || p.name.toLowerCase().includes(query))
-      .slice(0, 5)
+      .slice(0, 30)
       .map((p) => ({ id: p.id, name: p.name }));
 
     this.projectMatches = matches;
@@ -1502,6 +1523,7 @@ export class QuickAddModal extends Modal {
     this.projectSuggestIndex = (this.projectSuggestIndex + delta + n) % n;
     const rows = this.projectSuggestEl.querySelectorAll<HTMLElement>(".qa2-proj-row");
     rows.forEach((row, i) => row.toggleClass("is-active", i === this.projectSuggestIndex));
+    rows[this.projectSuggestIndex]?.scrollIntoView({ block: "nearest" });
   }
 
   private acceptProjectSuggest(name: string): void {
@@ -1877,7 +1899,7 @@ export class QuickAddModal extends Modal {
       estimatedTime = minutesBetween(scheduledTime, endTime);
     }
 
-    // Classic AI/quick add: place in a free / non-overlapping slot
+    // Classic AI/quick add: keep a clear time; free slot only on explicit request
     {
       const dateStr = dateStrFromUID(dateUID);
       if (dateStr) {
@@ -1886,12 +1908,13 @@ export class QuickAddModal extends Modal {
           scheduledTime,
           endTime,
           estimatedMinutes: estimatedTime || 60,
+          pickFreeSlot: draft?.pickFreeSlot || wantsFreeSlotPlacement(this.inputValue()),
         });
         if (resolved) {
-          scheduledTime = resolved.scheduledTime;
-          endTime = resolved.endTime;
+          scheduledTime = resolved.scheduledTime ?? undefined;
+          endTime = resolved.endTime ?? undefined;
           estimatedTime = resolved.estimatedMinutes;
-        } else {
+        } else if (draft?.pickFreeSlot || wantsFreeSlotPlacement(this.inputValue())) {
           new Notice(tRaw("tasks.quickAdd.noFreeSlot", { date: dateStr }));
         }
       }
@@ -1953,7 +1976,7 @@ export class QuickAddModal extends Modal {
     if (estimatedTime === undefined && scheduledTime && endTime) {
       estimatedTime = minutesBetween(scheduledTime, endTime);
     }
-    // Place in a free / non-overlapping slot
+    // Keep a clear time; free slot only when the draft asked for it
     {
       const dateStr = dateStrFromUID(dateUID);
       if (dateStr) {
@@ -1962,12 +1985,13 @@ export class QuickAddModal extends Modal {
           scheduledTime,
           endTime,
           estimatedMinutes: estimatedTime || 60,
+          pickFreeSlot: draft.pickFreeSlot,
         });
         if (resolved) {
-          scheduledTime = resolved.scheduledTime;
-          endTime = resolved.endTime;
+          scheduledTime = resolved.scheduledTime ?? undefined;
+          endTime = resolved.endTime ?? undefined;
           estimatedTime = resolved.estimatedMinutes;
-        } else {
+        } else if (draft.pickFreeSlot) {
           new Notice(tRaw("tasks.quickAdd.noFreeSlot", { date: dateStr }));
         }
       }

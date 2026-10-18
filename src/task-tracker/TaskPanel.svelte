@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import { get } from "svelte/store";
   import type { App } from "obsidian";
+  import { Notice } from "obsidian";
   import moment from "moment";
   import { getDateUID } from "obsidian-daily-notes-interface";
   import type { ITask, IProject } from "./types";
@@ -409,12 +410,27 @@
       const plugin = (appInstance as unknown as {
         plugins?: { getPlugin?: (id: string) => import("../main").default | undefined };
       }).plugins?.getPlugin?.("worklife-calendar");
-      if (!plugin) return;
+      if (!plugin) {
+        new Notice($t("settings.update.updateFailed"));
+        return;
+      }
       const latest = await fetchLatestRelease();
-      if (!latest) return;
-      await updatePluginNow(plugin, latest);
-    } catch {
-      /* notice shown by updatePluginNow path */
+      if (!latest) {
+        new Notice($t("settings.update.checkFailed"));
+        return;
+      }
+      const result = await updatePluginNow(plugin, latest);
+      if (result.ok) {
+        new Notice($t("settings.update.updateSuccess", { version: latest.version }));
+        if (result.error === "reload-required") {
+          new Notice($t("settings.update.reloadRequired"));
+        }
+        pluginUpdateInfo.set({ version: null });
+      } else {
+        new Notice(`${$t("settings.update.updateFailed")}: ${result.error || ""}`);
+      }
+    } catch (e) {
+      new Notice(`${$t("settings.update.updateFailed")}: ${errorMessage(e)}`);
     } finally {
       updatingPlugin = false;
     }

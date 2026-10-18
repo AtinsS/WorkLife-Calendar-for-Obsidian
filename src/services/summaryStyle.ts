@@ -114,7 +114,7 @@ Do not split sections by source note.`,
 - open questions, blockers (if any)
 Never separate by note.`,
     };
-    block = blocks[style as Exclude<SummaryStyle, "custom">] || blocks.detailed;
+    block = blocks[style] || blocks.detailed;
   }
 
   let sys = `${SUMMARY_BASE}\n\n${block}`;

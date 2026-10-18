@@ -8,7 +8,7 @@ import {
   updateTask,
   updateTaskStatus,
 } from "../task-tracker/stores";
-import type { IProject, ITask, TaskStatus } from "../task-tracker/types";
+import type { ITask, TaskStatus } from "../task-tracker/types";
 import {
   findFreeSlot,
   resolveCreateTimes,
@@ -22,6 +22,7 @@ export {
   resolveCreateTimes,
   dateStrFromUID,
   slotOverlaps,
+  wantsFreeSlotPlacement,
   type BusySlot,
   type CreateTimeResult,
 } from "../task-tracker/freeSlot";
@@ -116,6 +117,7 @@ export function resolveCreateTimesForDate(input: {
   endTime?: string | null;
   estimatedMinutes?: number;
   forceFreeSlot?: boolean;
+  pickFreeSlot?: boolean;
 }): CreateTimeResult | null {
   return resolveCreateTimes({
     ...input,
@@ -465,6 +467,9 @@ export function applyScheduleOps(operations: ScheduleOp[]): ApplyOpsResult {
             endTime: t.endTime,
             estimatedTime: t.estimatedTime,
           })),
+          // Times are chosen by the model when the user asks for a free slot;
+          // without a clock time the task stays untimed.
+          pickFreeSlot: false,
         });
         if (!resolved) {
           warnings.push(tRaw("schedule.aiOpsNoSlot", { date: dateStr, title: op.title }));
@@ -479,8 +484,8 @@ export function applyScheduleOps(operations: ScheduleOp[]): ApplyOpsResult {
           projectId,
           priority: op.priority || "medium",
           sortOrder: 0,
-          scheduledTime: resolved?.scheduledTime,
-          endTime: resolved?.endTime,
+          scheduledTime: resolved?.scheduledTime ?? undefined,
+          endTime: resolved?.endTime ?? undefined,
           estimatedTime: resolved?.estimatedMinutes ?? op.estimatedMinutes,
         });
         map.set(created.id, created);
@@ -523,11 +528,14 @@ RULES:
 - TIME PICKING for "create":
   * Read "Occupied time blocks" for the target day. Never schedule over them.
   * "на 1 час" / "1 hour" → estimatedMinutes: 60. "на 30 минут" → 30. Default 60.
-  * If the user asks to pick a free slot (or gives a date+duration without a clock time), set scheduledTime/endTime to the first FREE gap in 09:00–21:00 (30-min grid).
-  * If the model is unsure of a free time, set scheduledTime/endTime to null — the app will place it safely.
+  * If the user asks to pick a free slot («подбери свободный слот», "pick a free slot", «найди время»), set scheduledTime/endTime to the first FREE gap in 09:00–21:00 (30-min grid).
+  * If the user does NOT ask for a free slot and gives no clock time, leave scheduledTime/endTime null — the task is created without a time. NEVER auto-place into a free slot.
+  * If the model is unsure of a free time, set scheduledTime/endTime to null.
 - Example (dates illustrative):
   User: "Создай задачу на следующий четверг Купить молоко, подбери свободный слот, на 1 час"
   → {"operations":[{"type":"create","title":"Купить молоко","date":"<next Thursday>","estimatedMinutes":60,"scheduledTime":"<first free HH:MM>","endTime":"<HH:MM + 60m>"}]}
+  User: "Создай задачу на завтра Прочитать статью"
+  → {"operations":[{"type":"create","title":"Прочитать статью","date":"<tomorrow>","scheduledTime":null,"endTime":null}]}
 - If the instruction is a question, not a mutation, return operations: [] and put the answer in "summary".
 - Match the user's language for "summary".
 - Output JSON only. No markdown fences, no commentary.`;
@@ -560,7 +568,7 @@ RULES:
 - Use EXACT task ids from the task list. Never invent ids. Match by title when the analysis names tasks.
 - Prefer one operation with many taskIds over many identical ops.
 - "shiftDays" is an integer; "toDate" is absolute YYYY-MM-DD. Use one or the other.
-- For "create": if no clock time is given, pick a free slot (09:00–21:00, no overlap with existing tasks) and set estimatedMinutes + scheduledTime/endTime.
+- For "create": if no clock time is given, leave scheduledTime/endTime null (the task stays untimed) unless the analysis explicitly asks to pick a free slot — then use the first free gap (09:00–21:00, no overlap).
 - If nothing is safely actionable, return operations: [] and explain in "summary".
 - Be conservative: when unsure which task is meant, skip that recommendation rather than guessing.
 - Match the analysis language for "summary".
@@ -577,7 +585,7 @@ ${analysisText.slice(0, 6000)}`;
 
 /** Task + project context so the model can reference real ids / project names. */
 export function buildScheduleOpsContext(now: Date = new Date()): string {
-  const projects = get(projectsStore) as IProject[];
+  const projects = get(projectsStore);
   const projMap = new Map(projects.map((p) => [p.id, p.name]));
   const all = [...get(tasksStore)];
   const todayStr = fmtDate(now);

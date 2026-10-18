@@ -15,7 +15,7 @@
 
 [**Русский README**](https://github.com/AtinsS/WorkLife-Calendar-for-Obsidian/blob/master/README.RU.md)
 
-![WorkLife Calendar](image-2.png)
+![WorkLife Calendar](image-3.png)
 
 ## 💡 Why this plugin exists
 
@@ -48,7 +48,7 @@ Many workflows have the same problem: tasks live in one place, the calendar in a
 | **⚖️ Habits & health** | Habit streaks, weight chart |
 | **💰 Finances** | Budget planning, savings goals, income, expenses, Markdown / Excel summaries |
 | **📊 Analytics** | Charts for projects, income, and habits |
-| **🤖 Local AI (Ollama)** | Task extraction, summaries, schedule commands, AI chat, free time slots, expense analysis, workout plans, brainstorming in the context of a note |
+| **🤖 Local AI (Ollama)** | Task extraction, summaries, schedule commands, AI chat with selection tools, expense analysis, workout plans, brainstorming in the context of a note |
 | **🔔 Notifications** | Desktop reminders + phone push notifications via ntfy.sh |
 
 > [!NOTE] 🎁 Bonus
@@ -158,13 +158,13 @@ Runs entirely on your computer—your data isn’t sent anywhere.
 - **Tasks** — extract tasks from a note (right-click a `.md` file), break tasks into subtasks, generate descriptions, and use smart input (for example, “Create several tasks titled ‘Call’, repeat every Thursday, project ‘Work’”).
 - **Notes** — summarize a folder or selected notes in these styles: Concise / Detailed / Bullet Points / For Managers / **Custom**.
 - **Schedule (AI Actions)** — summarize a period, assess workload with **“Apply Recommendations”** (preview → confirmation), and process natural-language commands (“move tasks in the ‘Home’ project by one day,” “create ‘Buy milk’ next Thursday for 1 hour”). Changes always go through an **operation plan** that you confirm.
-- **AI chat (Ask AI)** — brainstorm in the context of a note or group of notes (right-click → *AI Tools* or use the command palette). Copy a response or chat, add it to a note, and save chat history.
+- **AI chat (Ask AI)** — brainstorm in the context of a note or group of notes (right-click → *AI Tools* or use the command palette). Select any text in chat for a floating **“Explain” / “Make task”** toolbar, or right-click the selection. Per-message actions: copy, send to note, make task, rewrite shorter/longer. Set your name, the assistant’s name, “About you”, and the communication style in *Settings → AI → Chat*.
 - **Finances** — analyze expenses from text, forecast budgets, create allocation rules, and provide tips in Markdown / Excel summaries.
 - **Workout plans** — questionnaire → plan → tasks and workout streaks. If you have no equipment, the plan uses bodyweight exercises only; static exercises (such as planks) always include a hold duration.
 
-### Smart free time slots
+### Smart free time slots (on request)
 
-When you create a task with a **date and duration** but no time—for example, *“Buy milk next Thursday, 1 hour”*—the plugin schedules it in the **first available slot** (09:00–21:00, in 30-minute intervals), avoiding conflicts. The time is shown **before confirmation** in quick-add chips or AI review cards. If the day is fully booked, you’ll see a warning and the task will be created without a time.
+A task **without a time stays untimed** by default. Ask for a free slot explicitly (e.g. *“Buy milk next Thursday, pick a free slot, 1 hour”*) and the plugin places it in the first available window (09:00–21:00, 30-minute grid), avoiding conflicts. The time is shown **before confirmation** in quick-add chips or AI review cards. If the day is fully booked, you’ll see a warning and the task is created without a time.
 
 Available in **Quick Add** and **AI schedule commands**.
 
@@ -197,9 +197,9 @@ Every change is shown in advance. Recommendations from **What’s done** are not
 ### Privacy
 
 - Requests go to the Ollama server you configure (by default, `http://localhost:11434`).
-- The model receives **only the content needed for the current action**: note or summary text, task titles and times, amounts, or chat questions.
-- Passwords, tokens, and your entire vault are **not** sent.
-- ⚠️ The address field accepts remote endpoints (LAN / SSH / cloud), in which case the data goes to **another machine**. Keep it set to `localhost` for personal data.
+- The model receives **only the content needed for the current action**: note or summary text, task titles and times, amounts, chat questions and history. The chat also sends your name, “About you”, and communication style when filled in.
+- Plugin settings (GitHub token, weather API keys) are **never** sent to the model — but if a note contains passwords, they go with the note text.
+- ⚠️ The address field accepts remote endpoints (LAN / SSH / cloud). If you use **cloud-hosted Ollama models**, note / task / chat content is processed on the provider’s side and may be stored there — don’t send passwords or tokens. Keep it set to `localhost` for personal data.
 - AI is hidden on mobile and works only on desktop.
 
 **Settings:** *Settings → AI (Ollama)* — enable AI, configure the address and models, toggle actions, and manage privacy settings.
@@ -253,7 +253,7 @@ A simple way to receive notifications on your phone:
 2. Enable **ntfy.sh** in the plugin settings and set a topic.
 3. Subscribe to that topic in the app.
 
-You can also enable **scheduled push notifications** (queued when Obsidian opens so they arrive on time, even when it’s closed) and a **daily summary**.
+You can also enable **scheduled push notifications** (queued when Obsidian opens so they arrive on time, even when it’s closed) and a **daily digest**. The digest includes the day’s tasks, weather, and habits, and can be sent either as a delayed push (arrives even if Obsidian is closed) or only while Obsidian is open.
 
 > [!CAUTION] Security
 > Use a unique topic, such as a randomly generated UUID like `a7f9b2c4-8e1d-4f3a-9c5b-2d6e8f0a1b3c`, so no one else can subscribe to your notifications. The plugin sends only notification triggers (for example, “Overdue: Task title”), not financial data or full text.

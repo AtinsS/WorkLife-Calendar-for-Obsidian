@@ -11,6 +11,7 @@ import type { ITask } from "src/task-tracker/types";
 import type { ISettings } from "src/settings";
 import { getActiveTimer } from "src/task-tracker/TimerManager";
 import { isTaskOverdue } from "src/task-tracker/overdue";
+import { habits as habitStore } from "src/habit-tracker/stores";
 import { recordNotificationEvent } from "./notificationTelemetry";
 import { tRaw } from "../i18n";
 import { errorMessage } from "../utils/sanitize";
@@ -52,6 +53,7 @@ export class NotificationService {
   private timer: number | null = null;
   private digestTimer: number | null = null;
   private digestCmdTimer: number | null = null;
+  private localDigestTimer: number | null = null;
   private digestScheduling = false;
   private lastDigestDate = "";
   private lastDigestCmdPoll = 0;
@@ -492,7 +494,7 @@ export class NotificationService {
   /** Schedule ntfy.sh push with the day's task summary at the configured time.
    *  Delivery is delayed via X-Delay so it arrives even if Obsidian is closed.
    *  Idempotent via sequence ID `daily-digest`: reschedule replaces the pending push. */
-  scheduleNtfyDailyDigest(): void {
+  async scheduleNtfyDailyDigest(): Promise<void> {
     const opts: ISettings = this.plugin.options;
     if (!opts.ntfyEnabled || !opts.ntfyDailyDigestEnabled || !opts.ntfyTopic) return;
     if (this.isNtfyScheduledDisabledOnThisDevice()) return;
@@ -512,22 +514,55 @@ export class NotificationService {
 
     this.digestScheduling = true;
     try {
-      const body = this.buildDigestBody(delivery);
+      const body = await this.buildDigestBody(delivery);
 
       // Mark BEFORE network call so a concurrent tick cannot double-send
       scheduled[DIGEST_SEQ] = fireUnix;
       this.lastDigestDate = digestDate;
       this.saveNtfySchedule(scheduled);
 
-      // Same sequence ID replaces any previously queued digest (time changed, etc.)
-      this.sendNtfyDelayed(tRaw("taskStore.notificationTitle"), body, delivery.toISOString(), DIGEST_SEQ);
+      const useDelayed = opts.ntfyDigestDelayed !== false;
+      if (useDelayed) {
+        // Same sequence ID replaces any previously queued digest (time changed, etc.)
+        this.sendNtfyDelayed(tRaw("taskStore.notificationTitle"), body, delivery.toISOString(), DIGEST_SEQ);
+      } else {
+        // Local timer: send at delivery time only while Obsidian is open
+        this.scheduleLocalDigest(delivery, body);
+      }
     } finally {
       this.digestScheduling = false;
     }
   }
 
-  /** Build a richer digest body for the given delivery day. */
-  private buildDigestBody(delivery: Moment): string {
+  /** Fire a local (non-delayed) digest at `delivery` while the app stays open. */
+  private scheduleLocalDigest(delivery: Moment, body: string): void {
+    if (this.localDigestTimer) {
+      window.clearTimeout(this.localDigestTimer);
+      this.localDigestTimer = null;
+    }
+    const ms = delivery.valueOf() - Date.now();
+    if (ms <= 0) return;
+    this.localDigestTimer = window.setTimeout(() => {
+      this.localDigestTimer = null;
+      const opts: ISettings = this.plugin.options;
+      if (!opts.ntfyEnabled || !opts.ntfyDailyDigestEnabled || !opts.ntfyTopic) return;
+      void requestUrl({
+        url: `https://ntfy.sh/${encodeURIComponent(opts.ntfyTopic)}`,
+        method: "POST",
+        headers: {
+          "X-Title": tRaw("taskStore.notificationTitle"),
+          "X-Tags": "worklife",
+          "X-Sequence-ID": DIGEST_SEQ,
+        },
+        body,
+      }).catch(() => {
+        /* logged upstream */
+      });
+    }, Math.min(ms, 2 ** 31 - 1));
+  }
+
+  /** Build a richer digest body for the given delivery day (tasks + habits + weather). */
+  private async buildDigestBody(delivery: Moment): Promise<string> {
     const dateStr = delivery.format("YYYY-MM-DD");
     const dateLabel = delivery.format("ddd DD.MM.YYYY");
     const dayTasks = get(tasks)
@@ -542,10 +577,6 @@ export class NotificationService {
         return at.localeCompare(bt) || a.title.localeCompare(b.title);
       });
 
-    if (!dayTasks.length) {
-      return tRaw("notifications.dailyDigestEmpty", { date: dateLabel });
-    }
-
     const fmtEst = (min: number): string => {
       const h = Math.floor(min / 60);
       const m = min % 60;
@@ -554,50 +585,109 @@ export class NotificationService {
       return tRaw("notifications.durationM", { m: String(m) });
     };
 
-    const timed: string[] = [];
-    const untimed: string[] = [];
-    const high: string[] = [];
-    const deadlines: string[] = [];
-    let totalEst = 0;
+    const sections: string[] = [];
+    sections.push(`📋 ${dateLabel}`);
 
-    for (const t of dayTasks) {
-      if (t.estimatedTime) totalEst += t.estimatedTime;
-      if (t.priority === "high") high.push(t.title);
-      if (t.deadline === `day-${dateStr}`) {
-        deadlines.push(t.deadlineTime ? `${t.title} (${t.deadlineTime})` : t.title);
+    // ── Weather ──
+    const weatherLine = await this.buildWeatherLine(dateStr);
+    if (weatherLine) sections.push(weatherLine);
+
+    // ── Habits ──
+    const habitsLine = this.buildHabitsLine(dateStr);
+    if (habitsLine) sections.push(habitsLine);
+
+    // ── Tasks ──
+    if (!dayTasks.length) {
+      sections.push(tRaw("notifications.dailyDigestEmpty", { date: dateLabel }));
+    } else {
+      const timed: string[] = [];
+      const untimed: string[] = [];
+      const high: string[] = [];
+      const deadlines: string[] = [];
+      let totalEst = 0;
+
+      for (const t of dayTasks) {
+        if (t.estimatedTime) totalEst += t.estimatedTime;
+        if (t.priority === "high") high.push(t.title);
+        if (t.deadline === `day-${dateStr}`) {
+          deadlines.push(t.deadlineTime ? `${t.title} (${t.deadlineTime})` : t.title);
+        }
+
+        const est = t.estimatedTime ? ` ⏱${fmtEst(t.estimatedTime)}` : "";
+        const mark = t.priority === "high" ? " !" : t.priority === "medium" ? " ·" : "";
+        const line = t.scheduledTime
+          ? `${t.scheduledTime}  ${t.title}${est}${mark}`
+          : `${t.title}${est}${mark}`;
+        if (t.scheduledTime) timed.push(line);
+        else untimed.push(line);
       }
 
-      const est = t.estimatedTime ? ` ⏱${fmtEst(t.estimatedTime)}` : "";
-      const mark = t.priority === "high" ? " !" : t.priority === "medium" ? " ·" : "";
-      const line = t.scheduledTime
-        ? `${t.scheduledTime}  ${t.title}${est}${mark}`
-        : `${t.title}${est}${mark}`;
-      if (t.scheduledTime) timed.push(line);
-      else untimed.push(line);
+      if (timed.length) sections.push(timed.join("\n"));
+      if (untimed.length) {
+        sections.push(tRaw("notifications.dailyDigestNoTime", { count: String(untimed.length), list: untimed.join("\n") }));
+      }
+      if (high.length) {
+        sections.push(tRaw("notifications.dailyDigestHighPriority", { list: high.join(", ") }));
+      }
+      if (deadlines.length) {
+        sections.push(tRaw("notifications.dailyDigestDeadline", { list: deadlines.join(", ") }));
+      }
+      sections.push(
+        tRaw("notifications.dailyDigestSummary", {
+          count: String(dayTasks.length),
+          totalTime: totalEst ? fmtEst(totalEst) : "—",
+        }),
+      );
     }
 
-    const extra: string[] = [];
-    if (untimed.length) {
-      extra.push(tRaw("notifications.dailyDigestNoTime", { count: String(untimed.length), list: untimed.join("\n") }));
-    }
-    if (high.length) {
-      extra.push(tRaw("notifications.dailyDigestHighPriority", { list: high.join(", ") }));
-    }
-    if (deadlines.length) {
-      extra.push(tRaw("notifications.dailyDigestDeadline", { list: deadlines.join(", ") }));
-    }
+    return sections.join("\n\n");
+  }
 
-    const summary = tRaw("notifications.dailyDigestSummary", {
-      count: String(dayTasks.length),
-      totalTime: totalEst ? fmtEst(totalEst) : "—",
-    });
+  /** One-line weather for the digest day (empty when weather is off / unavailable). */
+  private async buildWeatherLine(dateStr: string): Promise<string> {
+    const opts: ISettings = this.plugin.options;
+    if (!opts.weatherEnabled) return "";
+    const lat = opts.weatherLatitude;
+    const lon = opts.weatherLongitude;
+    if (typeof lat !== "number" || typeof lon !== "number") return "";
+    try {
+      const { fetchWeekWeather } = await import("./weatherService");
+      const days = await fetchWeekWeather(
+        lat,
+        lon,
+        dateStr,
+        dateStr,
+        opts.weatherProvider as never,
+        opts.weatherApiKey,
+      );
+      const day = days?.find((d) => d.date === dateStr);
+      if (!day) return "";
+      return tRaw("notifications.dailyDigestWeather", {
+        icon: day.icon,
+        label: day.label,
+        min: String(Math.round(day.tempMin)),
+        max: String(Math.round(day.tempMax)),
+      });
+    } catch {
+      return "";
+    }
+  }
 
-    return tRaw("notifications.dailyDigest", {
-      date: dateLabel,
-      list: timed.join("\n"),
-      extra: extra.length ? `\n${extra.join("\n")}` : "",
-      summary,
-    });
+  /** Habits planned for the digest day (empty when habit tracker is hidden). */
+  private buildHabitsLine(_dateStr: string): string {
+    try {
+      const list = get(habitStore);
+      const active = list.filter((h) => h && !h.archived);
+      if (!active.length) return "";
+      const names = active.slice(0, 8).map((h) => h.title || "—");
+      const more = active.length > names.length ? ` +${active.length - names.length}` : "";
+      return tRaw("notifications.dailyDigestHabits", {
+        count: String(active.length),
+        list: names.join(", ") + more,
+      });
+    } catch {
+      return "";
+    }
   }
 
   /** Send the digest immediately (on-demand / ntfy command / settings test). */
@@ -609,7 +699,7 @@ export class NotificationService {
       return { ok: false, error: "deferred notifications disabled on this device" };
     }
 
-    const body = this.buildDigestBody(momentFn());
+    const body = await this.buildDigestBody(momentFn());
     try {
       const resp = await requestUrl({
         url: `https://ntfy.sh/${encodeURIComponent(opts.ntfyTopic)}`,
@@ -649,6 +739,10 @@ export class NotificationService {
 
   /** Cancel the pending delayed digest on ntfy (feature turned off). */
   cancelScheduledDigest(): void {
+    if (this.localDigestTimer) {
+      window.clearTimeout(this.localDigestTimer);
+      this.localDigestTimer = null;
+    }
     const opts: ISettings = this.plugin.options;
     if (!opts.ntfyTopic) return;
     if (this.isNtfyScheduledDisabledOnThisDevice()) return;
@@ -672,7 +766,7 @@ export class NotificationService {
   private ensureDailyDigestLoop(): void {
     if (this.digestTimer) return;
     this.digestTimer = window.setInterval(() => {
-      this.scheduleNtfyDailyDigest();
+      void this.scheduleNtfyDailyDigest();
     }, DIGEST_ENSURE_INTERVAL_MS);
   }
 
@@ -680,6 +774,10 @@ export class NotificationService {
     if (this.digestTimer) {
       window.clearInterval(this.digestTimer);
       this.digestTimer = null;
+    }
+    if (this.localDigestTimer) {
+      window.clearTimeout(this.localDigestTimer);
+      this.localDigestTimer = null;
     }
     this.lastDigestDate = "";
     this.digestScheduling = false;

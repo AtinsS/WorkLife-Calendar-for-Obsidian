@@ -7,7 +7,7 @@ import { get } from "svelte/store";
 import { streamOllamaChat, resolveModel } from "./OllamaService";
 import { errorMessage } from "../utils/sanitize";
 import { renderMarkdown } from "../ui/markdown";
-import { showTypingDots } from "../ui/typingDots";
+import { mountTypingBlock } from "../ui/typingDots";
 import {
   buildSummarySystem,
   normalizeSummaryStyle,
@@ -71,6 +71,8 @@ export class AISummaryModal extends CustomModal {
 
   private titleEl: HTMLInputElement | null = null;
   private textareaEl: HTMLTextAreaElement | null = null;
+  private emptyEl: HTMLElement | null = null;
+  private modelCaptionEl: HTMLElement | null = null;
   private previewEl: HTMLElement | null = null;
   private typingHostEl: HTMLElement | null = null;
   private modeBtn: HTMLButtonElement | null = null;
@@ -186,16 +188,38 @@ export class AISummaryModal extends CustomModal {
     this.progressFillEl = this.progressEl.createDiv({ cls: "ai-summary-progress-fill" });
 
     // Scan shell wraps the output area (same visual language as AI extract analysis)
+    // Model caption slot — sits ABOVE the answer field
+    this.modelCaptionEl = this.contentEl.createDiv({ cls: "ai-model-caption-slot" });
     const scanShell = this.contentEl.createDiv({ cls: "ai-summary-scan" });
+
+    // Pretty empty stub — textarea stays hidden until generation (or manual edit)
+    this.emptyEl = scanShell.createDiv({ cls: "ai-summary-empty" });
+    this.emptyEl.createDiv({ cls: "ai-summary-empty-icon", text: "✨" });
+    this.emptyEl.createDiv({
+      cls: "ai-summary-empty-title",
+      text: tRaw("ai.summaryEmptyTitle"),
+    });
+    this.emptyEl.createDiv({
+      cls: "ai-summary-empty-hint",
+      text: tRaw("ai.summaryEmptyHint"),
+    });
+
     this.textareaEl = scanShell.createEl("textarea", {
-      cls: "ai-summary-textarea",
+      cls: "ai-summary-textarea ai-hidden",
       attr: {
         rows: "14",
         placeholder: tRaw("ai.summaryPlaceholder"),
         spellcheck: "false",
+        readonly: "readonly",
       },
     });
     this.textareaEl.value = this.summaryText;
+    // Starts locked so the empty field doesn't look like a free-form editor.
+    // Unlocks on explicit edit (click/focus) or after generation.
+    this.textareaEl.readOnly = true;
+    this.textareaEl.addEventListener("focus", () => {
+      if (this.textareaEl && !this.isGenerating) this.textareaEl.readOnly = false;
+    });
     this.textareaEl.addEventListener("input", () => {
       this.summaryText = this.textareaEl?.value ?? "";
       this.syncCreateBtn();
@@ -237,6 +261,7 @@ export class AISummaryModal extends CustomModal {
     this.abort = null;
     this.titleEl = null;
     this.textareaEl = null;
+    this.emptyEl = null;
     this.previewEl = null;
     this.typingHostEl = null;
     this.modeBtn = null;
@@ -251,6 +276,10 @@ export class AISummaryModal extends CustomModal {
     // Locked until generation produces (or user types) a body.
     if (!this.summaryText.trim() || this.isGenerating) return;
     this.viewMode = this.viewMode === "preview" ? "edit" : "preview";
+    // Entering edit unlocks the textarea (starts read-only until first generation)
+    if (this.viewMode === "edit" && this.textareaEl) {
+      this.textareaEl.readOnly = false;
+    }
     this.applyViewMode();
   }
 
@@ -258,6 +287,10 @@ export class AISummaryModal extends CustomModal {
     const preview = this.viewMode === "preview";
     this.textareaEl?.toggleClass("ai-hidden", preview);
     this.previewEl?.toggleClass("ai-hidden", !preview);
+    // Preview is always locked; edit mode is unlocked explicitly
+    if (this.textareaEl) this.textareaEl.readOnly = preview || this.isGenerating;
+    // Empty stub only when there is no summary yet
+    this.emptyEl?.toggleClass("ai-hidden", !!this.summaryText.trim() || this.isGenerating);
     if (this.modeBtn) {
       this.modeBtn.textContent = preview
         ? tRaw("ai.summaryEdit")
@@ -358,6 +391,7 @@ export class AISummaryModal extends CustomModal {
     this.abort = new AbortController();
     this.contentEl.addClass("scanning");
     this.viewMode = "edit";
+    if (this.textareaEl) this.textareaEl.readOnly = true;
     this.applyViewMode();
 
     try {
@@ -379,8 +413,12 @@ export class AISummaryModal extends CustomModal {
       // Animation only while generating — text appears when the run finishes
       this.textareaEl?.addClass("ai-hidden");
       this.previewEl?.addClass("ai-hidden");
+      this.emptyEl?.addClass("ai-hidden");
       this.typingHostEl?.removeClass("ai-hidden");
-      if (this.typingHostEl) showTypingDots(this.typingHostEl);
+      if (this.typingHostEl) {
+        // Spinner centered in the field; model label lives ABOVE the field
+        mountTypingBlock(this.typingHostEl, resolveModel("reason", opts), this.modelCaptionEl);
+      }
 
       const result = await streamOllamaChat(
         opts.ollamaUrl || "http://localhost:11434",
@@ -410,6 +448,7 @@ export class AISummaryModal extends CustomModal {
       this.typingHostEl?.addClass("ai-hidden");
       if (this.textareaEl) {
         this.textareaEl.removeClass("ai-hidden");
+        this.textareaEl.readOnly = false;
         this.textareaEl.value = this.summaryText;
         this.textareaEl.scrollTop = this.textareaEl.scrollHeight;
       }
@@ -443,6 +482,8 @@ export class AISummaryModal extends CustomModal {
       this.contentEl.removeClass("scanning");
       this.typingHostEl?.addClass("ai-hidden");
       if (this.generateBtn) this.generateBtn.disabled = false;
+      // Allow editing the result (or typing a custom summary) once generation ends
+      if (this.textareaEl) this.textareaEl.readOnly = false;
       this.syncCreateBtn();
       this.abort = null;
     }

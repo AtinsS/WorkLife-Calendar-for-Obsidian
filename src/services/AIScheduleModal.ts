@@ -2,7 +2,7 @@ import type { App } from "obsidian";
 import { Notice, normalizePath, TFile as TFileClass } from "obsidian";
 import { get } from "svelte/store";
 import { CustomModal } from "../ui/CustomModal";
-import { showTypingDots } from "../ui/typingDots";
+import { mountTypingBlock } from "../ui/typingDots";
 import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
 import { tasks } from "../task-tracker/stores";
@@ -259,6 +259,7 @@ export class AIScheduleModal extends CustomModal {
   private statsEl: HTMLElement | null = null;
   private statusEl: HTMLElement | null = null;
   private outputEl: HTMLElement | null = null;
+  private modelCaptionEl: HTMLElement | null = null;
   private runBtn: HTMLButtonElement | null = null;
   private stopBtn: HTMLButtonElement | null = null;
   private saveBtn: HTMLButtonElement | null = null;
@@ -377,12 +378,14 @@ export class AIScheduleModal extends CustomModal {
       attr: { type: "button" },
     });
     kindLoad.addEventListener("click", () => {
+      if (this.analysisKind !== "load") this.clearAnalysisOutput();
       this.analysisKind = "load";
       kindLoad.addClass("is-active");
       kindSum.removeClass("is-active");
       this.syncFooter();
     });
     kindSum.addEventListener("click", () => {
+      if (this.analysisKind !== "summary") this.clearAnalysisOutput();
       this.analysisKind = "summary";
       kindSum.addClass("is-active");
       kindLoad.removeClass("is-active");
@@ -428,7 +431,8 @@ export class AIScheduleModal extends CustomModal {
     this.statusEl.createSpan({ cls: "ai-sch-spinner", attr: { "aria-hidden": "true" } });
     this.statusEl.createSpan({ cls: "ai-sch-status-text", text: tRaw("schedule.aiReady") });
 
-    // Output stage
+    // Output stage — model caption lives ABOVE the framed field, not inside it
+    this.modelCaptionEl = this.contentEl.createDiv({ cls: "ai-model-caption-slot" });
     const scanShell = this.contentEl.createDiv({ cls: "ai-sch-scan" });
     this.outputEl = scanShell.createDiv({ cls: "ai-sch-output" });
     this.renderEmptyState();
@@ -496,6 +500,17 @@ export class AIScheduleModal extends CustomModal {
     this.refreshStats();
   }
 
+  /** Drop previous analysis text so switching kind never shows stale recommendations. */
+  private clearAnalysisOutput(): void {
+    this.resultText = "";
+    this.analysisText = "";
+    this.showingOps = false;
+    this.pendingOps = null;
+    this.renderEmptyState();
+    this.setStatus(tRaw("schedule.aiReady"));
+    this.syncFooter();
+  }
+
   private renderEmptyState(): void {
     const el = this.outputEl;
     if (!el) return;
@@ -522,10 +537,16 @@ export class AIScheduleModal extends CustomModal {
   }
 
   /** Thinking dots while the model runs — full text appears only when done. */
-  private renderTyping(): void {
+  private renderTyping(role: "reason" | "extract" = "reason"): void {
     const el = this.outputEl;
     if (!el) return;
-    showTypingDots(el);
+    const opts = get(settings) as {
+      ollamaModel?: string;
+      ollamaModelMode?: "single" | "dual";
+      ollamaModelExtract?: string;
+    };
+    // Spinner centered in the field; model label lives ABOVE the field
+    mountTypingBlock(el, resolveModel(role, opts), this.modelCaptionEl);
   }
 
   /** Analyze vs command: panels + which footer buttons make sense. */
@@ -575,7 +596,7 @@ export class AIScheduleModal extends CustomModal {
           const { settings: settingsStore } = await import("../ui/stores");
           settingsStore.update((cur) => ({
             ...cur,
-            workoutProfile: changes.workoutProfile as never,
+            workoutProfile: changes.workoutProfile,
           }));
         },
       }).open();
@@ -926,7 +947,7 @@ export class AIScheduleModal extends CustomModal {
     this.syncFooter();
     this.setStatus("");
     this.setScanning(true);
-    this.renderTyping();
+    this.renderTyping("reason");
 
     const lang = tRaw("locale.momentLocale") === "ru" ? "ru" : "en";
 
@@ -1000,7 +1021,7 @@ export class AIScheduleModal extends CustomModal {
     if (this.applyRecsBtn) this.applyRecsBtn.disabled = true;
     this.setStatus(tRaw("schedule.aiOpsPlanning"), "busy");
     this.setScanning(true);
-    this.renderTyping();
+    this.renderTyping("extract");
 
     try {
       const raw = await streamOllamaChat(
@@ -1086,7 +1107,7 @@ export class AIScheduleModal extends CustomModal {
     this.showingOps = false;
     this.setStatus(tRaw("schedule.aiOpsPlanning"), "busy");
     this.setScanning(true);
-    this.renderTyping();
+    this.renderTyping("extract");
     this.syncFooter();
 
     try {

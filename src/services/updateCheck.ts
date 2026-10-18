@@ -1,6 +1,7 @@
 import { Notice, requestUrl } from "obsidian";
 import type CalendarPlugin from "src/main";
 import { tRaw } from "../i18n";
+import { errorMessage } from "../utils/sanitize";
 import { writable } from "svelte/store";
 
 const REPO = "AtinsS/WorkLife-Calendar-for-Obsidian";
@@ -123,6 +124,7 @@ export async function findPluginDirByApp(app: CalendarPlugin["app"], manifestId:
 /**
  * Download release files into the plugin folder and reload the plugin.
  * Writes main.js, styles.css (if present), manifest.json.
+ * File writes and hot-reload are independent: a reload failure still means a successful update.
  */
 export async function updatePluginNow(
   plugin: CalendarPlugin,
@@ -133,46 +135,64 @@ export async function updatePluginNow(
     if (!pluginDir) return { ok: false, error: "plugin folder not found" };
 
     const adapter = plugin.app.vault.adapter;
+    const version = release.version;
 
-    // Always refresh main.js + manifest; styles only if shipped
-    if (!release.assets.mainJs) return { ok: false, error: "main.js missing in release" };
+    // Resolve asset URLs: release assets first, then conventional release-download paths
+    const assetUrl = (name: string, explicit?: string): string =>
+      explicit ||
+      `https://github.com/${REPO}/releases/download/v${version}/${name}`;
 
-    const mainJs = await downloadText(release.assets.mainJs);
-    if (!mainJs || !mainJs.includes("obsidian")) {
+    const mainJsUrl = assetUrl("main.js", release.assets.mainJs);
+    const mainJs = await downloadText(mainJsUrl);
+    if (!mainJs || mainJs.length < 100) {
       return { ok: false, error: "downloaded main.js looks invalid" };
     }
 
     await adapter.write(`${pluginDir}/main.js`, mainJs);
 
-    if (release.assets.manifestJson) {
-      const manifestText = await downloadText(release.assets.manifestJson);
-      await adapter.write(`${pluginDir}/manifest.json`, manifestText);
+    try {
+      const manifestText = await downloadText(
+        assetUrl("manifest.json", release.assets.manifestJson),
+      );
+      if (manifestText.trim().startsWith("{")) {
+        await adapter.write(`${pluginDir}/manifest.json`, manifestText);
+      }
+    } catch {
+      // manifest is optional — keep the current one
     }
 
-    if (release.assets.stylesCss) {
-      const styles = await downloadText(release.assets.stylesCss);
+    try {
+      const styles = await downloadText(
+        assetUrl("styles.css", release.assets.stylesCss),
+      );
       await adapter.write(`${pluginDir}/styles.css`, styles);
+    } catch {
+      // styles are optional
     }
 
-    saveJson(LAST_NOTIFIED_KEY, release.version);
+    saveJson(LAST_NOTIFIED_KEY, version);
     pluginUpdateInfo.set({ version: null });
 
-    // Hot-reload plugin if the API is available
-    const plugins = (plugin.app as unknown as {
-      plugins?: {
-        disablePlugin?: (id: string) => Promise<void>;
-        enablePlugin?: (id: string) => Promise<void>;
-      };
-    }).plugins;
-    if (plugins?.disablePlugin && plugins?.enablePlugin) {
-      await plugins.disablePlugin(plugin.manifest.id);
-      await plugins.enablePlugin(plugin.manifest.id);
-      return { ok: true };
+    // Hot-reload is best-effort: files are already on disk
+    try {
+      const plugins = (plugin.app as unknown as {
+        plugins?: {
+          disablePlugin?: (id: string) => Promise<void>;
+          enablePlugin?: (id: string) => Promise<void>;
+        };
+      }).plugins;
+      if (plugins?.disablePlugin && plugins?.enablePlugin) {
+        await plugins.disablePlugin(plugin.manifest.id);
+        await plugins.enablePlugin(plugin.manifest.id);
+        return { ok: true };
+      }
+    } catch {
+      return { ok: true, error: "reload-required" };
     }
 
     return { ok: true, error: "reload-required" };
   } catch (e: unknown) {
-    return { ok: false, error: e instanceof Error ? e.message : "update failed" };
+    return { ok: false, error: errorMessage(e) };
   }
 }
 

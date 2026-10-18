@@ -30,6 +30,8 @@ import {
   ISettings,
   applyAccentColor,
   applyGlassBgColor,
+  applyPanelShape,
+  applyChatBubbleColors,
   applyAllColors,
 } from "./settings";
 import { TFile, TFolder, Menu, type MenuItem } from "obsidian";
@@ -404,7 +406,7 @@ export default class CalendarPlugin extends Plugin {
       id: "ai-ask-question",
       name: tRaw("ai.contextMenuAsk"),
       checkCallback: (checking: boolean) => {
-        if (checking) return this.options.ollamaEnabled === true;
+        if (checking) return this.options.ollamaEnabled === true && this.options.aiChatEnabled !== false;
         void import("./services/AIAskModal").then(({ openAiAsk }) => openAiAsk(this.app));
       },
     });
@@ -440,9 +442,9 @@ export default class CalendarPlugin extends Plugin {
       });
     });
 
-    // Right-click menu: insert blocks
+    // Right-click menu: insert blocks + AI actions on selection
     this.registerEvent(
-      this.app.workspace.on("editor-menu", (menu, editor) => {
+      this.app.workspace.on("editor-menu", (menu, editor, view) => {
         menu.addItem((item) => {
           item.setTitle(tRaw("main.contextMenu.insertDashboard"))
             .setIcon("layout-grid")
@@ -461,6 +463,46 @@ export default class CalendarPlugin extends Plugin {
               editor.setCursor({ line: cursor.line + 1, ch: 0 });
             });
         });
+
+        // AI actions for the selected text — two clear paths: explain in chat, or make a task
+        const selection = editor.getSelection().trim();
+        if (!selection || !this.options.ollamaEnabled) return;
+        if (window.innerWidth <= 768) return;
+
+        const file = view?.file ?? null;
+        const selActions: AiMenuAction[] = [];
+        if (this.options.aiChatEnabled !== false) {
+          selActions.push({
+            title: tRaw("ai.askQa.contextMenuExplain"),
+            icon: "lucide-lightbulb",
+            onClick: () => {
+              void import("./services/AIAskModal").then(({ openAiAskForSelection }) =>
+                openAiAskForSelection(this.app, selection, {
+                  prefill: tRaw("ai.askQa.explainPrompt"),
+                  send: true,
+                  file,
+                }),
+              );
+            },
+          });
+        }
+        selActions.push({
+          title: tRaw("ai.askQa.contextMenuMakeTasks"),
+          icon: "check-square",
+          onClick: () => {
+            void import("./task-tracker/QuickAddModal").then(({ QuickAddModal }) => {
+              const now = window.moment
+                ? window.moment()
+                : (activeWindow as unknown as { moment: () => Moment }).moment();
+              // Straight into AI mode — selection is free-form input for the model
+              new QuickAddModal(this.app, now, undefined, {
+                initialText: selection.slice(0, 200),
+                initialMode: "multi",
+              }).open();
+            });
+          },
+        });
+        addAiMenuItems(menu, selActions);
       })
     );
 
@@ -508,15 +550,17 @@ export default class CalendarPlugin extends Plugin {
         }
 
         // Live chat in the context of this note / folder
-        aiActions.push({
-          title: tRaw("ai.contextMenuAsk"),
-          icon: "lucide-message-circle-question",
-          onClick: () => {
-            void import("./services/AIAskModal").then(({ openAiAskFor }) =>
-              openAiAskFor(this.app, file),
-            );
-          },
-        });
+        if (this.options.aiChatEnabled !== false) {
+          aiActions.push({
+            title: tRaw("ai.contextMenuAsk"),
+            icon: "lucide-message-circle-question",
+            onClick: () => {
+              void import("./services/AIAskModal").then(({ openAiAskFor }) =>
+                openAiAskFor(this.app, file),
+              );
+            },
+          });
+        }
 
         addAiMenuItems(menu, aiActions);
       })
@@ -544,19 +588,21 @@ export default class CalendarPlugin extends Plugin {
             },
           });
         }
-        multiActions.push({
-          title: tRaw("ai.contextMenuAsk"),
-          icon: "lucide-message-circle-question",
-          onClick: () => {
-            void import("./services/AIAskModal").then(({ openAiAsk }) =>
-              openAiAsk(
-                this.app,
-                mdFiles.slice(0, 12),
-                tRaw("ai.summarySelection", { count: String(mdFiles.length) }),
-              ),
-            );
-          },
-        });
+        if (this.options.aiChatEnabled !== false) {
+          multiActions.push({
+            title: tRaw("ai.contextMenuAsk"),
+            icon: "lucide-message-circle-question",
+            onClick: () => {
+              void import("./services/AIAskModal").then(({ openAiAsk }) =>
+                openAiAsk(
+                  this.app,
+                  mdFiles.slice(0, 12),
+                  tRaw("ai.summarySelection", { count: String(mdFiles.length) }),
+                ),
+              );
+            },
+          });
+        }
         addAiMenuItems(menu, multiActions);
       })
     );
@@ -570,6 +616,8 @@ export default class CalendarPlugin extends Plugin {
     if (this.options.glassBgColor) {
       applyGlassBgColor(this.options.glassBgColor, this.options.glassOpacity);
     }
+    applyPanelShape(this.options);
+    applyChatBubbleColors(this.options.chatUserBg, this.options.chatBotBg);
     applyAllColors(this.options);
 
     // Migrate legacy calendar-data.json to per-module files (one-time, idempotent)
@@ -610,7 +658,7 @@ export default class CalendarPlugin extends Plugin {
     }
     // Schedule 6:00 morning digest with the day's task list (and keep it daily)
     if (this.options.ntfyDailyDigestEnabled) {
-      this.notificationService.scheduleNtfyDailyDigest();
+      void this.notificationService.scheduleNtfyDailyDigest();
     }
 
     // Check for a new plugin version on every Obsidian open

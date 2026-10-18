@@ -81,7 +81,8 @@ export function slotOverlaps(
   const start = parseHHMM(scheduledTime);
   if (start === null) return true;
   const dur = Math.max(15, durationMin || 60);
-  const end = parseHHMM(endTime) && endTime ? (parseHHMM(endTime) as number) : start + dur;
+  const endMin = endTime ? parseHHMM(endTime) : null;
+  const end = endMin !== null ? endMin : start + dur;
   for (const t of busy) {
     const s = parseHHMM(t.scheduledTime);
     if (s === null) continue;
@@ -99,18 +100,31 @@ export interface CreateTimeInput {
   busy?: BusySlot[];
   /** Always take a free slot even if the given time looks valid. */
   forceFreeSlot?: boolean;
+  /**
+   * Place into a free slot when the user did not give a clock time.
+   * Off by default: a task without time stays untimed unless explicitly requested.
+   */
+  pickFreeSlot?: boolean;
 }
 
 export interface CreateTimeResult {
-  scheduledTime: string;
-  endTime: string;
+  scheduledTime: string | null;
+  endTime: string | null;
   estimatedMinutes: number;
+}
+
+/** True when the user text explicitly asks to pick a free slot. */
+export function wantsFreeSlotPlacement(text: string): boolean {
+  return /подбери\s+(?:свободн\w*\s+)?слот|свободн\w*\s+слот|найди\s+(?:свободн\w*\s+)?(?:время|слот)|place\s+(?:it\s+)?in\s+a?\s*free|pick\s+a?\s*free\s+slot|find\s+a?\s*free\s+(?:slot|time)|free\s+slot/i.test(
+    text,
+  );
 }
 
 /**
  * Resolve create-time fields.
- * Keeps a clear non-overlapping time; otherwise places the task in a free slot.
- * Returns null when the day has no room for the duration.
+ * Keeps a clear non-overlapping time. Without a clock time the task stays
+ * untimed unless the user asked for a free slot (`pickFreeSlot` / `forceFreeSlot`).
+ * Returns null when a free slot was requested but the day has no room.
  */
 export function resolveCreateTimes(input: CreateTimeInput): CreateTimeResult | null {
   const dur = Math.max(15, Math.min(8 * 60, Math.round(input.estimatedMinutes || 0) || 60));
@@ -118,6 +132,7 @@ export function resolveCreateTimes(input: CreateTimeInput): CreateTimeResult | n
   const rawStart = (input.scheduledTime || "").trim();
   const rawEnd = (input.endTime || "").trim();
   const hasTime = !!rawStart;
+  const wantSlot = !!input.pickFreeSlot || !!input.forceFreeSlot;
 
   const clean =
     hasTime &&
@@ -132,6 +147,11 @@ export function resolveCreateTimes(input: CreateTimeInput): CreateTimeResult | n
         ? rawEnd
         : fmtHHMM((parseHHMM(rawStart) ?? DAY_START) + dur);
     return { scheduledTime: rawStart, endTime: end, estimatedMinutes: dur };
+  }
+
+  // No clock time and no free-slot request → leave the task untimed.
+  if (!hasTime && !wantSlot) {
+    return { scheduledTime: null, endTime: null, estimatedMinutes: dur };
   }
 
   const slot = findFreeSlot(busy, dur);

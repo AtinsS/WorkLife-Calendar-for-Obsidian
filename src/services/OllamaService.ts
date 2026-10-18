@@ -122,6 +122,7 @@ RULES:
 - In Format A do NOT flatten the theme heading into its subtasks — keep the heading as the parent task.
 - Strip markers (🕐 ⏫ 🔼 🔽 🔴 🟡 🟢) into fields. "в 10:00" / "10:00–13:00" → scheduledTime + estimatedMinutes.
 - "— 2 ч", "(15 мин)", "2 часа" in heading/line → estimatedMinutes.
+- NEVER put checklist items or subtask titles into "description". Description is only a short prose note. Subtasks go only into the "subtasks" array.
 
 OUTPUT SCHEMA:
 {
@@ -349,7 +350,12 @@ function parseStudyPlan(content: string): ExtractedTask[] {
     }
   }
   pushCurrent();
-  return tasks.filter((t) => t.title.length > 0);
+  return tasks
+    .filter((t) => t.title.length > 0)
+    .map((t) => ({
+      ...t,
+      description: stripSubtasksFromDescription(t.description, t.subtasks),
+    }));
 }
 
 /**
@@ -915,6 +921,7 @@ RULES:
 - "Group all tasks in 1 day" / "сгруппируй в 1 день" → same dayIndex (1) and same date for all.
 - Prefer real calendar "date" values when a concrete day is known.
 - Answer in the user's language. Be concise and specific to this list.
+- NEVER put checklist items or subtask titles into "description". Subtasks live only in the "subtasks" array.
 
 Task schema:
 {
@@ -1001,15 +1008,46 @@ ${instruction}`;
   return { action, summary, tasks: withSelection };
 }
 
+/** Strip checklist/subtask lines from a description so they stay only in `subtasks`. */
+function stripSubtasksFromDescription(
+  description: string | undefined,
+  subtasks: Array<{ title: string }>,
+): string | undefined {
+  if (!description) return undefined;
+  const subKeys = new Set(
+    subtasks
+      .map((s) => s.title.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const lines = description.split(/\r?\n/).filter((line) => {
+    const t = line
+      .replace(/^\s*[-*+•]\s*(?:\[[ xX]?\]\s*)?/, "")
+      .replace(/^\s*\d+[.)]\s+/, "")
+      .replace(/^[☐☑✓✔]\s*/, "")
+      .trim()
+      .toLowerCase();
+    if (!t) return false;
+    if (subKeys.has(t)) return false;
+    // Drop pure checklist-looking lines even when titles don't match exactly
+    if (/^\s*[-*+•]\s*(?:\[[ xX]?\]\s*)?\S/.test(line) && subtasks.length > 0) return false;
+    return true;
+  });
+  const out = lines.join("\n").trim();
+  return out || undefined;
+}
+
 /** Map raw model JSON into ExtractedTask[] with enrichment + sanitization */
 export function normalizeExtractedTasks(parsed: RawOllamaResponse): {
   tasks: ExtractedTask[];
   weekContext: WeekContext;
 } {
   const tasks = (parsed.tasks ?? []).map((t) => {
+    const subtasks = Array.isArray(t.subtasks)
+      ? t.subtasks.filter((s) => s.title).map((s) => ({ title: s.title }))
+      : [];
     const base: ExtractedTask = {
       title: t.title || "Untitled task",
-      description: t.description || undefined,
+      description: stripSubtasksFromDescription(t.description || undefined, subtasks),
       priority: (["low", "medium", "high"].includes(t.priority ?? "") ? t.priority : "medium") as "low" | "medium" | "high",
       estimatedMinutes: typeof t.estimatedMinutes === "number" && t.estimatedMinutes > 0 ? t.estimatedMinutes : undefined,
       dayIndex: typeof t.dayIndex === "number" && t.dayIndex > 0 ? Math.floor(t.dayIndex) : 1,
@@ -1019,7 +1057,7 @@ export function normalizeExtractedTasks(parsed: RawOllamaResponse): {
       dayTheme: t.dayTheme || undefined,
       scheduledTime: t.scheduledTime && /^\d{2}:\d{2}$/.test(t.scheduledTime) ? t.scheduledTime : undefined,
       endTime: t.endTime && /^\d{2}:\d{2}$/.test(t.endTime) ? t.endTime : undefined,
-      subtasks: Array.isArray(t.subtasks) ? t.subtasks.filter((s) => s.title).map((s) => ({ title: s.title })) : [],
+      subtasks,
       selected: true,
     };
     return enrichTask(base);

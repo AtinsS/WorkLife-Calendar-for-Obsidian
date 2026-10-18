@@ -6,7 +6,7 @@ import {
   CustomModal,
   guardTyping,
 } from "../ui/CustomModal";
-import { showTypingDots } from "../ui/typingDots";
+import { mountTypingBlock } from "../ui/typingDots";
 import { FileSuggestModal } from "../modals/FileSuggestModal";
 import { tRaw } from "../i18n";
 import { errorMessage } from "../utils/sanitize";
@@ -52,6 +52,7 @@ export class AIExtractModal extends CustomModal {
   private autoScheduleToggleEl: HTMLInputElement | null = null;
   private analysisPanelEl: HTMLDivElement | null = null;
   private analysisStreamEl: HTMLDivElement | null = null;
+  private modelCaptionEl: HTMLDivElement | null = null;
   private analysisSpinnerEl: HTMLDivElement | null = null;
   private askPanelEl: HTMLDivElement | null = null;
   private chatLogEl: HTMLDivElement | null = null;
@@ -110,6 +111,8 @@ export class AIExtractModal extends CustomModal {
 
     // Live analysis panel
     this.analysisPanelEl = this.contentEl.createDiv({ cls: "ai-analysis-panel ai-hidden" });
+    // Model caption slot — sits ABOVE the analysis field
+    this.modelCaptionEl = this.analysisPanelEl.createDiv({ cls: "ai-model-caption-slot" });
     const analysisHeader = this.analysisPanelEl.createDiv({ cls: "ai-analysis-header" });
     this.analysisSpinnerEl = analysisHeader.createDiv({ cls: "ai-analysis-spinner" });
     analysisHeader.createSpan({ text: tRaw("ai.analyzing"), cls: "ai-analysis-label" });
@@ -218,8 +221,13 @@ export class AIExtractModal extends CustomModal {
 
   private resetAnalysisStream(): void {
     if (this.analysisStreamEl) {
-      this.analysisStreamEl.textContent = "";
-      showTypingDots(this.analysisStreamEl);
+      // Spinner centered in the field; model label lives ABOVE the field
+      const opts = get(settings) as {
+        ollamaModel?: string;
+        ollamaModelMode?: "single" | "dual";
+        ollamaModelExtract?: string;
+      };
+      mountTypingBlock(this.analysisStreamEl, resolveModel("extract", opts), this.modelCaptionEl);
     }
     if (this.analysisPanelEl) this.analysisPanelEl.removeClass("ai-hidden");
   }
@@ -403,7 +411,10 @@ export class AIExtractModal extends CustomModal {
     this.chatLogEl.querySelector(".ai-chat-hint")?.remove();
 
     const row = this.chatLogEl.createDiv({ cls: `ai-chat-msg ai-chat-msg-${entry.role}` });
-    row.createDiv({ cls: "ai-chat-role", text: entry.role === "user" ? tRaw("ai.chatYou") : tRaw("ai.chatAI") });
+    const opts = get(settings) as { userName?: string; aiName?: string };
+    const userLabel = (opts.userName || "").trim() || tRaw("ai.chatYou");
+    const aiLabel = (opts.aiName || "").trim() || tRaw("ai.chatAI");
+    row.createDiv({ cls: "ai-chat-role", text: entry.role === "user" ? userLabel : aiLabel });
     const bubble = row.createDiv({ cls: "ai-chat-bubble" });
     bubble.textContent = entry.text;
     if (entry.streaming) {
@@ -865,6 +876,7 @@ export class AIExtractModal extends CustomModal {
 
         const created = addTask({
           title: task.title,
+          // Subtasks go to the checklist only — never into description
           description: task.description,
           completed: false,
           status: "todo",
