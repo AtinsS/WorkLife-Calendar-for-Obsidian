@@ -47,7 +47,7 @@ Many workflows have the same problem: tasks live in one place, the calendar in a
 | **⚖️ Habits & health** | Habit streaks, weight chart |
 | **💰 Finances** | Budget planning, savings goals, income, expenses, Markdown / Excel summaries |
 | **📊 Analytics** | Charts for projects, income, and habits |
-| **🤖 Local AI (Ollama)** | Task extraction, summaries, schedule commands, AI chat with selection tools, expense analysis, workout plans, brainstorming in the context of a note |
+| **🤖 Local AI (Ollama)** | Task extraction, summaries, schedule commands, AI chat (styles, web search, selection tools), expense analysis, workout plans, brainstorming in the context of a note |
 | **🔔 Notifications** | Desktop reminders + phone push notifications via ntfy.sh |
 
 > [!NOTE] 🎁 Bonus
@@ -157,7 +157,11 @@ Runs entirely on your computer—your data isn’t sent anywhere.
 - **Tasks** — extract tasks from a note (right-click a `.md` file), break tasks into subtasks, generate descriptions, and use smart input (for example, “Create several tasks titled ‘Call’, repeat every Thursday, project ‘Work’”).
 - **Notes** — summarize a folder or selected notes in these styles: Concise / Detailed / Bullet Points / For Managers / **Custom**.
 - **Schedule (AI Actions)** — summarize a period, assess workload with **“Apply Recommendations”** (preview → confirmation), and process natural-language commands (“move tasks in the ‘Home’ project by one day,” “create ‘Buy milk’ next Thursday for 1 hour”). Changes always go through an **operation plan** that you confirm.
-- **AI chat (Ask AI)** — brainstorm in the context of a note or group of notes (right-click → *AI Tools* or use the command palette). Select any text in chat for a floating **“Explain” / “Make task”** toolbar, or right-click the selection. Per-message actions: copy, send to note, make task, rewrite shorter/longer. Set your name, the assistant’s name, “About you”, and the communication style in *Settings → AI → Chat*.
+- **AI chat (Ask AI)** — live chat in the context of a note or folder (right-click → *AI Tools* or the command palette).
+  - **Styles** in the chat header: *Open* (free chat) / *Brainstorm* / *Advisor* (verdict, pros/cons, risks). Switch anytime; the next message uses the new style.
+  - **Web search** (`🌐 Web` in the bottom bar): the plugin fetches top results (DuckDuckGo → Wikipedia) and injects them into the prompt. Ollama models have no browsing of their own — the search is always plugin-side. The search query is built from your message **and** note keywords so short chit-chat («как тебе идея?») is not sent as-is. Sources are listed under the answer. Turn the toggle off for fully offline chats.
+  - Selection toolbar (**Explain** / **Make task**), per-message actions (copy, to note, make task, shorter/longer), save/copy chat. The active model name is always visible above the messages.
+  - Name, assistant name, “About you”, and tone extras — in *Settings → AI → Chat*.
 - **Finances** — analyze expenses from text, forecast budgets, create allocation rules, and provide tips in Markdown / Excel summaries.
 - **Workout plans** — questionnaire → plan → tasks and workout streaks. If you have no equipment, the plan uses bodyweight exercises only; static exercises (such as planks) always include a hold duration.
 
@@ -199,6 +203,7 @@ Every change is shown in advance. Recommendations from **What’s done** are not
 - The model receives **only the content needed for the current action**: note or summary text, task titles and times, amounts, chat questions and history. The chat also sends your name, “About you”, and communication style when filled in.
 - Plugin settings (GitHub token, weather API keys) are **never** sent to the model — but if a note contains passwords, they go with the note text.
 - ⚠️ The address field accepts remote endpoints (LAN / SSH / cloud). If you use **cloud-hosted Ollama models**, note / task / chat content is processed on the provider’s side and may be stored there — don’t send passwords or tokens. Keep it set to `localhost` for personal data.
+- **Web search in chat** (optional) sends a short search query (message + note keywords) to DuckDuckGo / Wikipedia. Full note bodies are not sent. Disable `🌐 Web` for fully offline chats.
 - AI is hidden on mobile and works only on desktop.
 
 **Settings:** *Settings → AI (Ollama)* — enable AI, configure the address and models, toggle actions, and manage privacy settings.

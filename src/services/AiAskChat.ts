@@ -11,6 +11,12 @@ import { get } from "svelte/store";
 import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
 import { streamOllamaChat, resolveModel } from "./OllamaService";
+import {
+  analyzeModelInternetSupport,
+  buildSearchQuery,
+  formatSearchContext,
+  searchWeb,
+} from "./webSearch";
 import { errorMessage } from "../utils/sanitize";
 import { renderInline, renderMarkdown } from "../ui/markdown";
 import { showTypingDots, showModelCaption } from "../ui/typingDots";
@@ -19,6 +25,47 @@ const MAX_CONTEXT_CHARS = 14000;
 const MAX_FILES = 12;
 const MAX_MSG_CHARS = 6000;
 const MAX_SELECTION_CHARS = 4000;
+
+export type ChatStyle = "open" | "brainstorm" | "advisor";
+
+/** Base system prompts per chat style. User tone / about / name are appended on top. */
+const CHAT_STYLE_SYSTEM: Record<ChatStyle, string> = {
+  open: "You are a helpful AI assistant inside an Obsidian plugin. Stay grounded in the provided note context when it is present. Reply in the user's language. Use light markdown (short paragraphs, bullets, **bold**). Be concise and practical — this is a live conversation, not a report.",
+  brainstorm:
+    "You are a collaborative brainstorming partner inside an Obsidian plugin. Stay grounded in the provided note context when it is present. Think out loud with the user: ask clarifying questions when useful, offer alternatives, challenge assumptions. Reply in the user's language. Use light markdown (short paragraphs, bullets, **bold**). Be concise but substantive — this is a live conversation, not a report.",
+  advisor:
+    "You are a decision advisor inside an Obsidian plugin. The user often asks whether to take an action. Stay grounded in the provided note context when it is present. Lead with a clear recommendation (yes / no / depends), then the main pros, cons and risks. Ask at most one clarifying question, and only when the answer truly depends on it. Reply in the user's language. Use light markdown (short paragraphs, bullets, **bold**). Be concise and decisive — this is a live conversation, not a report.",
+};
+
+function resolveChatStyle(raw: string | undefined): ChatStyle {
+  return raw === "brainstorm" || raw === "advisor" ? raw : "open";
+}
+
+const STYLE_LABEL_KEY: Record<ChatStyle, string> = {
+  open: "ai.askQa.styleOpen",
+  brainstorm: "ai.askQa.styleBrainstorm",
+  advisor: "ai.askQa.styleAdvisor",
+};
+
+const STYLE_HINT_KEY: Record<ChatStyle, string> = {
+  open: "ai.askQa.styleOpenHint",
+  brainstorm: "ai.askQa.styleBrainstormHint",
+  advisor: "ai.askQa.styleAdvisorHint",
+};
+
+/** Persist chat style via the plugin when available; always update the store. */
+function persistChatStyle(app: App, style: ChatStyle): void {
+  settings.update((s) => ({ ...s, aiChatStyle: style }));
+  type PluginHost = {
+    plugins?: {
+      getPlugin?: (id: string) => {
+        writeOptions?: (changes: Record<string, unknown>) => Promise<void>;
+      } | null;
+    };
+  };
+  const plugin = (app as unknown as PluginHost).plugins?.getPlugin?.("worklife-calendar");
+  void plugin?.writeOptions?.({ aiChatStyle: style });
+}
 
 /** Extra context attached to the conversation (editor selection etc.). */
 export interface AskSelection {
@@ -80,15 +127,27 @@ export class AiAskChat {
   private selectionChipEl: HTMLElement | null = null;
   private chipsRowEl: HTMLElement | null = null;
   private selectionToolbarEl: HTMLElement | null = null;
+  private styleRowEl: HTMLElement | null = null;
+  private webSearchRowEl: HTMLElement | null = null;
+  private chatStyle: ChatStyle;
+  private webSearchOn: boolean;
+  private lastWebSources: Array<{ title: string; url: string; snippet: string }> = [];
 
   constructor(app: App, root: HTMLElement, files?: TFile[], label?: string) {
     this.app = app;
     this.root = root;
     this.files = files?.length ? files.slice(0, MAX_FILES) : resolveActiveFiles(app);
     this.contextLabel = label || labelForFiles(this.files);
-    const opts = get(settings) as { userName?: string; aiName?: string };
+    const opts = get(settings) as {
+      userName?: string;
+      aiName?: string;
+      aiChatStyle?: ChatStyle;
+      aiWebSearchEnabled?: boolean;
+    };
     this.userLabel = (opts.userName || "").trim() || tRaw("ai.askQa.you");
     this.aiLabel = (opts.aiName || "").trim() || tRaw("ai.askQa.ai");
+    this.chatStyle = resolveChatStyle(opts.aiChatStyle);
+    this.webSearchOn = opts.aiWebSearchEnabled === true;
   }
 
   mount(): void {
@@ -106,12 +165,17 @@ export class AiAskChat {
       cls: "ai-ask-context-chip",
     });
 
+    // Style switcher on the same row as «Чат с ИИ»
+    this.styleRowEl = head.createDiv({ cls: "ai-ask-styles ai-ask-styles--head" });
+    this.renderStylePicker();
+
     this.messagesEl = this.root.createDiv({ cls: "ai-ask-messages" });
     this.renderEmptyChat();
     this.bindSelectionToolbar();
-    // Model caption ABOVE the messages field (outside of it)
+    // Model caption ABOVE the messages field (outside of it) — always visible
     this.modelCaptionEl = this.root.createDiv({ cls: "ai-model-caption-slot" });
     this.messagesEl.before(this.modelCaptionEl);
+    this.refreshModelCaption();
 
     this.statusEl = this.root.createDiv({ cls: "ai-sch-status ai-ask-status" });
     this.statusEl.createSpan({ cls: "ai-sch-spinner", attr: { "aria-hidden": "true" } });
@@ -132,6 +196,10 @@ export class AiAskChat {
       attr: { type: "button" },
     });
     saveChatBtn.addEventListener("click", () => void this.saveChatNote());
+
+    // Web toggle lives next to Copy/Save at the bottom
+    this.webSearchRowEl = bar.createDiv({ cls: "ai-ask-websearch ai-ask-websearch--bar" });
+    this.renderWebSearchToggle();
 
     const composer = this.root.createDiv({ cls: "ai-ask-composer" });
 
@@ -185,6 +253,9 @@ export class AiAskChat {
     this.statusEl = null;
     this.streamBodyEl = null;
     this.contextChipEl = null;
+    this.styleRowEl = null;
+    this.webSearchRowEl = null;
+    this.modelCaptionEl = null;
     this.root.empty();
   }
 
@@ -277,14 +348,130 @@ export class AiAskChat {
     empty.createDiv({ cls: "ai-sch-empty-icon", text: "💬" });
     empty.createDiv({ cls: "ai-sch-empty-title", text: tRaw("ai.askQa.emptyTitle") });
     empty.createDiv({ cls: "ai-sch-empty-hint", text: tRaw("ai.askQa.emptyHint") });
+    empty.createDiv({ cls: "ai-sch-empty-hint", text: tRaw("ai.askQa.stylePickHint") });
+  }
+
+  /** Style segmented control with tooltips (compact, lives in the header). */
+  private renderStylePicker(): void {
+    const row = this.styleRowEl;
+    if (!row) return;
+    row.empty();
+
+    const tabs = row.createDiv({ cls: "ai-ask-styles-tabs", attr: { role: "tablist" } });
+    const styles: ChatStyle[] = ["open", "brainstorm", "advisor"];
+    for (const id of styles) {
+      const hint = tRaw(STYLE_HINT_KEY[id]);
+      const btn = tabs.createEl("button", {
+        cls: `ai-ask-style-btn${this.chatStyle === id ? " is-active" : ""}`,
+        text: tRaw(STYLE_LABEL_KEY[id]),
+        attr: {
+          type: "button",
+          role: "tab",
+          "aria-selected": this.chatStyle === id ? "true" : "false",
+          title: hint,
+        },
+      });
+      btn.addEventListener("click", () => {
+        if (this.chatStyle === id) return;
+        this.chatStyle = id;
+        persistChatStyle(this.app, id);
+        this.renderStylePicker();
+      });
+    }
+  }
+
+  /** Keep the model name visible even when the model is idle. */
+  private refreshModelCaption(): void {
+    if (!this.modelCaptionEl) return;
+    const opts = get(settings) as {
+      ollamaModel?: string;
+      ollamaModelMode?: "single" | "dual";
+      ollamaModelExtract?: string;
+    };
+    showModelCaption(this.modelCaptionEl, resolveModel("reason", opts));
+  }
+
+  /** Web search toggle (compact, in the bottom bar) + model internet capability. */
+  private renderWebSearchToggle(): void {
+    const row = this.webSearchRowEl;
+    if (!row) return;
+    row.empty();
+
+    const opts = get(settings) as { ollamaUrl?: string; ollamaModel?: string };
+    const intel = analyzeModelInternetSupport(opts);
+    const hint = `${tRaw("ai.askQa.webSearchHint")}\n${intel.reason}`;
+
+    const btn = row.createEl("button", {
+      cls: `ai-sch-btn ai-ask-bar-btn ai-ask-websearch-btn${this.webSearchOn ? " is-active" : ""}`,
+      text: `🌐 ${tRaw("ai.askQa.webSearch")}${this.webSearchOn ? " ●" : ""}`,
+      attr: {
+        type: "button",
+        title: hint,
+        "aria-pressed": this.webSearchOn ? "true" : "false",
+      },
+    });
+    btn.addEventListener("click", () => {
+      this.webSearchOn = !this.webSearchOn;
+      settings.update((s) => ({ ...s, aiWebSearchEnabled: this.webSearchOn }));
+      type PluginHost = {
+        plugins?: {
+          getPlugin?: (id: string) => {
+            writeOptions?: (changes: Record<string, unknown>) => Promise<void>;
+          } | null;
+        };
+      };
+      const plugin = (this.app as unknown as PluginHost).plugins?.getPlugin?.("worklife-calendar");
+      void plugin?.writeOptions?.({ aiWebSearchEnabled: this.webSearchOn });
+      this.renderWebSearchToggle();
+      new Notice(this.webSearchOn ? tRaw("ai.askQa.webSearchOn") : tRaw("ai.askQa.webSearchOff"));
+    });
+  }
+
+  /**
+   * Optionally fetch web results and prepend them to the user payload.
+   * Skipped when the toggle is off. Failures degrade silently to no context.
+   */
+  private async gatherWebContext(
+    text: string,
+    signal?: AbortSignal,
+    noteContext?: string,
+    history?: string,
+  ): Promise<string> {
+    if (!this.webSearchOn) return "";
+    const query = buildSearchQuery(text, noteContext, history);
+    if (!query) {
+      // Nothing searchable (chit-chat / empty) — skip silently
+      return "";
+    }
+
+    this.setStatus(tRaw("ai.askQa.webSearching"), "busy");
+    try {
+      const resp = await searchWeb(query, 5, signal);
+      if (!resp.ok || resp.results.length === 0) {
+        this.lastWebSources = [];
+        this.setStatus(
+          `${tRaw("ai.askQa.webSearchFailed")}${resp.error ? `: ${resp.error}` : ""}`,
+          "error",
+        );
+        return "";
+      }
+      this.lastWebSources = resp.results;
+      this.setStatus(`${tRaw("ai.askQa.webSearch")}: ${resp.results.length}`, "idle");
+      return formatSearchContext(resp.results, query);
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") throw e;
+      this.lastWebSources = [];
+      this.setStatus(`${tRaw("ai.askQa.webSearchFailed")}: ${errorMessage(e)}`, "error");
+      return "";
+    }
   }
 
   private renderMessages(): void {
     const el = this.messagesEl;
     if (!el) return;
     this.streamBodyEl = null;
-    // Model caption is only meaningful while generating
-    this.modelCaptionEl?.empty();
+    // Model caption stays visible while idle — only refresh the name
+    this.refreshModelCaption();
     if (this.messages.length === 0) {
       this.renderEmptyChat();
       return;
@@ -299,13 +486,8 @@ export class AiAskChat {
   private beginStream(): void {
     const el = this.messagesEl;
     if (!el) return;
-    const opts = get(settings) as {
-      ollamaModel?: string;
-      ollamaModelMode?: "single" | "dual";
-      ollamaModelExtract?: string;
-    };
     // Model label goes ABOVE the messages field, not inside the bubble
-    showModelCaption(this.modelCaptionEl ?? this.root, resolveModel("reason", opts));
+    this.refreshModelCaption();
     const row = el.createDiv({ cls: "ai-ask-msg ai-ask-msg--assistant" });
     const avatar = row.createDiv({ cls: "ai-ask-msg-avatar" });
     avatar.createSpan({ text: "✨" });
@@ -679,14 +861,23 @@ export class AiAskChat {
         .slice(0, -1)
         .map((m) => `${m.role === "user" ? this.userLabel : this.aiLabel}: ${m.text}`)
         .join("\n\n");
+      const webContext = await this.gatherWebContext(
+        text,
+        this.abort.signal,
+        context,
+        history,
+      );
 
-      const userContent = context
-        ? `Note context:\n${context}\n\n${history ? `Conversation so far:\n${history}\n\n` : ""}User message:\n${text}`
-        : `${history ? `Conversation so far:\n${history}\n\n` : ""}User message:\n${text}`;
+      const blocks: string[] = [];
+      if (context) blocks.push(`Note context:\n${context}`);
+      if (webContext) blocks.push(webContext);
+      if (history) blocks.push(`Conversation so far:\n${history}`);
+      blocks.push(`User message:\n${text}`);
+      const userContent = blocks.join("\n\n");
 
       const about = (opts.userAbout || "").trim();
       const tone = (opts.aiTone || "").trim();
-      const systemParts = [tRaw("ai.askQa.system")];
+      const systemParts = [CHAT_STYLE_SYSTEM[this.chatStyle]];
       if (about) {
         systemParts.push(`About the user (use for tone and context): ${about}`);
       }
@@ -695,6 +886,17 @@ export class AiAskChat {
       }
       if (this.aiLabel && this.aiLabel !== tRaw("ai.askQa.ai")) {
         systemParts.push(`Your name is ${this.aiLabel}. Address yourself by this name if needed.`);
+      }
+      // Only talk about web access when the search toggle is on. Local models
+      // otherwise volunteer a canned "I have no internet" refusal.
+      if (this.webSearchOn && webContext) {
+        systemParts.push(
+          "You WERE given current web search results below (fetched just now by the host app). Use them as live context: answer with those facts, cite site titles or domains when useful. Do NOT say that you cannot search the web or lack internet access — the search already happened and the results are in this message. If the snippets do not cover the question, say what is missing and answer from general knowledge.",
+        );
+      } else if (this.webSearchOn) {
+        systemParts.push(
+          "Web search was attempted for this question but returned no usable snippets. Answer from general knowledge and the note context. Do not invent citations. You may mention in one short phrase that live sources were unavailable — then move on and still help.",
+        );
       }
 
       const result = await streamOllamaChat(
@@ -713,6 +915,7 @@ export class AiAskChat {
       this.messages.push({ role: "assistant", text: result.trim() });
       this.streamBodyEl = null;
       this.renderMessages();
+      this.mountSourceList();
       this.setStatus("");
     } catch (e) {
       if ((e as Error)?.name === "AbortError") {
@@ -727,6 +930,7 @@ export class AiAskChat {
         this.renderMessages();
       }
     } finally {
+      this.lastWebSources = [];
       this.isRunning = false;
       this.abort = null;
       this.root.removeClass("scanning", "generating");
@@ -734,6 +938,26 @@ export class AiAskChat {
       if (this.stopBtn) this.stopBtn.disabled = true;
       this.inputEl?.focus();
     }
+  }
+
+  /** Show clickable sources used for the last answer (when web search was on). */
+  private mountSourceList(): void {
+    const host = this.messagesEl;
+    if (!host || this.lastWebSources.length === 0) return;
+    const box = host.createDiv({ cls: "ai-ask-sources" });
+    box.createDiv({ cls: "ai-ask-sources-title", text: tRaw("ai.askQa.webSearch") });
+    for (const s of this.lastWebSources) {
+      const a = box.createEl("a", {
+        cls: "ai-ask-sources-link",
+        text: s.title,
+        attr: { href: s.url, target: "_blank", rel: "noopener noreferrer" },
+      });
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.open(s.url, "_blank", "noopener,noreferrer");
+      });
+    }
+    host.scrollTop = host.scrollHeight;
   }
 }
 

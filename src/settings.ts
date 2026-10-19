@@ -49,6 +49,10 @@ export interface ISettings {
   userAbout?: string;
   /** How the AI should talk to the user (tone / style rules) */
   aiTone?: string;
+  /** Chat personality preset: open (default) | brainstorm | advisor */
+  aiChatStyle?: "open" | "brainstorm" | "advisor";
+  /** Plugin-side web search for the chat (Ollama models cannot browse) */
+  aiWebSearchEnabled?: boolean;
   helloShowTasksBtn?: boolean;
   helloShowAnalyticsBtn?: boolean;
   helloShowFinanceBtn?: boolean;
@@ -339,6 +343,8 @@ export const defaultSettings = Object.freeze({
   ollamaContextSize: 0,
   aiExtractEnabled: true,
   aiChatEnabled: true,
+  aiChatStyle: "open" as const,
+  aiWebSearchEnabled: true,
   aiSummaryEnabled: true,
   aiSubtasksEnabled: true,
   aiScheduleActionsEnabled: true,

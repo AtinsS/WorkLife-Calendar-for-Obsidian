@@ -13160,20 +13160,25 @@ input.ai-task-time-input.ai-task-time-input {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 12px 14px 10px;
+  padding: 10px 8px 8px;
   overflow: hidden;
+  max-width: none;
+  width: 100%;
 }
 
 .ai-ask-view .ai-ask-window {
   flex: 1;
   min-height: 0;
   height: 100%;
+  max-width: none;
+  width: 100%;
 }
 
 .ai-ask-view .ai-ask-messages {
   flex: 1;
   min-height: 0;
   max-height: none;
+  width: 100%;
 }
 
 .ai-ask-view .ai-ask-bar {
@@ -13190,8 +13195,25 @@ input.ai-task-time-input.ai-task-time-input {
 .ai-ask-head {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 4px 2px 0;
+  flex-wrap: wrap;
+}
+
+.ai-ask-head .ai-sch-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Style switcher on the same row as the chat title */
+.ai-ask-styles--head {
+  margin: 0 0 0 auto;
+  flex: 0 0 auto;
+}
+
+.ai-ask-styles--head .ai-ask-styles-tabs {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .ai-ask-context {
@@ -13223,12 +13245,13 @@ input.ai-task-time-input.ai-task-time-input {
 .ai-ask-messages {
   flex: 1;
   min-height: 300px;
-  max-height: 460px;
+  max-height: 560px;
+  width: 100%;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 16px 14px;
+  padding: 16px 12px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   user-select: text;
@@ -13255,7 +13278,8 @@ input.ai-task-time-input.ai-task-time-input {
 .ai-ask-msg {
   display: flex;
   gap: 10px;
-  max-width: 94%;
+  max-width: 100%;
+  width: 100%;
   animation: ai-ask-in 0.22s ease-out;
 }
 
@@ -13309,14 +13333,17 @@ input.ai-task-time-input.ai-task-time-input {
   flex-direction: column;
   gap: 4px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .ai-ask-msg--user .ai-ask-msg-col {
   align-items: flex-end;
+  flex: 0 1 auto;
+  max-width: min(75%, 640px);
 }
 
 .ai-ask-msg-who {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -13325,10 +13352,10 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-ask-msg-body {
-  padding: 11px 14px;
+  padding: 12px 16px;
   border-radius: 14px;
-  font-size: 13px;
-  line-height: 1.6;
+  font-size: 15px;
+  line-height: 1.65;
   color: var(--text-normal);
   min-width: 0;
   overflow-wrap: anywhere;
@@ -13349,13 +13376,40 @@ input.ai-task-time-input.ai-task-time-input {
   border: 1px solid var(--mcp-chat-bot-border);
   border-bottom-left-radius: 5px;
   backdrop-filter: blur(6px);
+  width: 100%;
+  max-width: 100%;
 }
 
+.ai-ask-msg--assistant .ai-ask-msg-col {
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+}
+
+/* Thinking cloud stays compact; the bubble only grows with real text */
 .ai-ask-msg-body.is-streaming {
   border-color: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 45%, transparent);
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--mcp-accent, #7c5cfc) 12%, transparent),
     0 4px 20px color-mix(in srgb, var(--mcp-accent, #7c5cfc) 14%, transparent);
+  width: fit-content;
+  max-width: 100%;
+  min-width: 72px;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.ai-ask-msg--assistant:has(.is-streaming) {
+  width: auto;
+  max-width: 100%;
+  align-self: flex-start;
+}
+
+.ai-ask-msg--assistant:has(.is-streaming) .ai-ask-msg-col {
+  flex: 0 1 auto;
+  width: auto;
 }
 
 /* Markdown inside chat bubbles */
@@ -13373,17 +13427,17 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-ask-msg-body .ai-sch-out-h1 {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 700;
 }
 
 .ai-ask-msg-body .ai-sch-out-h2 {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
 }
 
 .ai-ask-msg-body .ai-sch-out-h3 {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 650;
 }
 
@@ -13399,7 +13453,7 @@ input.ai-task-time-input.ai-task-time-input {
 .ai-ask-msg-body .ai-sch-out-code {
   padding: 1px 6px;
   border-radius: 5px;
-  font-size: 11.5px;
+  font-size: 13px;
   background: rgba(0, 0, 0, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.08);
   color: #c8e0ff;
@@ -13415,8 +13469,8 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-ask-msg-body .ai-sch-out-codeblock {
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.55;
   color: #d0e4ff;
 }
 
@@ -13441,7 +13495,7 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-ask-msg-body .ai-sch-out-table {
-  font-size: 11.5px;
+  font-size: 13px;
   width: 100%;
 }
 
@@ -13452,8 +13506,8 @@ input.ai-task-time-input.ai-task-time-input {
 /* Model caption ABOVE the answer field — same quiet look as .ai-status */
 .ai-model-caption {
   padding: 4px 2px 0;
-  font-size: 12px;
-  color: rgba(200, 210, 220, 0.5);
+  font-size: 13px;
+  color: rgba(200, 210, 220, 0.55);
   min-height: 18px;
   letter-spacing: 0.01em;
 }
@@ -13461,7 +13515,118 @@ input.ai-task-time-input.ai-task-time-input {
 .ai-model-caption-name {
   font-family: var(--font-monospace);
   font-weight: 500;
-  color: rgba(200, 210, 220, 0.5);
+  color: rgba(200, 210, 220, 0.55);
+}
+
+/* Chat style picker (Open / Brainstorm / Advisor) — header row */
+.ai-ask-styles {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.ai-ask-styles-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-ask-style-btn {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.ai-ask-style-btn:hover {
+  color: var(--text-normal);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.ai-ask-style-btn.is-active {
+  color: var(--text-on-accent, #fff);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 85%, transparent);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--mcp-accent, #7c5cfc) 35%, transparent);
+}
+
+/* Web search toggle — bottom bar (next to Copy / Save chat) */
+.ai-ask-websearch--bar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  margin-left: auto;
+}
+
+.ai-ask-websearch-btn {
+  align-self: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.ai-ask-websearch-btn:hover {
+  color: var(--text-normal);
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.ai-ask-websearch-btn.is-active {
+  color: var(--text-on-accent, #fff);
+  border-color: transparent;
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 75%, #2a9d8f 25%);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--mcp-accent, #7c5cfc) 30%, transparent);
+}
+
+.ai-ask-sources {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 12px;
+}
+
+.ai-ask-sources-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 4px;
+}
+
+.ai-ask-sources-link {
+  display: block;
+  color: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 80%, #fff);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  padding: 2px 0;
+  font-size: 12.5px;
+}
+
+.ai-ask-sources-link:hover {
+  color: var(--text-normal);
 }
 
 /* Centered loading spinner in large output fields (not chat) */
@@ -13698,7 +13863,9 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 .ai-ask-input {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
   min-height: 58px;
   max-height: 150px;
   resize: vertical;
@@ -13709,7 +13876,7 @@ input.ai-task-time-input.ai-task-time-input {
     #12121a;
   color: var(--text-normal);
   padding: 11px 14px;
-  font-size: 13px;
+  font-size: 15px;
   font-family: inherit;
   color-scheme: dark;
   transition: border-color 0.18s ease, box-shadow 0.18s ease;
