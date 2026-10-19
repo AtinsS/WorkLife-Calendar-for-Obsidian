@@ -931,11 +931,9 @@ body {
 .markdown-rendered .task-list-item.is-checked {
   color: var(--wl-text-faint);
   text-decoration: line-through;
-  text-decoration-color: rgba(255, 255, 255, 0.22);
 }
 
 .theme-light .markdown-rendered .task-list-item.is-checked {
-  text-decoration-color: rgba(15, 20, 30, 0.22);
 }
 
 /* Tags */
@@ -1054,8 +1052,7 @@ a.internal-link sup {
 /* Kill empty chrome left by the properties/formatter panel.
    Collapsed panel keeps its header (so it can reopen) but zero body. */
 .el-pre.mod-frontmatter.mod-ui:empty,
-.metadata-properties:empty,
-.metadata-properties:not(:has(.metadata-property, .metadata-add-button, input, .multi-select-container, .metadata-property-key)) {
+.metadata-properties:empty {
   display: none !important;
   height: 0 !important;
   min-height: 0 !important;
@@ -1069,15 +1066,6 @@ a.internal-link sup {
   pointer-events: none !important;
 }
 
-/* If the container is kept in the DOM but visually empty */
-.mod-frontmatter.mod-ui:has(> :only-child:empty) {
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  border: none !important;
-}
 
 .metadata-property {
   border-radius: 8px;
@@ -2538,7 +2526,6 @@ input[type="range"] {
 /* --- Modals / prompts / menus --- */
 .is-mobile .modal {
   border-radius: var(--wl-radius-md);
-  max-height: calc(100vh - 48px - env(safe-area-inset-top));
   max-height: calc(100dvh - 48px - env(safe-area-inset-top));
   overflow: auto;
 }
@@ -2770,7 +2757,6 @@ input[type="range"] {
   }
 
   .is-mobile .modal {
-    max-height: calc(100vh - 16px);
     max-height: calc(100dvh - 16px);
   }
 }

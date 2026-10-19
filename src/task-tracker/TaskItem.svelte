@@ -45,8 +45,11 @@
   let showChecklist = false;
   let newChecklistTitle = "";
   let showDescription = false;
-  // Mobile: description is always visible
+  // Mobile: description always expanded
   $: if (isMobile) showDescription = true;
+  // Inline title editing — draft avoids store round-trips that collapse the card
+  let editingChecklistId: string | null = null;
+  let editingChecklistTitle = "";
 
   function handleToggleChecklist(id: string) { toggleChecklistItem(id); }
   function handleAddChecklistItem() {
@@ -56,20 +59,40 @@
     newChecklistTitle = "";
   }
   function handleRemoveChecklistItem(id: string) { removeChecklistItem(id); }
-  function handleChecklistTitleChange(id: string, value: string) {
-    const title = value.trim();
-    if (!title) return;
-    updateChecklistItem(id, { title });
+  function startChecklistEdit(id: string, title: string) {
+    editingChecklistId = id;
+    editingChecklistTitle = title;
+  }
+  function commitChecklistEdit() {
+    if (!editingChecklistId) return;
+    const title = editingChecklistTitle.trim();
+    if (title) updateChecklistItem(editingChecklistId, { title });
+    editingChecklistId = null;
+    editingChecklistTitle = "";
+  }
+  function cancelChecklistEdit() {
+    editingChecklistId = null;
+    editingChecklistTitle = "";
+  }
+  function focusChecklistInput(el: HTMLInputElement) {
+    el.focus();
+    el.select();
   }
   function onChecklistKeydown(e: Event) {
     const ke = e as KeyboardEvent;
-    if (ke.key !== "Enter") return;
+    if (ke.key === "Escape") {
+      ke.preventDefault();
+      ke.stopPropagation();
+      cancelChecklistEdit();
+      return;
+    }
+    if (ke.key !== "Enter") {
+      ke.stopPropagation();
+      return;
+    }
     ke.preventDefault();
+    ke.stopPropagation();
     (ke.currentTarget as HTMLInputElement | null)?.blur();
-  }
-  function onChecklistTitleInput(e: Event, id: string) {
-    const el = e.currentTarget as HTMLInputElement | null;
-    if (el) handleChecklistTitleChange(id, el.value);
   }
 
   function openNote(e: MouseEvent) {
@@ -230,28 +253,12 @@
     const translate = get(t);
     type MenuItem = { label: string; action?: () => void; danger?: boolean } | { divider: true };
     const items: MenuItem[] = [];
-    const mobile = typeof window !== "undefined" && window.innerWidth <= 768;
-
-    const pushDetailActions = () => {
-      if (!mobile) return;
-      if (task.description) {
-        items.push({
-          label: showDescription ? translate("tasks.item.hideDescription") : translate("tasks.item.description"),
-          action: () => { showDescription = !showDescription; },
-        });
-      }
-      items.push({
-        label: showChecklist ? translate("tasks.item.hideSubtasks") : translate("tasks.item.subtasks"),
-        action: () => { showChecklist = !showChecklist; },
-      });
-      items.push({ divider: true });
-    };
 
     if (task.status === "done" || task.status === "failed") {
       items.push({ label: translate("tasks.item.returnToTodo"), action: () => { quickStatus("todo"); } });
       items.push({ label: translate("tasks.item.returnToWork"), action: () => { quickStatus("progress"); } });
       items.push({ divider: true });
-      pushDetailActions();
+      items.push({ label: showChecklist ? translate("tasks.item.hideSubtasks") : translate("tasks.item.subtasks"), action: () => { showChecklist = !showChecklist; } });
       items.push({ label: translate("tasks.item.delete"), action: () => { handleDelete(); }, danger: true });
     } else {
       if (task.status !== "progress" && task.status !== "paused")
@@ -269,10 +276,7 @@
       if (optsAiWorkoutEnabled()) {
         items.push({ label: translate("workout.menuCreateTasksAi"), action: () => { void handleCreateTasksAi(); } });
       }
-      if (optsAiSubtasksEnabled() || optsAiWorkoutEnabled()) {
-        items.push({ divider: true });
-      }
-      pushDetailActions();
+      items.push({ label: showChecklist ? translate("tasks.item.hideSubtasks") : translate("tasks.item.subtasks"), action: () => { showChecklist = !showChecklist; } });
       items.push({ label: translate("tasks.item.edit"), action: () => { handleEdit(); } });
       items.push({ label: translate("tasks.item.delete"), action: () => { handleDelete(); }, danger: true });
     }
@@ -334,7 +338,7 @@
   class:carried-over={isCarriedOver}
   class:workout-session={isWorkoutTask}
   data-status={task.status}
-  draggable="true"
+  draggable={!isMobile}
   role="listitem"
   aria-label={task.title}
   style="--task-color: {task.projectId ? ($projects.find(p => p.id === task.projectId)?.color || 'var(--mcp-accent)') : 'var(--mcp-accent)'}"
@@ -356,30 +360,88 @@
       {/if}
     </button>
 
-    {#if task.boundNotePath}
-      <a class="task-title note-link" class:strikethrough={task.status === "done" || task.status === "failed"} href={task.boundNotePath} on:click|preventDefault={openNote}>{task.title}</a>
-    {:else}
-      <span class="task-title" class:strikethrough={task.status === "done" || task.status === "failed"}>{task.title}</span>
-    {/if}
+    <div class="task-main-text">
+      {#if task.boundNotePath}
+        <a class="task-title note-link" class:strikethrough={task.status === "done" || task.status === "failed"} href={task.boundNotePath} on:click|preventDefault={openNote}>{task.title}</a>
+      {:else}
+        <span class="task-title" class:strikethrough={task.status === "done" || task.status === "failed"}>{task.title}</span>
+      {/if}
 
-    {#if task.description && !isMobile}
-      <button class="task-descr-toggle" on:click|stopPropagation={() => showDescription = !showDescription} title={showDescription ? $t("tasks.item.hide") : $t("tasks.item.description")}>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><line x1="3" y1="4" x2="9" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="3" y1="6.5" x2="7.5" y2="6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-      </button>
-    {/if}
+      <!-- Meta + controls under the title -->
+      <div class="task-sub-row">
+        {#if taskProject}
+          <span class="task-project-chip" style="--pc:{taskProject.color}">
+            <span class="task-project-chip-dot"></span>
+            {taskProject.icon || "📁"} {taskProject.name}
+          </span>
+        {/if}
 
-    {#if task.priority === "high"}
-      <span class="task-priority high">!</span>
-    {:else if task.priority === "medium"}
-      <span class="task-priority medium">~</span>
-    {/if}
+        {#if $activeTab === "all" && task.status !== "done" && task.status !== "failed"}
+          <span class="task-status-badge status-badge-{task.status}">
+            {#if task.status === "todo"}{$t("tasks.tabs.todo")}{:else if task.status === "progress"}{$t("tasks.item.progress")}{:else if task.status === "paused"}{$t("tasks.item.paused")}{/if}
+          </span>
+        {/if}
 
-    {#if !isMobile}
-      <button class="checklist-toggle" on:click|stopPropagation={() => showChecklist = !showChecklist} title={$t("tasks.item.checklist")}>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 6l1.5 1.5L8.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        {#if checklistTotal > 0}{checklistDone}/{checklistTotal}{:else}+{/if}
-      </button>
-    {/if}
+        {#if isWorkoutTask}
+          <span class="task-workout-badge">💪</span>
+        {/if}
+
+        {#if task.isWorkTask}
+          <span class="task-work-badge">{$t("tasks.item.workBadge")}</span>
+        {/if}
+
+        {#if isCarriedOver}
+          <span class="task-carried-over-badge">⚠ {carriedOverLabel}</span>
+        {/if}
+
+        {#if task.recurrence}
+          <span class="task-recurring-icon" title={$t("tasks.item.recurring")}>🔄</span>
+        {/if}
+
+        {#if task.scheduledTime && task.status !== "done" && task.status !== "failed"}
+          <span class="task-scheduled {scheduledTimePassed ? 'passed' : ''}">
+            {scheduledTimePassed ? "⚠" : "🕐"} {task.scheduledTime}{#if task.endTime}–{task.endTime}{/if}
+          </span>
+        {:else if task.scheduledTime}
+          <span class="task-scheduled {task.status}">{$t(task.status === "done" ? "tasks.item.done" : "tasks.item.failed")}</span>
+        {/if}
+
+        {#if hasDeadline && task.status !== "done" && task.status !== "failed"}
+          <span class="task-deadline {deadlineOverdue ? 'overdue' : ''}">⏰ {deadlineLabel}</span>
+        {/if}
+
+        {#if timerDisplay}
+          <span class="task-timer">⏱ {timerDisplay}</span>
+        {:else if hasEstimate && !hasActual}
+          <span class="task-estimate">⏱ {formatEstimate(task.estimatedTime)}</span>
+        {:else if task.status === "done" && hasEstimate && hasActual}
+          <span class="task-estimate-compare {estimateOver ? 'over' : 'under'}">
+            ⏱ {formatEstimate(task.estimatedTime)} → ✓ {formatDuration(task.totalWorkTime)}
+          </span>
+        {:else if hasActual}
+          <span class="task-timer total">⏱ {formatDuration(task.totalWorkTime)}</span>
+        {/if}
+
+        {#if task.priority === "high"}
+          <span class="task-priority high">!</span>
+        {:else if task.priority === "medium"}
+          <span class="task-priority medium">~</span>
+        {/if}
+
+        {#if !isMobile && task.description}
+          <button class="task-icon-btn" class:active={showDescription} on:click|stopPropagation={() => showDescription = !showDescription} title={$t("tasks.item.description")}>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><line x1="3" y1="4" x2="9" y2="4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><line x1="3" y1="6.5" x2="7.5" y2="6.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          </button>
+        {/if}
+
+        {#if !isMobile}
+          <button class="task-icon-btn" class:active={showChecklist} on:click|stopPropagation={() => showChecklist = !showChecklist} title={$t("tasks.item.checklist")}>
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 6l1.5 1.5L8.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            {#if checklistTotal > 0}<span class="task-icon-count">{checklistDone}/{checklistTotal}</span>{/if}
+          </button>
+        {/if}
+      </div>
+    </div>
 
     <div class="task-actions-dropdown">
       <button class="task-actions-toggle" on:click={toggleActionsMenu}>⋮</button>
@@ -390,79 +452,42 @@
     <div class="wf-task-description">{task.description}</div>
   {/if}
 
-  <div class="task-item-row-meta">
-    {#if taskProject}
-      <span class="task-project-chip" style="--pc:{taskProject.color}">
-        <span class="task-project-chip-dot"></span>
-        {taskProject.icon || "📁"} {taskProject.name}
-      </span>
-    {/if}
-
-    {#if $activeTab === "all" && task.status !== "done" && task.status !== "failed"}
-      <span class="task-status-badge status-badge-{task.status}">
-        {#if task.status === "todo"}{$t("tasks.tabs.todo")}{:else if task.status === "progress"}{$t("tasks.item.progress")}{:else if task.status === "paused"}{$t("tasks.item.paused")}{/if}
-      </span>
-    {/if}
-
-    {#if isWorkoutTask}
-      <span class="task-workout-badge">💪</span>
-    {/if}
-
-    {#if task.isWorkTask}
-      <span class="task-work-badge">{$t("tasks.item.workBadge")}</span>
-    {/if}
-
-    {#if isCarriedOver}
-      <span class="task-carried-over-badge">⚠ {carriedOverLabel}</span>
-    {/if}
-
-    {#if task.recurrence}
-      <span class="task-recurring-icon" title={$t("tasks.item.recurring")}>🔄</span>
-    {/if}
-
-    {#if task.scheduledTime}
-      {#if task.status === "done"}
-        <span class="task-scheduled done">{$t("tasks.item.done")}</span>
-      {:else if task.status === "failed"}
-        <span class="task-scheduled failed">{$t("tasks.item.failed")}</span>
-      {:else}
-        <span class="task-scheduled {scheduledTimePassed ? 'passed' : ''}">
-          {scheduledTimePassed ? "⚠" : "🕐"} {task.scheduledTime}{#if task.endTime} — {task.endTime}{/if}
-        </span>
-      {/if}
-    {/if}
-
-    {#if hasDeadline && task.status !== "done" && task.status !== "failed"}
-      <span class="task-deadline {deadlineOverdue ? 'overdue' : ''}">⏰ {deadlineLabel}</span>
-    {/if}
-
-    {#if timerDisplay}
-      <span class="task-timer">⏱ {timerDisplay}</span>
-    {:else if hasEstimate && !hasActual}
-      <span class="task-estimate">⏱ {formatEstimate(task.estimatedTime)}</span>
-    {:else if task.status === "done" && hasEstimate && hasActual}
-      <span class="task-estimate-compare {estimateOver ? 'over' : 'under'}">
-        ⏱ {formatEstimate(task.estimatedTime)} → ✓ {formatDuration(task.totalWorkTime)}
-      </span>
-    {:else if hasActual}
-      <span class="task-timer total">⏱ {formatDuration(task.totalWorkTime)}</span>
-    {/if}
-  </div>
-
   {#if showChecklist}
-    <div class="checklist-section">
+    <div class="checklist-section" on:click|stopPropagation on:keydown|stopPropagation>
       {#each taskChecklistItems as item (item.id)}
-        <div class="checklist-item" class:checked={item.checked}>
-          <input type="checkbox" checked={item.checked} on:change={() => handleToggleChecklist(item.id)} on:click|stopPropagation />
-          <input
-            type="text"
-            class="checklist-title checklist-title-input"
-            class:strike={item.checked}
-            value={item.title}
-            on:click|stopPropagation
-            on:keydown|stopPropagation={onChecklistKeydown}
-            on:change={(e) => onChecklistTitleInput(e, item.id)}
-          />
+        <div class="checklist-item" class:checked={item.checked} class:editing={editingChecklistId === item.id}>
+          <button
+            type="button"
+            class="check-box"
+            class:checked={item.checked}
+            role="checkbox"
+            aria-checked={item.checked}
+            on:click|stopPropagation={() => handleToggleChecklist(item.id)}
+          >
+            {#if item.checked}
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5.2L4.2 7.4 8 2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            {/if}
+          </button>
+          {#if editingChecklistId === item.id}
+            <input
+              type="text"
+              class="checklist-title checklist-title-input"
+              bind:value={editingChecklistTitle}
+              use:focusChecklistInput
+              on:click|stopPropagation
+              on:keydown|stopPropagation={onChecklistKeydown}
+              on:blur={commitChecklistEdit}
+            />
+          {:else}
+            <span
+              class="checklist-title"
+              class:strike={item.checked}
+              role="button"
+              tabindex="0"
+              on:click|stopPropagation={() => startChecklistEdit(item.id, item.title)}
+              on:keydown|stopPropagation={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); startChecklistEdit(item.id, item.title); } }}
+            >{item.title}</span>
+          {/if}
           <button class="checklist-remove" on:click|stopPropagation={() => handleRemoveChecklistItem(item.id)} title={$t("common.delete")}>✕</button>
         </div>
       {/each}

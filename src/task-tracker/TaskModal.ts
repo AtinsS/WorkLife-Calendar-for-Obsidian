@@ -254,6 +254,12 @@ export class TaskModal extends CustomModal {
       subToggle.toggleClass("open", !!hidden);
     });
     this.renderSubtasks();
+    // Keep subtasks open when editing a task that already has them
+    if (this.task && this.subtaskTitles.some((t) => t.trim())) {
+      this.subtaskListEl?.removeClass("mcp-hidden");
+      subActions?.removeClass("mcp-hidden");
+      subToggle.addClass("open");
+    }
 
     // Extra parameters
     const extraToggle = panelBar.createEl("button", {
