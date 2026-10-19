@@ -14490,7 +14490,7 @@ input.ai-task-time-input.ai-task-time-input {
 
 .ai-sch-output {
   min-height: 240px;
-  max-height: 340px;
+  max-height: 280px;
   overflow-y: auto;
   padding: 16px 18px 18px;
   color: #dce7f2;
