@@ -398,9 +398,9 @@
     const d = momentFn(match[1], "YYYY-MM-DD");
     const today = momentFn().startOf("day");
     const diff = d.diff(today, "days");
-    if (diff < 0) return `${Math.abs(diff)}д просрочено`;
-    if (diff === 0) return "сегодня";
-    if (diff === 1) return "завтра";
+    if (diff < 0) return $t("schedule.overdueDays", { days: Math.abs(diff) });
+    if (diff === 0) return $t("schedule.today").toLowerCase();
+    if (diff === 1) return $t("schedule.tomorrow").toLowerCase();
     return d.format("D MMM");
   }
 
@@ -418,9 +418,9 @@
     const d = momentFn(match[1], "YYYY-MM-DD");
     const today = momentFn().startOf("day");
     const diff = d.diff(today, "days");
-    if (diff === 0) return "сегодня";
-    if (diff === 1) return "завтра";
-    if (diff === -1) return "вчера";
+    if (diff === 0) return $t("schedule.today").toLowerCase();
+    if (diff === 1) return $t("schedule.tomorrow").toLowerCase();
+    if (diff === -1) return $t("tasks.timeLogs.yesterday").toLowerCase();
     return d.format("D MMM");
   }
 

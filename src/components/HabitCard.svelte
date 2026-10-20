@@ -70,17 +70,17 @@
     <div class="habit-stat">
       <span class="habit-stat-value">{stats.currentStreak}</span>
       <span class="habit-stat-label">{$t("components.streak")}</span>
-      <span class="habit-stat-sub">{$t("components.streakDays")}</span>
+      <span class="habit-stat-sub">{$t("components.streakDays", { count: stats.currentStreak })}</span>
     </div>
     <div class="habit-stat">
       <span class="habit-stat-value">{stats.longestStreak}</span>
       <span class="habit-stat-label">{$t("components.maxStreak")}</span>
-      <span class="habit-stat-sub">{$t("components.streakDays")}</span>
+      <span class="habit-stat-sub">{$t("components.streakDays", { count: stats.longestStreak })}</span>
     </div>
     <div class="habit-stat">
       <span class="habit-stat-value">{stats.totalCompletions}</span>
       <span class="habit-stat-label">{$t("components.totalCompletions")}</span>
-      <span class="habit-stat-sub">{$t("components.completions")}</span>
+      <span class="habit-stat-sub">{$t("components.completions", { count: stats.totalCompletions })}</span>
     </div>
     <div class="habit-stat">
       <span class="habit-stat-value stat-accent">{stats.completionRate}%</span>

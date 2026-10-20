@@ -492,7 +492,7 @@
         </div>
       {/each}
       <div class="checklist-add">
-        <input type="text" placeholder={$t("tasks.item.checkistNew")} bind:value={newChecklistTitle} on:keydown|stopPropagation={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddChecklistItem(); } }} on:click|stopPropagation />
+        <input type="text" placeholder={$t("tasks.item.checklistNew")} bind:value={newChecklistTitle} on:keydown|stopPropagation={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAddChecklistItem(); } }} on:click|stopPropagation />
         <button on:click|stopPropagation={handleAddChecklistItem}>+</button>
       </div>
     </div>

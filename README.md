@@ -84,8 +84,8 @@ Many workflows have the same problem: tasks live in one place, the calendar in a
 
 ## 🧭 Quick start
 
-1. **Tasks** — open *Tasks* or click **“Quick Add Task”**, then type naturally: *“Submit report on Friday @Work !urgent”*.
-2. **Finances** — open the *Finances* section. It has four tabs: **Budget / Savings / Income / Expenses**. Add your first expense in the **Expenses** tab.
+1. **Tasks** — open *Tasks* or click **“Quick Add Task”**, then type naturally: *“! Submit report on Friday @Work”*.
+2. **Finances** — open the *Finances* section. It has four tabs: **Budget / Piggy bank / Income / Expenses**. Add your first expense in the **Expenses** tab.
 3. **Monthly summary** — at the end of the month, select **Markdown** or **Excel** and click **“Summary”** to generate a report.
 
 > [!TIP]
@@ -114,7 +114,7 @@ If the plugin saves you time and helps with your work, you can support its devel
 
 ## ✅ Focus and task management
 
-- Kanban board and lists with five statuses: To Do → In Progress → On Hold → Done → Not Done.
+- Kanban board and lists with five statuses: To Do → In Progress → Paused → Done → Not Done.
 - Live timer: track time right from a task card. The timer won’t reset if you restart Obsidian. (The timer starts when a task moves to **In Progress**; you can disable this in settings.)
 - Recurring tasks: set them up once to repeat daily, weekly, or monthly.
 - Automatically move overdue tasks to the next day (can be disabled).
@@ -132,7 +132,7 @@ A unified **Finances** section with four tabs—planned and actual figures are k
 | Tab | What’s included |
 | :--- | :--- |
 | **Budget** | Monthly plan (estimates only): planned income, how to allocate it, how much to save, and rules. **Does not affect** actual figures |
-| **Savings** | Savings goals; contributions are recorded as actual expenses |
+| **Piggy bank** | Savings goals; contributions are recorded as actual expenses |
 | **Income** | Earnings from tasks (hours × rate or daily rate), additional income sources, and categories |
 | **Expenses** | Actual spending, expense categories, text-based expense analysis (manual or AI-assisted), and savings contributions |
 
@@ -155,7 +155,7 @@ Runs entirely on your computer—your data isn’t sent anywhere.
 **What it can do:**
 
 - **Tasks** — extract tasks from a note (right-click a `.md` file), break tasks into subtasks, generate descriptions, and use smart input (for example, “Create several tasks titled ‘Call’, repeat every Thursday, project ‘Work’”).
-- **Notes** — summarize a folder or selected notes in these styles: Concise / Detailed / Bullet Points / For Managers / **Custom**.
+- **Notes** — summarize a folder or selected notes in these styles: Brief / Detailed / Bullets / Executive / **Custom**.
 - **Schedule (AI Actions)** — summarize a period, assess workload with **“Apply Recommendations”** (preview → confirmation), and process natural-language commands (“move tasks in the ‘Home’ project by one day,” “create ‘Buy milk’ next Thursday for 1 hour”). Changes always go through an **operation plan** that you confirm.
 - **AI chat (Ask AI)** — live chat in the context of a note or folder (right-click → *AI Tools* or the command palette).
   - **Styles** in the chat header: *Open* (free chat) / *Brainstorm* / *Advisor* (verdict, pros/cons, risks). Switch anytime; the next message uses the new style.
@@ -175,10 +175,10 @@ Available in **Quick Add** and **AI schedule commands**.
 
 | Style | Format | Best for |
 | :--- | :--- | :--- |
-| **Concise** | A heading plus 2–4 sentences covering everything in one continuous summary | Quickly refreshing your memory about a collection of notes |
+| **Brief** | A heading plus 2–4 sentences covering everything in one continuous summary | Quickly refreshing your memory about a collection of notes |
 | **Detailed** | Overview → Key ideas → Conclusions (bullet points) | Understanding the material in depth |
-| **Bullet Points** | A bulleted list only, with no prose | Skimming or getting a quick introduction to a topic |
-| **For Managers** | Main points → Facts and figures → Risks and questions | Meeting reports, status updates, and management briefings |
+| **Bullets** | A bulleted list only, with no prose | Skimming or getting a quick introduction to a topic |
+| **Executive** | TL;DR → Facts and figures → Risks and questions | Meeting reports, status updates, and management briefings |
 | **Custom** | Your own formatting rules (in settings or when generating a summary in the modal) | Corporate style, a fixed list of sections, language, or tone |
 
 All styles create **one unified summary** of all notes, without separate sections for each file. Names, dates, and figures are preserved. The **Additional instructions** field is appended to the prompt—for example, “highlight only actions and dates.”
@@ -222,7 +222,7 @@ Every change is shown in advance. Recommendations from **What’s done** are not
 
 The plugin stores data as JSON files in the `calendar-data/` folder at the root of your vault. When **“Sync to vault root”** is enabled, this becomes the primary data storage format and supports fast loading and syncing via:
 
-- **Obsidian Sync** / **Remotely Save***
+- **Obsidian Sync** / **Remotely Save**
 - **Syncthing**
 
 > [!WARNING] Financial data

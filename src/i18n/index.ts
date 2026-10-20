@@ -42,6 +42,39 @@ function getNestedValue(obj: unknown, path: string): string | string[] | undefin
 }
 
 /**
+ * Russian plural category: one / few / many.
+ * 1 → one, 2–4 → few, 5–20 → many, 21 → one, etc.
+ */
+export function ruPlural(n: number): "one" | "few" | "many" {
+  const abs = Math.abs(Math.trunc(n)) % 100;
+  const n1 = abs % 10;
+  if (abs > 10 && abs < 20) return "many";
+  if (n1 > 1 && n1 < 5) return "few";
+  if (n1 === 1) return "one";
+  return "many";
+}
+
+function resolvePluralValue(value: string | string[] | undefined, count: number | undefined): string | string[] | undefined {
+  if (value == null || Array.isArray(value) || typeof value !== "string") return value;
+  // Pipe forms: "one|few|many"
+  if (value.includes("|") && typeof count === "number" && Number.isFinite(count)) {
+    const forms = value.split("|");
+    if (forms.length === 3) {
+      return forms[ruPlural(count) === "one" ? 0 : ruPlural(count) === "few" ? 1 : 2];
+    }
+  }
+  return value;
+}
+
+function pickCount(params?: Record<string, string | number>): number | undefined {
+  if (!params) return undefined;
+  const raw = params.count ?? params.n;
+  if (typeof raw === "number" && Number.isFinite(raw)) return raw;
+  if (typeof raw === "string" && raw.trim() !== "" && Number.isFinite(Number(raw))) return Number(raw);
+  return undefined;
+}
+
+/**
  * Reactive translation store for use in Svelte components.
  * Usage: import { t } from "../i18n";  then  $t("key.path")
  */
@@ -61,10 +94,11 @@ function createT() {
       if (Array.isArray(value)) {
         return value.join(", ");
       }
+      value = resolvePluralValue(value, pickCount(params)) as string;
       if (params) {
         return Object.entries(params).reduce(
           (str, [k, v]) => str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v)),
-          value 
+          value
         );
       }
       return value ;
@@ -107,10 +141,11 @@ export function tRaw(key: string, params?: Record<string, string | number>): str
   value = resolveCurrencyKey(key, value);
   if (value === undefined) return key;
   if (Array.isArray(value)) return value.join(", ");
+  value = resolvePluralValue(value, pickCount(params)) as string;
   if (params) {
     return Object.entries(params).reduce(
       (str, [k, v]) => str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v)),
-      value 
+      value
     );
   }
   return value ;

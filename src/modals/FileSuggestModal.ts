@@ -1,4 +1,5 @@
 import { App, SuggestModal, TFile } from "obsidian";
+import { tRaw } from "../i18n";
 
 export interface FileSuggestion {
   file: TFile;
@@ -13,7 +14,7 @@ export class FileSuggestModal extends SuggestModal<FileSuggestion> {
     super(app);
     this.files = this.getVaultFiles();
     this.onSelect = onSelect;
-    this.setPlaceholder("Поиск заметки...");
+    this.setPlaceholder(tRaw("modals.fileSearchPlaceholder"));
   }
 
   getSuggestions(query: string): FileSuggestion[] {

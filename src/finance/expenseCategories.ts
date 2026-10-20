@@ -2,6 +2,8 @@
  * Expense category taxonomy with emoji.
  * Built-in defaults + user-defined custom categories (managed in the UI).
  */
+import { tRaw } from "../i18n";
+
 export interface ExpenseCategoryDef {
   id: string;
   name: string;
@@ -9,6 +11,15 @@ export interface ExpenseCategoryDef {
   keywords: string[];
   /** Built-ins cannot be deleted, only renamed/icon-changed is blocked too. */
   builtin?: boolean;
+}
+
+/** Display name: localized for builtins, stored name for custom categories. */
+export function categoryDisplayName(cat: ExpenseCategoryDef): string {
+  if (cat.builtin) {
+    const localized = tRaw(`finance.expenseCats.${cat.id}`);
+    if (localized && localized !== `finance.expenseCats.${cat.id}`) return localized;
+  }
+  return cat.name;
 }
 
 export const EXPENSE_CATEGORIES: ExpenseCategoryDef[] = [

@@ -459,7 +459,7 @@ export class WorkoutPlanModal extends CustomModal {
 
       if (day.estimatedMinutes) {
         card.createDiv({
-          text: `${day.estimatedMinutes} ${tRaw("workout.minutes")} · ${day.exercises.length} ${tRaw("workout.exercises")}`,
+          text: `${day.estimatedMinutes} ${tRaw("workout.minutes")} · ${tRaw("workout.exercisesCount", { count: day.exercises.length })}`,
           cls: "workout-day-meta",
         });
       }

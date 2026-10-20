@@ -1,4 +1,5 @@
 import { App, SuggestModal, TFolder } from "obsidian";
+import { tRaw } from "../i18n";
 
 export interface FolderSuggestion {
   folder: string;
@@ -12,7 +13,7 @@ export class FolderSuggestModal extends SuggestModal<FolderSuggestion> {
     super(app);
     this.folders = this.getVaultFolders();
     this.onSelect = onSelect;
-    this.setPlaceholder("Поиск папки...");
+    this.setPlaceholder(tRaw("modals.folderSearchPlaceholder"));
   }
 
   getSuggestions(query: string): FolderSuggestion[] {

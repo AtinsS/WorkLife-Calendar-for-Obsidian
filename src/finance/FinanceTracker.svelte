@@ -16,6 +16,7 @@
     iconForCategory,
     guessCategory,
     categoryByName,
+    categoryDisplayName,
     generateCategoryId as generateCatId,
     type ExpenseCategoryDef,
   } from "./expenseCategories";
@@ -275,6 +276,11 @@
 
   function formatMoney(amount: number): string {
     return amount.toLocaleString(get(locale) === "en" ? "en-US" : "ru-RU");
+  }
+
+  function catLabel(name: string): string {
+    const cat = categoryByName(expenseCats, name);
+    return cat ? categoryDisplayName(cat) : name;
   }
 
   function formatDelta(amount: number): string {
@@ -990,7 +996,7 @@
             {:else}
               <div class="cat-manager__row">
                 <span class="cat-manager__icon">{cat.icon}</span>
-                <span class="cat-manager__name">{cat.name}</span>
+                <span class="cat-manager__name">{categoryDisplayName(cat)}</span>
                 {#if !cat.builtin}
                   <button class="dash-btn dash-btn--sm" on:click={() => startEditCategory(cat)} title={$t("common.edit")}>✎</button>
                   <button class="cat-delete" on:click={() => removeCustomCategory(cat.id)} title={$t("common.delete")}>✕</button>
@@ -1014,7 +1020,7 @@
       <input class="expense-input amount" type="number" min="0" bind:value={newExpenseAmount} placeholder={$t("finance.expensesAmount")} />
       <select class="expense-input" bind:value={newExpenseCategory}>
         {#each expenseCats as cat (cat.id)}
-          <option value={cat.name}>{cat.icon} {cat.name}</option>
+          <option value={cat.name}>{cat.icon} {categoryDisplayName(cat)}</option>
         {/each}
       </select>
       <input class="expense-input date" type="date" bind:value={newExpenseDate} />
@@ -1039,7 +1045,7 @@
         {#each byCat as chip (chip.name)}
           <div class="expense-chip">
             <span class="expense-chip__icon">{chip.icon}</span>
-            <span class="expense-chip__name">{chip.name}</span>
+            <span class="expense-chip__name">{catLabel(chip.name)}</span>
             <span class="expense-chip__amt">{formatMoney(chip.amount)}</span>
           </div>
         {/each}
@@ -1060,7 +1066,7 @@
               <input class="expense-input amount" type="number" min="0" bind:value={editExpenseAmount} />
               <select class="expense-input" bind:value={editExpenseCategory}>
                 {#each expenseCats as cat (cat.id)}
-                  <option value={cat.name}>{cat.icon} {cat.name}</option>
+                  <option value={cat.name}>{cat.icon} {categoryDisplayName(cat)}</option>
                 {/each}
               </select>
               <input class="expense-input date" type="date" bind:value={editExpenseDate} />
@@ -1079,7 +1085,7 @@
               <div class="expense-card__body">
                 <span class="expense-card__name">{exp.name}</span>
                 <div class="expense-card__meta">
-                  {#if exp.categoryName}<span class="expense-card__cat">{exp.categoryName}</span>{/if}
+                  {#if exp.categoryName}<span class="expense-card__cat">{catLabel(exp.categoryName)}</span>{/if}
                   <span class="expense-card__date">{exp.date}</span>
                 </div>
               </div>

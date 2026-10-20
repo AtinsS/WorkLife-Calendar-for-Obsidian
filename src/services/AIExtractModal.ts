@@ -744,7 +744,7 @@ export class AIExtractModal extends CustomModal {
         // Subtasks badge
         if (task.subtasks.length > 0) {
           const stBadge = meta.createSpan({
-            text: `☐ ${task.subtasks.length} ${tRaw("ai.subtasks")}`,
+            text: `☐ ${tRaw("ai.subtasksCount", { count: task.subtasks.length })}`,
             cls: "ai-subtasks-badge",
           });
           // Subtasks container — append to taskList (AFTER taskRow), not inside taskRow
@@ -753,7 +753,7 @@ export class AIExtractModal extends CustomModal {
             if (subtasksListEl) {
               subtasksListEl.remove();
               subtasksListEl = null;
-              stBadge.textContent = `☐ ${task.subtasks.length} ${tRaw("ai.subtasks")}`;
+              stBadge.textContent = `☐ ${tRaw("ai.subtasksCount", { count: task.subtasks.length })}`;
             } else {
               subtasksListEl = taskList.createDiv({ cls: "ai-subtasks-list" });
               for (const st of task.subtasks) {
@@ -761,7 +761,7 @@ export class AIExtractModal extends CustomModal {
                 stItem.createSpan({ text: "☐" });
                 stItem.createSpan({ text: st.title, cls: "ai-subtask-title" });
               }
-              stBadge.textContent = `☑ ${task.subtasks.length} ${tRaw("ai.subtasks")}`;
+              stBadge.textContent = `☑ ${tRaw("ai.subtasksCount", { count: task.subtasks.length })}`;
               // Move subtasks list right after the current taskRow
               taskRow.after(subtasksListEl);
             }

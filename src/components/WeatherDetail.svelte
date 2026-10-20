@@ -49,7 +49,7 @@
     if (!dateStr) return "";
     try {
       const m = window.moment(dateStr, "YYYY-MM-DD", true);
-      if (m.isValid()) return m.format("D MMMM") + " " + tRaw("weather.updatedAt");
+      if (m.isValid()) return m.format("D MMMM");
     } catch { /* ignore */ }
     return dateStr;
   }

@@ -1,5 +1,5 @@
 import { requestUrl, type RequestUrlParam, type RequestUrlResponse } from "obsidian";
-import { tRaw } from "../i18n";
+import { tRaw, tArrayRaw } from "../i18n";
 import { errorMessage } from "../utils/sanitize";
 
 const TRANSIENT_NET_ERRORS = [
@@ -214,7 +214,7 @@ function getWmoCode(code: number): { icon: string; label: string } {
 }
 
 function windDegToCompass(deg: number): string {
-  const dirs = ["С", "ССВ", "СВ", "ВСВ", "В", "ВЮВ", "ЮВ", "ЮЮВ", "Ю", "ЮЮЗ", "ЮЗ", "ЗЮЗ", "З", "ЗСЗ", "СЗ", "ССЗ"];
+  const dirs = tArrayRaw("weather.windDirs");
   return dirs[Math.round(deg / 22.5) % 16] || "";
 }
 

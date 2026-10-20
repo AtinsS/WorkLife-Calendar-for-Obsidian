@@ -87,11 +87,11 @@
   }
 
   function formatMinutes(minutes: number): string {
-    if (minutes <= 0) return "0м";
+    if (minutes <= 0) return `0${$t("schedule.minutes")}`;
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    if (h === 0) return `${m}м`;
-    return m > 0 ? `${h}ч ${m}м` : `${h}ч`;
+    if (h === 0) return `${m}${$t("schedule.minutes")}`;
+    return m > 0 ? `${h}${$t("schedule.hours")} ${m}${$t("schedule.minutes")}` : `${h}${$t("schedule.hours")}`;
   }
 
   function projectFor(task: ITask, map: Map<string, IProject>): IProject | null {

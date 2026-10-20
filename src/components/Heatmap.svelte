@@ -2,12 +2,15 @@
   import moment from "moment";
   import { getHeatmapData } from "../habit-tracker/stores";
   import type { HeatmapCell } from "../habit-tracker/stores";
+  import { t, tArray } from "../i18n";
 
   export let habitId: string | undefined = undefined;
 
   let cells: HeatmapCell[] = [];
   let months: string[] = [];
-  let dayLabels = ["Mon", "", "Wed", "", "Fri", "", ""];
+
+  $: weekdaysShort = $tArray("common.weekdays.short");
+  $: dayLabels = [weekdaysShort[0] || "", "", weekdaysShort[2] || "", "", weekdaysShort[4] || "", "", ""];
 
   $: {
     cells = getHeatmapData(habitId);
@@ -53,7 +56,7 @@
 
 <div class="heatmap-container">
   <div class="heatmap-header">
-    <span class="heatmap-total">{totalCompletions} completions in the last year</span>
+    <span class="heatmap-total">{$t("habitAnalytics.heatmapTotal", { count: totalCompletions })}</span>
   </div>
   <div class="heatmap-grid-wrapper">
     <div class="heatmap-day-labels">
@@ -66,17 +69,17 @@
         <div
           class="heatmap-cell"
           style="background-color: {getColor(cell.level)}; grid-row: {getDayIndex(cell.date) + 1}; grid-column: {getWeekIndex(cell.date) + 1}; animation-delay: {Math.min(i * 3, 420)}ms;"
-          title="{cell.date}: {cell.count} completion{cell.count !== 1 ? 's' : ''}"
+          title="{cell.date}: {$t('habitAnalytics.heatmapCell', { count: cell.count })}"
         ></div>
       {/each}
     </div>
   </div>
   <div class="heatmap-legend">
-    <span class="heatmap-legend-label">Less</span>
+    <span class="heatmap-legend-label">{$t("habitAnalytics.heatmapLess")}</span>
     {#each levelColors as color}
       <div class="heatmap-cell heatmap-legend-cell" style="background-color: {color};"></div>
     {/each}
-    <span class="heatmap-legend-label">More</span>
+    <span class="heatmap-legend-label">{$t("habitAnalytics.heatmapMore")}</span>
   </div>
 </div>
 
