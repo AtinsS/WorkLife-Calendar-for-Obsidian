@@ -14,6 +14,24 @@
   import { toDateKey } from "./types";
   import { countUp } from "../utils/visualMotion";
   import WeightChart from "./WeightChart.svelte";
+  import { guardTyping, installTypingShield } from "../ui/CustomModal";
+  import { onMount, onDestroy } from "svelte";
+
+  let rootEl: HTMLElement | null = null;
+  let unbindTyping: (() => void) | null = null;
+
+  onMount(() => {
+    if (rootEl) unbindTyping = installTypingShield(rootEl);
+    const note = rootEl?.querySelector<HTMLInputElement>(".wt-note");
+    const weight = rootEl?.querySelector<HTMLInputElement>(".wt-weight");
+    if (note) guardTyping(note, () => onSave());
+    if (weight) guardTyping(weight, () => onSave());
+  });
+
+  onDestroy(() => {
+    unbindTyping?.();
+    unbindTyping = null;
+  });
 
   let dateInput = toDateKey(new Date());
   /** type=number binds a number after first input — keep union for safety */
@@ -88,7 +106,7 @@
   }
 </script>
 
-<div class="weight-tracker">
+<div class="weight-tracker" bind:this={rootEl}>
   <div class="wt-header">
     <h3>{$t("weight.title")}</h3>
     <div class="wt-goal-fields">

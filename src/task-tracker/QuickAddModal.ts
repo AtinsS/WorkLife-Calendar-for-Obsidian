@@ -1,4 +1,5 @@
 import { App, Modal, Notice } from "obsidian";
+import { guardTyping, installTypingShield } from "../ui/CustomModal";
 import type { Moment } from "moment";
 import { getDateUID } from "obsidian-daily-notes-interface";
 import { get } from "svelte/store";
@@ -493,6 +494,7 @@ export class QuickAddModal extends Modal {
   private subtasksSyncCount: (() => void) | null = null;
   private extraBody: HTMLElement | null = null;
   private extra: ExtraForm;
+  private unbindTyping: (() => void) | null = null;
   private extraCtrls: {
     date?: HTMLInputElement;
     start?: HTMLInputElement;
@@ -714,7 +716,9 @@ export class QuickAddModal extends Modal {
     });
 
     // ── Events ──
+    this.unbindTyping = installTypingShield(this.modalEl);
     this.bindInputEvents();
+    guardTyping(this.inputEl);
     // Switch to AI mode after the full UI exists (initialMode: "multi")
     if (this.startInMulti) this.setMode("multi");
     this.modalEl.addEventListener("keydown", (e: KeyboardEvent) => {
@@ -900,6 +904,7 @@ export class QuickAddModal extends Modal {
 
     this.inputEl.value = current;
     this.bindInputEvents();
+    guardTyping(this.inputEl);
     this.inputEl.focus();
   }
 
@@ -2035,6 +2040,10 @@ export class QuickAddModal extends Modal {
   }
 
   onClose(): void {
+    if (this.unbindTyping) {
+      this.unbindTyping();
+      this.unbindTyping = null;
+    }
     this.contentEl.empty();
   }
 }

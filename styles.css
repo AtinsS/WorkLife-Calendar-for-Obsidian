@@ -2933,15 +2933,48 @@ body > .task-actions-menu {
   z-index: 15;
 }
 
-/* Soft keyboard open: drop the dark scrim so it does not paint under the keyboard */
+/* Soft keyboard open: the theme's body starfield (fixed attachment) must not
+   slide in under/behind the keyboard as a «подложка». Keep only the solid
+   canvas colour — no radial-gradient stars, no fixed attachment. */
+html.wl-keyboard-open body {
+  background-image: none;
+  background-attachment: scroll;
+}
+
+/* Soft keyboard open: modal scrims use a solid app surface. Not rgba(0,0,0,.6)
+   (paints a dark bar under the keyboard) and not transparent (re-exposes the
+   body night-sky). Hello search is immune (markdown scroller); task search and
+   other plugin inputs hit these overlays / glass panels. */
 html.wl-keyboard-open .wf-dialog-overlay,
 html.wl-keyboard-open .dash-popup-overlay,
 html.wl-keyboard-open .goals-modal-overlay,
 html.wl-keyboard-open .time-logs-overlay,
-html.wl-keyboard-open .holiday-list-overlay {
+html.wl-keyboard-open .holiday-list-overlay,
+html.wl-keyboard-open .month-goals-modal-overlay {
+  background: var(--background-primary, #0b0d12);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Obsidian-native modal backdrop (theme paints it with --background-modifier-cover
+   + blur). On mobile it is a full-screen fixed scrim that rides with the keyboard
+   — the «что-то выезжает из-под клавиатуры» plate on QuickAdd / weight. Drop it. */
+html.wl-keyboard-open .modal-bg {
   background: transparent;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+/* QuickAdd rests at min(90vh, …) so the primary action hides under the keyboard.
+   Same pattern as .kbm-board-modal: shrink while the keyboard is open. */
+html.wl-keyboard-open .quick-add-shell {
+  max-height: min(60dvh, 480px);
+  margin-bottom: 8px;
+}
+
+html.wl-keyboard-open .quick-add-shell .modal-content.qa2,
+html.wl-keyboard-open .wf-task-modal .wf-dialog-content.qa2 {
+  max-height: min(60dvh, 480px);
 }
 
 /* Note: do NOT set z-index on bare .modal вЂ” it conflicts with Obsidian's own modal styles */
@@ -5095,11 +5128,11 @@ h2.tm-title.tm-title {
     font-size: 15px;
     min-width: 0;
     flex: 1 1 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    overflow-wrap: normal;
-    word-break: normal;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     line-height: 1.3;
   }
 
@@ -14276,7 +14309,7 @@ input.ai-task-time-input.ai-task-time-input {
   }
 
   .task-tracker-body {
-    padding: 0 10px 12px;
+    padding: 0 6px 12px;
   }
 
   .task-tracker-list {
@@ -14287,7 +14320,7 @@ input.ai-task-time-input.ai-task-time-input {
 
   .task-tracker-list .task-item {
     margin-bottom: 0;
-    padding: 12px 12px 12px 14px;
+    padding: 12px 10px 12px 12px;
     border-radius: 12px;
     gap: 6px;
     background: rgba(255, 255, 255, 0.03);
@@ -14330,17 +14363,17 @@ input.ai-task-time-input.ai-task-time-input {
     flex: 1 1 0;
   }
 
-  /* One line + ellipsis — never wrap long titles */
+  /* Long titles wrap — full text fits on the card */
   .task-tracker-list .task-title {
     font-size: 15px;
     font-weight: 550;
     line-height: 1.35;
     letter-spacing: 0;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    overflow-wrap: normal;
-    word-break: normal;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     flex: 0 1 auto;
     min-width: 0;
     width: 100%;
@@ -14353,8 +14386,8 @@ input.ai-task-time-input.ai-task-time-input {
 
   .task-tracker-list .task-sub-row {
     gap: 3px;
-    flex-wrap: nowrap;
-    overflow: hidden;
+    flex-wrap: wrap;
+    overflow: visible;
   }
 
   /* Only time chips on mobile — drop project/status/label noise */

@@ -19,7 +19,7 @@
   }
 
   .mobile-tasks :global(.task-tracker-panel) {
-    padding: 12px 14px;
+    padding: 8px 6px;
     height: 100%;
     display: flex;
     flex-direction: column;

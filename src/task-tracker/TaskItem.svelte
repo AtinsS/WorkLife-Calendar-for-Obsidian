@@ -434,12 +434,10 @@
           </button>
         {/if}
 
-        {#if !isMobile}
-          <button class="task-icon-btn" class:active={showChecklist} on:click|stopPropagation={() => showChecklist = !showChecklist} title={$t("tasks.item.checklist")}>
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 6l1.5 1.5L8.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            {#if checklistTotal > 0}<span class="task-icon-count">{checklistDone}/{checklistTotal}</span>{/if}
-          </button>
-        {/if}
+        <button class="task-icon-btn" class:active={showChecklist} on:click|stopPropagation={() => showChecklist = !showChecklist} title={$t("tasks.item.checklist")}>
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="currentColor" stroke-width="1.2"/><path d="M3.5 6l1.5 1.5L8.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          {#if checklistTotal > 0}<span class="task-icon-count">{checklistDone}/{checklistTotal}</span>{/if}
+        </button>
       </div>
     </div>
 

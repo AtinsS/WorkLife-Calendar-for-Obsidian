@@ -122,6 +122,42 @@ export function guardTyping(
   );
 }
 
+/**
+ * Window-capture typing shield for non-CustomModal roots (Obsidian `Modal`,
+ * Svelte views). Obsidian hotkeys listen in capture on `document` and eat Space
+ * before the field sees it — this claims Space first. Enter is left alone so
+ * the host can submit on its own terms.
+ * Returns cleanup — call it when the surface unmounts.
+ */
+export function installTypingShield(root: HTMLElement): () => void {
+  let lastEditable: HTMLInputElement | HTMLTextAreaElement | null = null;
+  const onFocusIn = (e: Event): void => {
+    const t = e.target;
+    if (!isEditableTarget(t)) return;
+    const el = t as HTMLInputElement | HTMLTextAreaElement;
+    if (root.contains(el)) lastEditable = el;
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.key === "Escape" || e.isComposing) return;
+    const active = document.activeElement;
+    const inside =
+      root.contains(e.target as Node) || (active != null && root.contains(active));
+    if (!inside) return;
+    if (isSpaceKey(e)) {
+      const el = resolveEditable(e, root, lastEditable);
+      if (el) claimSpace(e, el);
+    }
+  };
+  // Window capture runs BEFORE document capture, where Obsidian hotkeys live.
+  window.addEventListener("keydown", onKey, true);
+  document.addEventListener("focusin", onFocusIn, true);
+  return () => {
+    window.removeEventListener("keydown", onKey, true);
+    document.removeEventListener("focusin", onFocusIn, true);
+    lastEditable = null;
+  };
+}
+
 type ModalHost = {
   /** @internal */ _wlRoot: HTMLElement;
   lastEditable: HTMLInputElement | HTMLTextAreaElement | null;
