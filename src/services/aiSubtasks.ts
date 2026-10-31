@@ -20,7 +20,7 @@ export async function splitTaskIntoSubtasks(
     ollamaModelExtract?: string;
   };
   if (!opts.ollamaEnabled) {
-    new Notice(tRaw("ai.summaryNeedOllama"));
+    new Notice(tRaw("ai.needOllama"));
     return 0;
   }
   if (opts.aiSubtasksEnabled === false) {

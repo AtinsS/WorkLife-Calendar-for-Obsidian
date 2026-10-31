@@ -13,6 +13,7 @@
     carryOverOverdueTasks, updateRecurringSeries,
   } from "./stores";
   import TaskItem from "./TaskItem.svelte";
+  import { requestTaskDeletion } from "./taskDeletion";
   import KanbanTabs from "./KanbanTabs.svelte";
   import TimeLogsModal from "./TimeLogsModal.svelte";
   import { TaskModal } from "./TaskModal";
@@ -267,7 +268,8 @@
   }
 
   async function handleTaskDelete(task: ITask) {
-    removeTask(task.id);
+    // Recurring tasks ask "this occurrence / whole series" — see taskDeletion.ts
+    requestTaskDeletion(appInstance, task.id);
   }
 
   function toggleTaskStatus(task: ITask): "done" | "todo" {

@@ -136,6 +136,49 @@ describe("parseScheduleOps", () => {
       projectName: "Home",
     });
   });
+
+  it("accepts loose times/dates in create ops (9:00, 2026-7-5) and passes pickFreeSlot", () => {
+    const plan = parseScheduleOps(
+      JSON.stringify({
+        summary: "ok",
+        operations: [
+          {
+            type: "create",
+            title: "Call",
+            date: "2026-7-5",
+            scheduledTime: "9:00",
+            endTime: "10:30",
+            pickFreeSlot: true,
+          },
+          { type: "create", title: "Bad", date: "2026-13-45", scheduledTime: "25:00" },
+        ],
+      }),
+    );
+    expect(plan.operations).toHaveLength(2);
+    expect(plan.operations[0]).toMatchObject({
+      type: "create",
+      title: "Call",
+      date: "2026-07-05",
+      scheduledTime: "09:00",
+      endTime: "10:30",
+      pickFreeSlot: true,
+    });
+    // impossible date/time are dropped, not silently kept
+    expect(plan.operations[1]).toMatchObject({ type: "create", title: "Bad" });
+    const bad = plan.operations[1] as { date?: string; scheduledTime?: string };
+    expect(bad.date).toBeUndefined();
+    expect(bad.scheduledTime).toBeUndefined();
+  });
+
+  it("resolves task by title when the model echoes a title instead of an id", () => {
+    const plan = parseScheduleOps(
+      JSON.stringify({
+        summary: "ok",
+        operations: [{ type: "move", taskIds: ["Buy milk"], shiftDays: 1 }],
+      }),
+    );
+    expect(plan.operations).toHaveLength(1);
+  });
 });
 
 describe("applyScheduleOps", () => {
@@ -188,6 +231,13 @@ describe("applyScheduleOps", () => {
     ]);
     expect(res.applied).toBe(1);
     expect(res.skipped).toBe(2);
+    expect(get(tasks).find((t) => t.id === "a")?.dateUID).toBe("day-2026-07-11");
+  });
+
+  it("resolves a title echoed instead of an id (recs→ops match-by-title fallback)", () => {
+    const res = applyScheduleOps([{ type: "move", taskIds: ["A"], shiftDays: 1 }]);
+    expect(res.applied).toBe(1);
+    expect(res.skipped).toBe(0);
     expect(get(tasks).find((t) => t.id === "a")?.dateUID).toBe("day-2026-07-11");
   });
 

@@ -159,7 +159,7 @@ export class AIFinanceModal extends CustomModal {
 
   private ensureAi(): boolean {
     if (!getFinanceAiConfig().enabled) {
-      new Notice(tRaw("ai.summaryNeedOllama"));
+      new Notice(tRaw("ai.needOllama"));
       return false;
     }
     return true;

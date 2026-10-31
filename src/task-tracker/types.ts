@@ -3,6 +3,8 @@ export interface RecurrenceConfig {
   interval?: number;
   daysOfWeek?: number[];
   until?: DateUID; // dateUID "day-YYYY-MM-DD" — повторение до этой даты включительно
+  /** Occurrence dates (YYYY-MM-DD) the user deleted — never regenerate them. */
+  deletedDates?: string[];
 }
 
 export type TaskStatus = "todo" | "progress" | "done" | "paused" | "failed" | "all";

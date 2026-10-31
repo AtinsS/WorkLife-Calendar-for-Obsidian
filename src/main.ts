@@ -392,7 +392,8 @@ export default class CalendarPlugin extends Plugin {
       name: tRaw("main.commands.createWorkoutPlan"),
       checkCallback: (checking: boolean) => {
         if (checking) {
-          return this.options.aiWorkoutEnabled !== false && this.options.ollamaEnabled === true;
+          // Desktop-only per AI policy (same gate as the file-menu AI actions)
+          return this.options.aiWorkoutEnabled !== false && this.options.ollamaEnabled === true && window.innerWidth > 768;
         }
         void import("./workout/WorkoutPlanModal").then(({ WorkoutPlanModal }) => {
           new WorkoutPlanModal(this.app, {
@@ -406,7 +407,7 @@ export default class CalendarPlugin extends Plugin {
       id: "ai-ask-question",
       name: tRaw("ai.contextMenuAsk"),
       checkCallback: (checking: boolean) => {
-        if (checking) return this.options.ollamaEnabled === true && this.options.aiChatEnabled !== false;
+        if (checking) return this.options.ollamaEnabled === true && this.options.aiChatEnabled !== false && window.innerWidth > 768;
         void import("./services/AIAskModal").then(({ openAiAsk }) => openAiAsk(this.app));
       },
     });

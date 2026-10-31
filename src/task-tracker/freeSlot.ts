@@ -115,7 +115,8 @@ export interface CreateTimeResult {
 
 /** True when the user text explicitly asks to pick a free slot. */
 export function wantsFreeSlotPlacement(text: string): boolean {
-  return /подбери\s+(?:свободн\w*\s+)?слот|свободн\w*\s+слот|найди\s+(?:свободн\w*\s+)?(?:время|слот)|place\s+(?:it\s+)?in\s+a?\s*free|pick\s+a?\s*free\s+slot|find\s+a?\s*free\s+(?:slot|time)|free\s+slot/i.test(
+  // NB: `\w` is ASCII-only — "свободн\w*" never matched "свободный/свободное" (Cyrillic).
+  return /подбери\s+(?:свободн[а-яё]*\s+)?слот|свободн[а-яё]*\s+(?:слот|время|место)|найди\s+(?:свободн[а-яё]*\s+)?(?:время|слот|место)|place\s+(?:it\s+)?in\s+a?\s*free|pick\s+a?\s*free\s+slot|find\s+a?\s*free\s+(?:slot|time)|free\s+slot/i.test(
     text,
   );
 }

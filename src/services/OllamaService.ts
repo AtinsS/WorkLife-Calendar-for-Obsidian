@@ -98,7 +98,7 @@ INPUT:
 - [ ] npx prisma init
 
 OUTPUT (one task + nested subtasks; duration from heading → estimatedMinutes):
-{"title": "PostgreSQL + Prisma + Workspace", "description": "настраиваем базу данных и описываем модели.", "estimatedMinutes": 120, "dayIndex": 1, "weekday": "Понедельник", "subtasks": [{"title": "docker-compose.yml с PostgreSQL 16"}, {"title": ".env с DATABASE_URL"}, {"title": "Workspace — id, name, apiKey"}, {"title": "Operator — id, email"}, {"title": "npx prisma init"}]}
+{"title": "PostgreSQL + Prisma + Workspace", "description": "настраиваем базу данных и описываем модели.", "priority": "medium", "estimatedMinutes": 120, "dayIndex": 1, "weekday": "Понедельник", "subtasks": [{"title": "docker-compose.yml с PostgreSQL 16"}, {"title": ".env с DATABASE_URL"}, {"title": "Workspace — id, name, apiKey"}, {"title": "Operator — id, email"}, {"title": "npx prisma init"}]}
 
 FORMAT B — DAILY NOTES (day headers + independent checklist lines).
 Day header is NEVER a task. Each checkbox/emoji line is an INDEPENDENT task.
@@ -117,12 +117,13 @@ OUTPUT (flat tasks; 🔴=high 🟡=medium 🟢=low; "в 10:00" → scheduledTime
 
 RULES:
 - Detect format first. Format A: heading=task, nested list=subtasks. Format B: each line=task.
-- Each day/date section gets an INCREMENTING dayIndex (1, 2, 3...).
-- Do NOT turn day headers (Понедельник, День 1, 📅 Вторник) into tasks in Format B.
+- dayIndex: 1 = FIRST day section in the document, then 2, 3... in order of appearance. When real dates are known, also fill "date".
+- Do NOT turn day headers (Понедельник, День 1, 📅 Вторник) into tasks in Format B. WRONG: {"title": "Понедельник (21.09)"} → RIGHT: skip the header, emit its lines as tasks with that date.
 - In Format A do NOT flatten the theme heading into its subtasks — keep the heading as the parent task.
-- Strip markers (🕐 ⏫ 🔼 🔽 🔴 🟡 🟢) into fields. "в 10:00" / "10:00–13:00" → scheduledTime + estimatedMinutes.
+- Strip markers (🕐 ⏫ 🔼 🔽 🔴 🟡 🟢) into fields. "в 10:00" / "10:00–13:00" → scheduledTime (+ endTime) + estimatedMinutes. "9:00" means "09:00".
 - "— 2 ч", "(15 мин)", "2 часа" in heading/line → estimatedMinutes.
 - NEVER put checklist items or subtask titles into "description". Description is only a short prose note. Subtasks go only into the "subtasks" array.
+- Keep title/description in the SAME language as the source document. "weekday" must be in that language too (e.g. "Понедельник").
 
 OUTPUT SCHEMA:
 {
@@ -138,6 +139,7 @@ OUTPUT SCHEMA:
     "date": "YYYY-MM-DD|null",
     "dayTheme": "string|null",
     "scheduledTime": "HH:MM|null",
+    "endTime": "HH:MM|null",
     "subtasks": [{"title": "string"}]
   }]
 }`;
@@ -494,6 +496,31 @@ interface RawOllamaResponse {
   };
 }
 
+/**
+ * First balanced JSON object in a text (string/escape aware).
+ * Greedy /\{[\s\S]*\}/ breaks when trailing prose contains "}" or multiple objects.
+ */
+export function extractBalancedJson(text: string): string | null {
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+  let depth = 0;
+  let inStr = false;
+  let esc = false;
+  for (let i = start; i < text.length; i++) {
+    const c = text[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === "{") depth++;
+    else if (c === "}") {
+      depth--;
+      if (depth === 0) return text.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
 export function parseOllamaJson(content: string): RawOllamaResponse {
   try {
     return JSON.parse(content) as RawOllamaResponse;
@@ -506,10 +533,10 @@ export function parseOllamaJson(content: string): RawOllamaResponse {
         /* fall through */
       }
     }
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    const jsonMatch = extractBalancedJson(content);
     if (jsonMatch) {
       try {
-        return JSON.parse(jsonMatch[0]) as RawOllamaResponse;
+        return JSON.parse(jsonMatch) as RawOllamaResponse;
       } catch {
         /* fall through */
       }
@@ -521,7 +548,8 @@ export function parseOllamaJson(content: string): RawOllamaResponse {
 function deduplicateTasks(tasks: ExtractedTask[]): ExtractedTask[] {
   const seen = new Set<string>();
   return tasks.filter((t) => {
-    const key = `${t.title.toLowerCase()}|${t.dayIndex}`;
+    // Include time so distinct same-day tasks with equal titles ("Совещание" 10:00 / 15:00) survive
+    const key = `${t.title.toLowerCase()}|${t.dayIndex}|${t.scheduledTime ?? ""}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -533,7 +561,8 @@ function deduplicateTasks(tasks: ExtractedTask[]): ExtractedTask[] {
 // ---------------------------------------------------------------------------
 
 function parseTimeRange(text: string): { start: string; minutes: number } | null {
-  const m = text.match(/(\d{1,2}):(\d{2})\s*[–\-—]\s*(\d{1,2}):(\d{2})/);
+  // "10:00–11:30" or Russian "10:00 до 11:30"
+  const m = text.match(/(\d{1,2}):(\d{2})\s*(?:[–\-—]|до)\s*(\d{1,2}):(\d{2})/i);
   if (!m) return null;
   const startMin = parseInt(m[1]) * 60 + parseInt(m[2]);
   const endMin = parseInt(m[3]) * 60 + parseInt(m[4]);
@@ -552,9 +581,10 @@ function parseSingleTime(text: string): string | null {
 }
 
 function parseDurationHint(text: string): number | null {
-  const mMin = text.match(/(\d+)\s*(?:мин|min)/i);
+  const mMin = text.match(/(\d+)\s*(?:мин|min)(?!\p{L})/iu);
   if (mMin) return parseInt(mMin[1]);
-  const mHour = text.match(/(\d+(?:[.,]\d+)?)\s*(?:час(?:а|ов)?|ч|h|hr|hour)\b/i);
+  // NB: trailing \b never fires after Cyrillic (JS \b is ASCII-\w based) — use (?!\p{L}) with u flag
+  const mHour = text.match(/(\d+(?:[.,]\d+)?)\s*(?:час(?:а|ов)?|ч|h|hr|hour)(?!\p{L})/iu);
   if (mHour) return Math.round(parseFloat(mHour[1].replace(",", ".")) * 60);
   return null;
 }
@@ -563,9 +593,9 @@ function stripTimeFromTitle(title: string): string {
   return title
     .replace(/🕐\s*\d{1,2}:\d{2}\s*[–\-—]\s*\d{1,2}:\d{2}/gu, "")
     .replace(/🕐\s*\d{1,2}:\d{2}/gu, "")
-    .replace(/\b[вс]\s+\d{1,2}:\d{2}\s*[–\-—]\s*\d{1,2}:\d{2}/giu, "")
-    .replace(/\b[вс]\s+\d{1,2}:\d{2}/giu, "")
-    .replace(/\s*\d{1,2}:\d{2}\s*[–\-—]\s*\d{1,2}:\d{2}\s*$/u, "")
+    .replace(/(?<!\p{L})[вс]\s+\d{1,2}:\d{2}\s*(?:[–\-—]|до)\s*\d{1,2}:\d{2}/giu, "")
+    .replace(/(?<!\p{L})[вс]\s+\d{1,2}:\d{2}/giu, "")
+    .replace(/\s*\d{1,2}:\d{2}\s*(?:[–\-—]|до)\s*\d{1,2}:\d{2}\s*$/u, "")
     .replace(/\s*\d{1,2}:\d{2}\s*$/u, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -582,8 +612,9 @@ function extractPriorityFromTitle(title: string): "low" | "medium" | "high" | nu
   if (/⏫|⚡|❗|🔴/.test(title)) return "high";
   if (/🔽|🟢/.test(title)) return "low";
   if (/🟡/.test(title)) return "medium";
-  if (/\b(срочно|urgent|критично|дедлайн|deadline|ASAP)\b/i.test(title)) return "high";
-  if (/\b(опционально|если останется|nice.to.have|hobby|хобби)\b/i.test(title)) return "low";
+  // NB: \b is ASCII-only — Cyrillic alternatives need (?<!\p{L})…(?!\p{L}) with u flag
+  if (/(?<!\p{L})(срочно|urgent|критично|дедлайн|deadline|ASAP)(?!\p{L})/iu.test(title)) return "high";
+  if (/(?<!\p{L})(опционально|если останется|nice.to.have|hobby|хобби)(?!\p{L})/iu.test(title)) return "low";
   return null;
 }
 
@@ -615,6 +646,15 @@ function enrichTask(t: ExtractedTask): ExtractedTask {
   const durationHint = parseDurationHint(title);
   if (durationHint && !estimatedMinutes) {
     estimatedMinutes = durationHint;
+  }
+  if (durationHint) {
+    // Strip only a TRAILING hint ("… (15 мин)" / "… — 2 ч" / "… 30 мин") so mid-title
+    // durations like "2 часа переговоров" stay part of the name.
+    title = title
+      .replace(/\s*[([]\s*\d+(?:[.,]\d+)?\s*(?:мин|min|час(?:а|ов)?|ч|h|hr|hour)\s*[)\]]\s*$/iu, "")
+      .replace(/\s*[–\-—]\s*\d+(?:[.,]\d+)?\s*(?:мин|min|час(?:а|ов)?|ч|h|hr|hour)\s*$/iu, "")
+      .replace(/\s+\d+(?:[.,]\d+)?\s*(?:мин|min|час(?:а|ов)?|ч|h|hr|hour)\s*$/iu, "")
+      .trim() || title;
   }
 
   // Derive endTime when missing: explicit end → else start + estimate
@@ -656,8 +696,8 @@ export function isTemporalTitle(title: string): boolean {
     .replace(/(?<!\p{L})(недел[яьие]|week)\s*\d*/giu, " ")
     .replace(/(?<!\p{L})(январь|февраль|март|апрель|май|июнь|июль|август|сентябрь|октябрь|ноябрь|декабрь)(?!\p{L})/giu, " ")
     .replace(/\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi, " ")
-    .replace(/(\d+(?:[.,]\d+)?)\s*(?:мин|min|час(?:а|ов)?|ч|h|hr|hour)\b/giu, " ")
-    .replace(/\b\d{1,2}:\d{2}([–-]\d{1,2}:\d{2})?\b/g, " ")
+    .replace(/(\d+(?:[.,]\d+)?)\s*(?:мин|min|час(?:а|ов)?|ч|h|hr|hour)(?!\p{L})/giu, " ")
+    .replace(/(?<!\p{L})(?:[вс]\s+)?\d{1,2}:\d{2}(?:\s*(?:[–\-—]|до)\s*\d{1,2}:\d{2})?(?!\p{L})/giu, " ")
     .replace(/(?<!\p{L})(утро|утром|день|днём|вечер|вечером|ночь|ночью|до обеда|после обеда)(?!\p{L})/giu, " ")
     // dates last so "26.09" / "21.09.2025" are not left behind after dashes
     .replace(/\b\d{1,2}[./-]\d{1,2}([./-]\d{2,4})?\b/g, " ")
@@ -676,7 +716,20 @@ export function sanitizeTemporalTasks(tasks: ExtractedTask[]): ExtractedTask[] {
   for (const task of tasks) {
     if (isTemporalTitle(task.title) && task.subtasks.length > 0) {
       for (const st of task.subtasks) {
-        promoted.push({ ...task, title: st.title, subtasks: [], selected: true });
+        // Inherit ONLY day-level context (date/weekday/dayIndex/priority).
+        // Never inherit the container's scheduledTime/endTime/estimatedMinutes/description —
+        // that made every promoted subtask a 2h clone of the day heading.
+        promoted.push({
+          title: st.title,
+          priority: task.priority,
+          dayIndex: task.dayIndex,
+          dayNumber: task.dayNumber,
+          weekday: task.weekday,
+          date: task.date,
+          dayTheme: task.dayTheme,
+          subtasks: [],
+          selected: true,
+        });
       }
     } else if (!isTemporalTitle(task.title)) {
       promoted.push(task);
@@ -695,18 +748,28 @@ export function fixDayIndex(tasks: ExtractedTask[]): ExtractedTask[] {
   const uniqueIndices = new Set(tasks.map((t) => t.dayIndex));
   if (uniqueIndices.size > 1) return tasks;
 
-  const dayKeyOrder: string[] = [];
-  const dayKeyMap = new Map<string, number>();
-
+  const dayKeys = new Set<string>();
   for (const task of tasks) {
     const key = task.date || task.weekday || null;
-    if (key && !dayKeyMap.has(key)) {
-      dayKeyMap.set(key, dayKeyOrder.length + 1);
-      dayKeyOrder.push(key);
-    }
+    if (key) dayKeys.add(key);
   }
 
-  if (dayKeyMap.size <= 1) return tasks;
+  if (dayKeys.size <= 1) return tasks;
+
+  // Order keys chronologically (dates first, then weekdays Mon→Sun), not by first
+  // appearance — otherwise a note listing Wednesday first assigns it dayIndex 1.
+  const sortedKeys = [...dayKeys].sort((a, b) => {
+    const aIsDate = /^\d{4}-\d{2}-\d{2}$/.test(a);
+    const bIsDate = /^\d{4}-\d{2}-\d{2}$/.test(b);
+    if (aIsDate && bIsDate) return a.localeCompare(b);
+    if (aIsDate !== bIsDate) return aIsDate ? -1 : 1;
+    const aw = WEEKDAY_TO_NUM[a.toLowerCase()] ?? WEEKDAY_TO_NUM[a.toLowerCase().slice(0, 2)] ?? 99;
+    const bw = WEEKDAY_TO_NUM[b.toLowerCase()] ?? WEEKDAY_TO_NUM[b.toLowerCase().slice(0, 2)] ?? 99;
+    return aw - bw;
+  });
+
+  const dayKeyMap = new Map<string, number>();
+  sortedKeys.forEach((key, i) => dayKeyMap.set(key, i + 1));
 
   return tasks.map((t) => {
     const key = t.date || t.weekday || null;
@@ -766,6 +829,17 @@ export interface StreamChatOptions {
   temperature?: number;
 }
 
+/**
+ * Rough token budget for the request: chars/3 + response headroom.
+ * Without an explicit num_ctx Ollama keeps the model's default (often 2–4k) and
+ * silently truncates long notes — tasks at the end of the file were missed.
+ */
+function estimateNumCtx(messages: Array<{ role: string; content: string }>): number {
+  const chars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0);
+  const needed = Math.ceil(chars / 3) + 2048;
+  return Math.max(4096, Math.min(32768, needed));
+}
+
 export async function streamOllamaChat(
   url: string,
   model: string,
@@ -777,7 +851,7 @@ export async function streamOllamaChat(
     messages,
     stream: true,
     ...(opts.format ? { format: opts.format } : {}),
-    options: { temperature: opts.temperature ?? 0.1 },
+    options: { temperature: opts.temperature ?? 0.1, num_ctx: estimateNumCtx(messages) },
   };
 
   opts.onProgress?.("connecting");
@@ -913,6 +987,7 @@ Return ONLY valid JSON:
 }
 
 RULES:
+- "action" MUST be exactly "edit" or "answer" — never omit it. Anything except "edit" is treated as "answer" (the task list will NOT be changed).
 - If the message is an instruction to change tasks → "action": "edit", APPLY the change, set "summary" to a short confirmation of what changed, return FULL updated "tasks".
 - If the message is a question → "action": "answer", set "summary" to a concise practical answer about THESE tasks (cite task numbers/titles), return "tasks" unchanged (full copy of current list).
 - Return EVERY task in "tasks" (full list, not a diff) in both cases.
@@ -996,7 +1071,10 @@ ${instruction}`;
     return { ...t, selected: byKey ?? byTitle ?? true };
   });
 
-  const action: "edit" | "answer" = parsed.action === "answer" ? "answer" : "edit";
+  // Require an EXPLICIT "edit" before the model's echoed list is allowed to replace
+  // the (possibly hand-edited) user list. A model that forgets/mangles "action"
+  // used to silently clobber manual edits — default to the safe "answer".
+  const action: "edit" | "answer" = parsed.action === "edit" ? "edit" : "answer";
   const summary =
     (parsed.summary || "").trim() ||
     (action === "answer"
@@ -1036,6 +1114,30 @@ function stripSubtasksFromDescription(
   return out || undefined;
 }
 
+/** Accept "9:00"/"09:00" (models often drop the leading zero) → normalized "HH:MM". */
+function normalizeTimeField(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const m = v.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return undefined;
+  const h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  if (h > 23 || min > 59) return undefined;
+  return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
+}
+
+/** Shape + real calendar validation (rejects "2025-13-45"). */
+function normalizeDateField(v: unknown): string | undefined {
+  if (typeof v !== "string") return undefined;
+  const m = v.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!m) return undefined;
+  const y = parseInt(m[1], 10);
+  const mo = parseInt(m[2], 10);
+  const d = parseInt(m[3], 10);
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return undefined;
+  return `${String(y).padStart(4, "0")}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
 /** Map raw model JSON into ExtractedTask[] with enrichment + sanitization */
 export function normalizeExtractedTasks(parsed: RawOllamaResponse): {
   tasks: ExtractedTask[];
@@ -1053,10 +1155,10 @@ export function normalizeExtractedTasks(parsed: RawOllamaResponse): {
       dayIndex: typeof t.dayIndex === "number" && t.dayIndex > 0 ? Math.floor(t.dayIndex) : 1,
       dayNumber: typeof t.dayNumber === "number" && t.dayNumber > 0 ? Math.floor(t.dayNumber) : undefined,
       weekday: t.weekday || undefined,
-      date: t.date && /^\d{4}-\d{2}-\d{2}$/.test(t.date) ? t.date : undefined,
+      date: normalizeDateField(t.date),
       dayTheme: t.dayTheme || undefined,
-      scheduledTime: t.scheduledTime && /^\d{2}:\d{2}$/.test(t.scheduledTime) ? t.scheduledTime : undefined,
-      endTime: t.endTime && /^\d{2}:\d{2}$/.test(t.endTime) ? t.endTime : undefined,
+      scheduledTime: normalizeTimeField(t.scheduledTime),
+      endTime: normalizeTimeField(t.endTime),
       subtasks,
       selected: true,
     };
@@ -1111,6 +1213,9 @@ export async function extractTasksFromNoteStream(
 
   let lastError: Error | null = null;
   let usedFallback = false;
+  // Appended to the user message on retry so the model sees WHY the last reply failed
+  // (re-sending the identical prompt reproduces the identical broken JSON).
+  let retryHint = "";
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let content = "";
@@ -1120,7 +1225,7 @@ export async function extractTasksFromNoteStream(
         model,
         [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: userPrompt },
+          { role: "user", content: userPrompt + retryHint },
         ],
         {
           format: "json",
@@ -1135,6 +1240,7 @@ export async function extractTasksFromNoteStream(
       );
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(errorMessage(e));
+      if (opts.signal?.aborted) throw lastError;
       if (attempt < maxRetries) continue;
       throw lastError;
     }
@@ -1145,7 +1251,11 @@ export async function extractTasksFromNoteStream(
       parsed = parseOllamaJson(content);
     } catch (e) {
       lastError = e instanceof Error ? e : new Error(errorMessage(e));
-      if (attempt < maxRetries) continue;
+      if (opts.signal?.aborted) throw lastError;
+      if (attempt < maxRetries) {
+        retryHint = `\n\nYour previous reply was NOT valid JSON (${lastError.message}). Reply with ONLY the JSON object matching the schema — no prose, no code fences.`;
+        continue;
+      }
       throw lastError;
     }
 
@@ -1155,59 +1265,6 @@ export async function extractTasksFromNoteStream(
   }
 
   throw lastError ?? new Error("Extraction failed");
-}
-
-export function distributeByDays(
-  tasks: ExtractedTask[],
-  startDate: string,
-): Map<string, ExtractedTask[]> {
-  const result = new Map<string, ExtractedTask[]>();
-  const start = new Date(`${startDate}T00:00:00`);
-
-  const byDate = new Map<string, ExtractedTask[]>();
-  for (const task of tasks) {
-    let dateStr: string;
-    if (task.date) {
-      dateStr = task.date;
-    } else {
-      const day = task.dayIndex || 1;
-      const dayDate = new Date(start.getTime() + (day - 1) * 86400000);
-      dateStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, "0")}-${String(dayDate.getDate()).padStart(2, "0")}`;
-    }
-    const list = byDate.get(dateStr) ?? [];
-    list.push(task);
-    byDate.set(dateStr, list);
-  }
-
-  for (const [dateStr, dayTasks] of byDate) {
-    dayTasks.sort((a, b) => {
-      const pri = { high: 0, medium: 1, low: 2 };
-      const priDiff = (pri[a.priority] ?? 1) - (pri[b.priority] ?? 1);
-      if (priDiff !== 0) return priDiff;
-      if (a.scheduledTime && b.scheduledTime) return a.scheduledTime.localeCompare(b.scheduledTime);
-      if (a.scheduledTime) return -1;
-      if (b.scheduledTime) return 1;
-      return 0;
-    });
-
-    let nextMinutes = 9 * 60;
-    for (const task of dayTasks) {
-      if (task.scheduledTime) {
-        const [h, m] = task.scheduledTime.split(":").map(Number);
-        const taskEnd = h * 60 + m + (task.estimatedMinutes ?? 60);
-        if (taskEnd > nextMinutes) nextMinutes = taskEnd;
-      } else {
-        const h = Math.floor(nextMinutes / 60);
-        const m = nextMinutes % 60;
-        task.scheduledTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-        nextMinutes += task.estimatedMinutes ?? 60;
-      }
-    }
-
-    result.set(dateStr, dayTasks);
-  }
-
-  return result;
 }
 
 // ---------------------------------------------------------------------------
@@ -1220,7 +1277,7 @@ Rules:
 - 3–8 short subtasks (unless the task is trivial — then 2–3).
 - Same language as the task title/description.
 - No numbering, no markdown in titles.
-- Concrete verbs: "Написать…", "Проверить…", "Собрать…".
+- Concrete action verbs in the task's language: "Написать…", "Проверить…", "Собрать…" (Russian) or "Write…", "Check…", "Assemble…" (English).
 - Do not repeat the parent title.
 - Use the project name and task description as context: tailor subtasks to the domain and any constraints mentioned there.`;
 

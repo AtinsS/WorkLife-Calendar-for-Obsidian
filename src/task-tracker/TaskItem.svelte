@@ -2,7 +2,8 @@
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import type { App } from "obsidian";
   import type { ITask, TaskStatus } from "./types";
-  import { updateTask, updateTaskStatus, removeTask, resetTaskTimer, projects, activeTab, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem, updateChecklistItem } from "./stores";
+  import { updateTask, updateTaskStatus, resetTaskTimer, projects, activeTab, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem, updateChecklistItem } from "./stores";
+  import { requestTaskDeletion } from "./taskDeletion";
   import { get } from "svelte/store";
   import { getActiveTimer, formatDuration, formatEstimate } from "./TimerManager";
   import { TaskModal } from "./TaskModal";
@@ -169,7 +170,8 @@
   }
 
   async function handleDelete() {
-    removeTask(task.id);
+    // Recurring tasks ask "this occurrence / whole series" — see taskDeletion.ts
+    requestTaskDeletion(appInstance, task.id);
   }
 
   // Actions menu
@@ -322,13 +324,22 @@
 
   function closeActionsMenu() {
     showActionsMenu = false;
-    if (actionsMenuEl) {
-      actionsMenuEl.remove();
-      const menu = document.querySelector(".task-actions-menu");
-      if (menu) menu.remove();
-      actionsMenuEl = null;
-    }
+    actionsMenuEl = null;
+    // Sweep EVERYWHERE, not just this component's reference: menus are appended to
+    // document.body and outlive their TaskItem (re-filter/unmount while open). An
+    // orphaned menu blocked cleanup of later ones and each open stacked one more
+    // menu on screen ("the more you click, the wider the menu gets").
+    document
+      .querySelectorAll(".task-actions-menu, .sch-ctx-overlay")
+      .forEach((n) => n.remove());
   }
+
+  onDestroy(() => {
+    // Component can die while its floating menu is open (task list re-filters).
+    document
+      .querySelectorAll(".task-actions-menu, .sch-ctx-overlay")
+      .forEach((n) => n.remove());
+  });
 </script>
 
 <div

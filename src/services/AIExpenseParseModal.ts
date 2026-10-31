@@ -124,7 +124,7 @@ export class AIExpenseParseModal extends CustomModal {
 
   private ensureAi(): boolean {
     if (!getFinanceAiConfig().enabled) {
-      new Notice(tRaw("ai.summaryNeedOllama"));
+      new Notice(tRaw("ai.needOllama"));
       return false;
     }
     return true;
@@ -154,7 +154,7 @@ export class AIExpenseParseModal extends CustomModal {
     } catch (e) {
       this.setStatus(
         e instanceof Error && e.message === "ollama-disabled"
-          ? tRaw("ai.summaryNeedOllama")
+          ? tRaw("ai.needOllama")
           : tRaw("ai.finance.error"),
         true,
       );

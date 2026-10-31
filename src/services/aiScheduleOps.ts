@@ -16,6 +16,7 @@ import {
   type BusySlot,
   type CreateTimeResult,
 } from "../task-tracker/freeSlot";
+import { normalizeAiTime, normalizeAiDate } from "./aiQuickAdd";
 
 export {
   findFreeSlot,
@@ -29,7 +30,6 @@ export {
 
 const MAX_OPS_TASKS = 200;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const TIME_RE = /^\d{2}:\d{2}$/;
 
 export type ScheduleOp =
   | { type: "move"; taskIds: string[]; toDate?: string; shiftDays?: number }
@@ -53,6 +53,8 @@ export type ScheduleOp =
       priority?: "low" | "medium" | "high";
       description?: string;
       projectName?: string;
+      /** User explicitly asked to place the task into a free slot — code picks it. */
+      pickFreeSlot?: boolean;
     };
 
 export interface ScheduleOpsPlan {
@@ -154,8 +156,8 @@ function asPriority(v: unknown): "low" | "medium" | "high" | null {
 
 function asTime(v: unknown): string | null | undefined {
   if (v === null) return null;
-  if (typeof v === "string" && TIME_RE.test(v)) return v;
-  return undefined;
+  // Lenient parse ("9:00", "9.30") — strict TIME_RE used to silently drop the time
+  return normalizeAiTime(v) ?? undefined;
 }
 
 /**
@@ -190,7 +192,7 @@ export function parseScheduleOps(content: string): ScheduleOpsPlan {
     const ids = toIdList(op.taskIds ?? op.taskId ?? op.ids);
 
     if (type === "move") {
-      const toDate = typeof op.toDate === "string" && DATE_RE.test(op.toDate) ? op.toDate : undefined;
+      const toDate = normalizeAiDate(op.toDate) ?? undefined;
       const shiftDays =
         typeof op.shiftDays === "number" && Number.isFinite(op.shiftDays)
           ? Math.trunc(op.shiftDays)
@@ -245,7 +247,8 @@ export function parseScheduleOps(content: string): ScheduleOpsPlan {
     if (type === "create") {
       const title = typeof op.title === "string" ? op.title.trim() : "";
       if (!title) continue;
-      const date = typeof op.date === "string" && DATE_RE.test(op.date) ? op.date : undefined;
+      // Lenient date ("2026-7-5" ok) — strict DATE_RE used to fall back to TODAY silently
+      const date = normalizeAiDate(op.date) ?? undefined;
       const scheduledTime = asTime(op.scheduledTime ?? op.start);
       const endTime = asTime(op.endTime ?? op.end);
       const priority = asPriority(op.priority) ?? undefined;
@@ -275,6 +278,7 @@ export function parseScheduleOps(content: string): ScheduleOpsPlan {
         priority,
         description,
         projectName,
+        pickFreeSlot: op.pickFreeSlot === true,
       });
     }
   }
@@ -283,7 +287,17 @@ export function parseScheduleOps(content: string): ScheduleOpsPlan {
 }
 
 function taskById(map: Map<string, ITask>, id: string): ITask | undefined {
-  return map.get(id);
+  const byId = map.get(id);
+  if (byId) return byId;
+  // Models sometimes echo a task TITLE instead of its id (recs→ops "match by title")
+  const q = (id || "").trim().toLowerCase();
+  if (!q) return undefined;
+  let byTitle: ITask | undefined;
+  for (const t of map.values()) {
+    if (t.title.trim().toLowerCase() === q) return t;
+    if (!byTitle && t.title.trim().toLowerCase().startsWith(q)) byTitle = t;
+  }
+  return byTitle;
 }
 
 function titleOf(map: Map<string, ITask>, id: string): string {
@@ -358,12 +372,15 @@ export function applyScheduleOps(operations: ScheduleOp[]): ApplyOpsResult {
   let skipped = 0;
   const warnings: string[] = [];
 
-  const touch = (id: string): boolean => {
-    if (!map.has(id)) {
+  const touch = (id: string): ITask | null => {
+    // Resolve the REAL task id — models sometimes echo a title instead of an id,
+    // and updates must target task.id, not the raw model string.
+    const task = taskById(map, id);
+    if (!task) {
       skipped += 1;
-      return false;
+      return null;
     }
-    return true;
+    return task;
   };
 
   for (const op of operations) {
@@ -386,62 +403,61 @@ export function applyScheduleOps(operations: ScheduleOp[]): ApplyOpsResult {
             skipped += 1;
             continue;
           }
-          updateTask(id, { dateUID: next });
-          map.set(id, { ...task, dateUID: next });
+          updateTask(task.id, { dateUID: next });
+          map.set(task.id, { ...task, dateUID: next });
           applied += 1;
         }
         break;
       }
       case "setStatus": {
         for (const id of op.taskIds) {
-          if (!touch(id)) continue;
-          updateTaskStatus(id, op.status, { autoStartTimer: false });
-          const task = taskById(map, id);
-          if (task) {
-            map.set(id, {
-              ...task,
-              status: op.status,
-              completed: op.status === "done",
-            });
-          }
+          const task = touch(id);
+          if (!task) continue;
+          updateTaskStatus(task.id, op.status, { autoStartTimer: false });
+          map.set(task.id, {
+            ...task,
+            status: op.status,
+            completed: op.status === "done",
+          });
           applied += 1;
         }
         break;
       }
       case "setPriority": {
         for (const id of op.taskIds) {
-          if (!touch(id)) continue;
-          updateTask(id, { priority: op.priority });
-          const task = taskById(map, id);
-          if (task) map.set(id, { ...task, priority: op.priority });
+          const task = touch(id);
+          if (!task) continue;
+          updateTask(task.id, { priority: op.priority });
+          map.set(task.id, { ...task, priority: op.priority });
           applied += 1;
         }
         break;
       }
       case "setTime": {
-        if (!touch(op.taskId)) break;
+        const task = touch(op.taskId);
+        if (!task) break;
         const patch: Partial<ITask> = {};
         if (op.scheduledTime !== undefined) patch.scheduledTime = op.scheduledTime ?? undefined;
         if (op.endTime !== undefined) patch.endTime = op.endTime ?? undefined;
-        updateTask(op.taskId, patch);
-        const task = taskById(map, op.taskId);
-        if (task) map.set(op.taskId, { ...task, ...patch });
+        updateTask(task.id, patch);
+        map.set(task.id, { ...task, ...patch });
         applied += 1;
         break;
       }
       case "rename": {
-        if (!touch(op.taskId)) break;
-        updateTask(op.taskId, { title: op.title });
-        const task = taskById(map, op.taskId);
-        if (task) map.set(op.taskId, { ...task, title: op.title });
+        const task = touch(op.taskId);
+        if (!task) break;
+        updateTask(task.id, { title: op.title });
+        map.set(task.id, { ...task, title: op.title });
         applied += 1;
         break;
       }
       case "delete": {
         for (const id of op.taskIds) {
-          if (!touch(id)) continue;
-          removeTask(id);
-          map.delete(id);
+          const task = touch(id);
+          if (!task) continue;
+          removeTask(task.id);
+          map.delete(task.id);
           applied += 1;
         }
         break;
@@ -467,9 +483,9 @@ export function applyScheduleOps(operations: ScheduleOp[]): ApplyOpsResult {
             endTime: t.endTime,
             estimatedTime: t.estimatedTime,
           })),
-          // Times are chosen by the model when the user asks for a free slot;
-          // without a clock time the task stays untimed.
-          pickFreeSlot: false,
+          // When the user asked for a free slot the op carries pickFreeSlot=true and
+          // the code picks the gap; otherwise the task stays untimed without a clock time.
+          pickFreeSlot: op.pickFreeSlot === true,
         });
         if (!resolved) {
           warnings.push(tRaw("schedule.aiOpsNoSlot", { date: dateStr, title: op.title }));
@@ -486,7 +502,12 @@ export function applyScheduleOps(operations: ScheduleOp[]): ApplyOpsResult {
           sortOrder: 0,
           scheduledTime: resolved?.scheduledTime ?? undefined,
           endTime: resolved?.endTime ?? undefined,
-          estimatedTime: resolved?.estimatedMinutes ?? op.estimatedMinutes,
+          // `|| 60` above is slot geometry only — persist a duration just because the
+          // geometry defaulted made every undated create "1 hour" long.
+          estimatedTime:
+            op.estimatedMinutes != null || op.pickFreeSlot === true
+              ? resolved?.estimatedMinutes ?? op.estimatedMinutes
+              : undefined,
         });
         map.set(created.id, created);
         applied += 1;
@@ -498,7 +519,21 @@ export function applyScheduleOps(operations: ScheduleOp[]): ApplyOpsResult {
   return { applied, skipped, warnings };
 }
 
-export function buildScheduleOpsSystem(): string {
+/** Live example dates for the ops prompts (copied placeholders were silently invalid). */
+function opsExampleDates(now: Date = new Date()): { tomorrow: string; nextThursday: string } {
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+  // "next Thursday" = the Thursday AFTER the coming one if today is Thursday, else the upcoming Thursday
+  const deltaToThu = (4 - now.getDay() + 7) % 7; // 0 when today is Thursday
+  const nextThursday = new Date(now);
+  nextThursday.setDate(now.getDate() + (deltaToThu === 0 ? 7 : deltaToThu));
+  return { tomorrow: iso(tomorrow), nextThursday: iso(nextThursday) };
+}
+
+export function buildScheduleOpsSystem(now: Date = new Date()): string {
+  const { tomorrow, nextThursday } = opsExampleDates(now);
   return `You are a schedule editor inside a calendar/task plugin.
 The user gives a natural-language instruction. You respond with ONLY valid JSON describing TASK OPERATIONS.
 
@@ -513,12 +548,12 @@ Return schema:
     { "type": "setTime", "taskId": "id", "scheduledTime": "HH:MM", "endTime": "HH:MM" },
     { "type": "rename", "taskId": "id", "title": "new title" },
     { "type": "delete", "taskIds": ["id"] },
-    { "type": "create", "title": "task title", "date": "YYYY-MM-DD", "scheduledTime": "HH:MM", "endTime": "HH:MM", "estimatedMinutes": 60, "priority": "low|medium|high", "description": "optional", "projectName": "optional exact project name" }
+    { "type": "create", "title": "task title", "date": "YYYY-MM-DD", "scheduledTime": "HH:MM", "endTime": "HH:MM", "estimatedMinutes": 60, "priority": "low|medium|high", "description": "optional", "projectName": "optional exact project name", "pickFreeSlot": false }
   ]
 }
 
 RULES:
-- Use EXACT task ids from the task list. Never invent ids.
+- Use EXACT task ids from the task list. Never invent ids. If you only know a task title, put the title string into taskIds — the plugin resolves it.
 - Prefer one operation that targets many taskIds over many identical ops.
 - Relative dates resolve against Today in the context.
   "next Thursday" / "следующий четверг" = the Thursday AFTER the coming one if today is Thursday, else the upcoming Thursday. Always output absolute "toDate" style via "date".
@@ -528,14 +563,13 @@ RULES:
 - TIME PICKING for "create":
   * Read "Occupied time blocks" for the target day. Never schedule over them.
   * "на 1 час" / "1 hour" → estimatedMinutes: 60. "на 30 минут" → 30. Default 60.
-  * If the user asks to pick a free slot («подбери свободный слот», "pick a free slot", «найди время»), set scheduledTime/endTime to the first FREE gap in 09:00–21:00 (30-min grid).
-  * If the user does NOT ask for a free slot and gives no clock time, leave scheduledTime/endTime null — the task is created without a time. NEVER auto-place into a free slot.
-  * If the model is unsure of a free time, set scheduledTime/endTime to null.
-- Example (dates illustrative):
+  * If the user asks to pick a free slot («подбери свободный слот», "pick a free slot", «найди время»), set "pickFreeSlot": true and leave scheduledTime/endTime null — the plugin itself picks the first free gap in 09:00–21:00.
+  * If the user does NOT ask for a free slot and gives no clock time, leave scheduledTime/endTime null and pickFreeSlot false — the task is created without a time. NEVER auto-place into a free slot.
+- Example (dates computed from Today — mirror that computation):
   User: "Создай задачу на следующий четверг Купить молоко, подбери свободный слот, на 1 час"
-  → {"operations":[{"type":"create","title":"Купить молоко","date":"<next Thursday>","estimatedMinutes":60,"scheduledTime":"<first free HH:MM>","endTime":"<HH:MM + 60m>"}]}
+  → {"operations":[{"type":"create","title":"Купить молоко","date":"${nextThursday}","estimatedMinutes":60,"pickFreeSlot":true,"scheduledTime":null,"endTime":null}]}
   User: "Создай задачу на завтра Прочитать статью"
-  → {"operations":[{"type":"create","title":"Прочитать статью","date":"<tomorrow>","scheduledTime":null,"endTime":null}]}
+  → {"operations":[{"type":"create","title":"Прочитать статью","date":"${tomorrow}","scheduledTime":null,"endTime":null}]}
 - If the instruction is a question, not a mutation, return operations: [] and put the answer in "summary".
 - Match the user's language for "summary".
 - Output JSON only. No markdown fences, no commentary.`;
@@ -559,16 +593,16 @@ Return ONLY valid JSON with the same schema as a schedule editor:
     { "type": "setTime", "taskId": "id", "scheduledTime": "HH:MM", "endTime": "HH:MM" },
     { "type": "rename", "taskId": "id", "title": "new title" },
     { "type": "delete", "taskIds": ["id"] },
-    { "type": "create", "title": "task title", "date": "YYYY-MM-DD", "scheduledTime": "HH:MM", "endTime": "HH:MM", "estimatedMinutes": 60, "priority": "low|medium|high", "description": "optional", "projectName": "optional exact project name" }
+    { "type": "create", "title": "task title", "date": "YYYY-MM-DD", "scheduledTime": "HH:MM", "endTime": "HH:MM", "estimatedMinutes": 60, "priority": "low|medium|high", "description": "optional", "projectName": "optional exact project name", "pickFreeSlot": false }
   ]
 }
 
 RULES:
 - ONLY encode actionable recommendations that mutate the schedule. Skip pure observations.
-- Use EXACT task ids from the task list. Never invent ids. Match by title when the analysis names tasks.
+- Use EXACT task ids from the task list. Never invent ids. If you only know a task title, put the title string into taskIds — the plugin resolves it.
 - Prefer one operation with many taskIds over many identical ops.
 - "shiftDays" is an integer; "toDate" is absolute YYYY-MM-DD. Use one or the other.
-- For "create": if no clock time is given, leave scheduledTime/endTime null (the task stays untimed) unless the analysis explicitly asks to pick a free slot — then use the first free gap (09:00–21:00, no overlap).
+- For "create": if no clock time is given, leave scheduledTime/endTime null (the task stays untimed) unless the analysis explicitly asks to pick a free slot — then set "pickFreeSlot": true and leave scheduledTime/endTime null; the plugin picks the first free gap (09:00–21:00, no overlap).
 - If nothing is safely actionable, return operations: [] and explain in "summary".
 - Be conservative: when unsure which task is meant, skip that recommendation rather than guessing.
 - Match the analysis language for "summary".

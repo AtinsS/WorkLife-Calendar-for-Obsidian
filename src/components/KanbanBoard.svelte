@@ -4,7 +4,8 @@
   import type { App } from "obsidian";
   import { get } from "svelte/store";
   import { getDateUID } from "obsidian-daily-notes-interface";
-  import { tasks, projects, updateTaskStatus, updateTask, removeTask, carryOverOverdueTasks, kanbanBoards, setTaskKanbanColumn, saveKanbanBoardFilters } from "../task-tracker/stores";
+  import { tasks, projects, updateTaskStatus, updateTask, carryOverOverdueTasks, kanbanBoards, setTaskKanbanColumn, saveKanbanBoardFilters } from "../task-tracker/stores";
+  import { requestTaskDeletion } from "../task-tracker/taskDeletion";
   import { activeTimers, formatDuration } from "../task-tracker/TimerManager";
   import type { ITask, TaskStatus, IProject, IKanbanColumnDef } from "../task-tracker/types";
   import { DEFAULT_KANBAN_BOARD_ID, createDefaultKanbanColumns } from "../task-tracker/types";
@@ -374,7 +375,8 @@
   }
 
   function handleDelete(taskId: string): void {
-    removeTask(taskId);
+    // Recurring tasks ask "this occurrence / whole series" — see taskDeletion.ts
+    requestTaskDeletion(appInstance, taskId);
   }
 
   function openEditTask(task: ITask): void {

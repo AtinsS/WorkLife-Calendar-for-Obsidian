@@ -13,7 +13,8 @@
     deleteLink,
     reorderCards,
   } from "./storage";
-  import { tasks, projects, updateTaskStatus, updateTask, removeTask } from "../task-tracker/stores";
+  import { tasks, projects, updateTaskStatus, updateTask } from "../task-tracker/stores";
+  import { requestTaskDeletion } from "../task-tracker/taskDeletion";
   import { habits, habitLogs, toggleHabitCompletion, getHabitProgressOnDate, addHabit, updateHabit, removeHabit } from "../habit-tracker/stores";
   import { TaskModal } from "../task-tracker/TaskModal";
   import { HabitModal } from "../habit-tracker/HabitModal";
@@ -240,7 +241,8 @@
   }
 
   function deleteTask(taskId: string) {
-    removeTask(taskId);
+    // Recurring tasks ask "this occurrence / whole series" — see taskDeletion.ts
+    requestTaskDeletion(appInstance, taskId);
   }
 
   // Habit CRUD

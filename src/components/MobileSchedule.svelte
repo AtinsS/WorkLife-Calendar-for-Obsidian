@@ -2,7 +2,8 @@
   import { onMount, onDestroy } from "svelte";
   import moment from "moment";
   import type { ITask } from "../task-tracker/types";
-  import { tasks, projects, updateTaskStatus, removeTask, updateTask, resetTaskTimer, carryOverOverdueTasks } from "../task-tracker/stores";
+  import { tasks, projects, updateTaskStatus, updateTask, resetTaskTimer, carryOverOverdueTasks } from "../task-tracker/stores";
+  import { requestTaskDeletion } from "../task-tracker/taskDeletion";
   import { TaskModal } from "../task-tracker/TaskModal";
   import type CalendarPlugin from "../main";
   import { settings } from "../ui/stores";
@@ -329,7 +330,7 @@
   }
 
   function contextDeleteTask() {
-    if (contextMenuTask) removeTask(contextMenuTask.id);
+    if (contextMenuTask) requestTaskDeletion(plugin.app, contextMenuTask.id);
     closeContextMenu();
   }
 

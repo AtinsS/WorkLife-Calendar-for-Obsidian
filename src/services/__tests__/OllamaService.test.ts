@@ -5,6 +5,8 @@ import {
   detectNoteFormat,
   parseStructuredNote,
   normalizeExtractedTasks,
+  parseOllamaJson,
+  extractBalancedJson,
   type ExtractedTask,
 } from "../OllamaService";
 
@@ -164,7 +166,7 @@ describe("sanitizeTemporalTasks", () => {
     ]);
   });
 
-  it("preserves metadata from parent when promoting subtasks", () => {
+  it("preserves day-level metadata but NOT time/duration from parent when promoting subtasks", () => {
     const tasks: ExtractedTask[] = [{
       title: "Понедельник · 22.09",
       priority: "high",
@@ -174,6 +176,9 @@ describe("sanitizeTemporalTasks", () => {
       date: "2025-09-22",
       dayTheme: "планирование",
       scheduledTime: "09:00",
+      endTime: "11:00",
+      estimatedMinutes: 120,
+      description: "тема дня",
       subtasks: [{ title: "Утренняя рутина" }],
       selected: true,
     }];
@@ -185,6 +190,11 @@ describe("sanitizeTemporalTasks", () => {
     expect(result[0].date).toBe("2025-09-22");
     expect(result[0].dayTheme).toBe("планирование");
     expect(result[0].weekday).toBe("Понедельник");
+    // time/duration/description belong to the day container — must NOT clone to each subtask
+    expect(result[0].scheduledTime).toBeUndefined();
+    expect(result[0].endTime).toBeUndefined();
+    expect(result[0].estimatedMinutes).toBeUndefined();
+    expect(result[0].description).toBeUndefined();
   });
 
   it("handles the exact user-reported case", () => {
@@ -484,5 +494,138 @@ describe("parseStructuredNote — Format B daily notes", () => {
     expect(parsed.tasks[0].weekday).toBe("Понедельник");
     expect(parsed.tasks[3].date).toMatch(/-09-22$/);
     expect(parsed.tasks[6].weekday).toBe("Среда");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression tests: Cyrillic \b fixes, field coercion, dedupe, balanced JSON
+// ---------------------------------------------------------------------------
+
+describe("normalizeExtractedTasks — Cyrillic regex + coercion regressions", () => {
+  const norm = (rawTasks: Array<Record<string, unknown>>) =>
+    normalizeExtractedTasks({ tasks: rawTasks as never }).tasks;
+
+  it("strips 'в 10:00' from titles (Cyrillic \\b regression)", () => {
+    const [t] = norm([{ title: "Созвон с командой в 10:00 — обсудить ТЗ", priority: "medium", dayIndex: 1, subtasks: [] }]);
+    expect(t.scheduledTime).toBe("10:00");
+    expect(t.title).toBe("Созвон с командой — обсудить ТЗ");
+  });
+
+  it("strips 'с 10:00 до 11:30' range from titles", () => {
+    const [t] = norm([{ title: "Совещание с 10:00 до 11:30", priority: "medium", dayIndex: 1, subtasks: [] }]);
+    expect(t.scheduledTime).toBe("10:00");
+    expect(t.estimatedMinutes).toBe(90);
+    expect(t.title).toBe("Совещание");
+  });
+
+  it("parses hour durations '2 часа' / '3 ч' (Cyrillic \\b regression)", () => {
+    const [a] = norm([{ title: "Deep work — 2 часа", priority: "medium", dayIndex: 1, subtasks: [] }]);
+    expect(a.estimatedMinutes).toBe(120);
+    expect(a.title).toBe("Deep work");
+    const [b] = norm([{ title: "Встреча — 3 ч", priority: "medium", dayIndex: 1, subtasks: [] }]);
+    expect(b.estimatedMinutes).toBe(180);
+  });
+
+  it("strips trailing duration hint but keeps mid-title durations", () => {
+    const [a] = norm([{ title: "Утренние страницы (15 мин)", priority: "medium", dayIndex: 1, subtasks: [] }]);
+    expect(a.estimatedMinutes).toBe(15);
+    expect(a.title).toBe("Утренние страницы");
+    const [b] = norm([{ title: "2 часа переговоров", priority: "medium", dayIndex: 1, subtasks: [] }]);
+    expect(b.estimatedMinutes).toBe(120);
+    expect(b.title).toBe("2 часа переговоров");
+  });
+
+  it("reads Cyrillic priority keywords (Cyrillic \\b regression)", () => {
+    const [h] = norm([{ title: "Сдать отчёт срочно", priority: "medium", dayIndex: 1, subtasks: [] }]);
+    expect(h.priority).toBe("high");
+    const [l] = norm([{ title: "Прочитать книгу хобби", priority: "medium", dayIndex: 1, subtasks: [] }]);
+    expect(l.priority).toBe("low");
+  });
+
+  it("accepts '9:00' and rejects '25:00' for scheduledTime/endTime", () => {
+    const [a] = norm([{ title: "Встреча", priority: "medium", dayIndex: 1, scheduledTime: "9:00", endTime: "10:30", subtasks: [] }]);
+    expect(a.scheduledTime).toBe("09:00");
+    expect(a.endTime).toBe("10:30");
+    const [b] = norm([{ title: "Встреча", priority: "medium", dayIndex: 1, scheduledTime: "25:00", endTime: "9:61", subtasks: [] }]);
+    expect(b.scheduledTime).toBeUndefined();
+    expect(b.endTime).toBeUndefined();
+  });
+
+  it("rejects impossible dates like 2025-13-45", () => {
+    const [t] = norm([{ title: "Встреча", priority: "medium", dayIndex: 1, date: "2025-13-45", subtasks: [] }]);
+    expect(t.date).toBeUndefined();
+    const [ok] = norm([{ title: "Встреча", priority: "medium", dayIndex: 1, date: "2025-02-28", subtasks: [] }]);
+    expect(ok.date).toBe("2025-02-28");
+  });
+
+  it("keeps same-title tasks at different times but merges exact duplicates", () => {
+    const distinct = norm([
+      { title: "Совещание", priority: "medium", dayIndex: 1, scheduledTime: "10:00", subtasks: [] },
+      { title: "Совещание", priority: "medium", dayIndex: 1, scheduledTime: "15:00", subtasks: [] },
+    ]);
+    expect(distinct).toHaveLength(2);
+    const merged = norm([
+      { title: "Совещание", priority: "medium", dayIndex: 1, scheduledTime: "10:00", subtasks: [] },
+      { title: "Совещание", priority: "medium", dayIndex: 1, scheduledTime: "10:00", subtasks: [] },
+    ]);
+    expect(merged).toHaveLength(1);
+  });
+
+  it("recognizes bare duration titles as temporal", () => {
+    expect(isTemporalTitle("2 часа")).toBe(true);
+    expect(isTemporalTitle("30 мин")).toBe(true);
+    expect(isTemporalTitle("Чтение")).toBe(false);
+  });
+});
+
+describe("fixDayIndex — chronological ordering", () => {
+  const make = (weekday: string): ExtractedTask => ({
+    title: `Task for ${weekday}`,
+    priority: "medium",
+    dayIndex: 1,
+    weekday,
+    subtasks: [],
+    selected: true,
+  });
+
+  it("orders Wednesday before Friday even when Friday is listed first", () => {
+    const result = fixDayIndex([make("Пятница"), make("Среда"), make("Четверг")]);
+    const byTitle = new Map(result.map((t) => [t.title, t.dayIndex]));
+    expect(byTitle.get("Task for Среда")).toBe(1);
+    expect(byTitle.get("Task for Четверг")).toBe(2);
+    expect(byTitle.get("Task for Пятница")).toBe(3);
+  });
+
+  it("orders dates lexicologically regardless of input order", () => {
+    const mk = (date: string): ExtractedTask => ({
+      title: `Task ${date}`, priority: "medium", dayIndex: 1, date, subtasks: [], selected: true,
+    });
+    const result = fixDayIndex([mk("2025-09-24"), mk("2025-09-22"), mk("2025-09-23")]);
+    const byTitle = new Map(result.map((t) => [t.title, t.dayIndex]));
+    expect(byTitle.get("Task 2025-09-22")).toBe(1);
+    expect(byTitle.get("Task 2025-09-23")).toBe(2);
+    expect(byTitle.get("Task 2025-09-24")).toBe(3);
+  });
+});
+
+describe("extractBalancedJson", () => {
+  it("stops at the closing brace even when trailing prose contains }", () => {
+    const text = '{"tasks": [{"title": "A"}]} and then a note with } inside';
+    expect(extractBalancedJson(text)).toBe('{"tasks": [{"title": "A"}]}');
+  });
+
+  it("ignores braces inside strings and escapes", () => {
+    expect(extractBalancedJson('x {"title": "a } b"} y')).toBe('{"title": "a } b"}');
+    expect(extractBalancedJson('{"title": "a \\" } b"}')).toBe('{"title": "a \\" } b"}');
+  });
+
+  it("returns null when no complete object exists", () => {
+    expect(extractBalancedJson("no json here")).toBeNull();
+    expect(extractBalancedJson('{"broken": ')).toBeNull();
+  });
+
+  it("parseOllamaJson survives trailing prose after the object", () => {
+    const parsed = parseOllamaJson('{"tasks": [{"title": "A"}]} hope this helps! }');
+    expect(parsed.tasks).toHaveLength(1);
   });
 });

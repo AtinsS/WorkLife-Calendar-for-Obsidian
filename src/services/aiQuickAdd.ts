@@ -2,6 +2,7 @@ import type { App, TFile } from "obsidian";
 import { get } from "svelte/store";
 import { settings } from "../ui/stores";
 import { tRaw } from "../i18n";
+import { parseQuickInput, parseDurationFromText, splitTaskLines } from "../task-tracker/quickAddParse";
 
 /** Desktop-only AI gate (user rule: AI is hidden/disabled on mobile). */
 export function isDesktopAI(): boolean {
@@ -81,7 +82,29 @@ export function formatQuickAddDateContext(now: Date = new Date()): string {
 
 /** Build the Ollama system prompt with live date / project / note context. */
 export function buildQuickAddSystem(context: AiQuickAddContext = {}): string {
-  const dateLine = formatQuickAddDateContext(context.now ?? new Date());
+  const now = context.now ?? new Date();
+  const dateLine = formatQuickAddDateContext(now);
+  // Few-shot example dates are computed live (not "<tomorrow>" placeholders):
+  // small local models copy example values verbatim, and a copied placeholder
+  // silently became an invalid date. A copied REAL date is always parseable and,
+  // since examples are rebuilt every call, correct for this run.
+  const iso = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const shift = (days: number) => {
+    const d = new Date(now);
+    d.setDate(now.getDate() + days);
+    return d;
+  };
+  const onOrAfter = (dow: number) => {
+    const delta = (dow - now.getDay() + 7) % 7;
+    return shift(delta);
+  };
+  const tomorrowISO = iso(shift(1));
+  const fridayISO = iso(onOrAfter(5));
+  // Week-plan example uses bare day headers ("пн:") → on/after-today dates
+  const nextMondayISO = iso(onOrAfter(1));
+  const nextTuesdayISO = iso(onOrAfter(2));
+  const nextFridayISO = iso(onOrAfter(5));
   const projects =
     context.projectNames && context.projectNames.length > 0
       ? context.projectNames.slice(0, 40).join(", ")
@@ -106,7 +129,7 @@ WEEK PLANS: a day header ("понедельник", "пн:", "вт —", "Monday
 
 For each task detect:
 - title: short actionable title in the user's language. Strip dates, times, @project, priority markers, durations, "в заметке X" / [[X]], recurrence phrases. Keep the action verb/object. No trailing punctuation junk.
-- date: absolute YYYY-MM-DD when the user names a day (today/tomorrow/weekday/date), else null. "в понедельник" = next Monday on/after today.
+- date: absolute YYYY-MM-DD when the user names a day (today/tomorrow/weekday/date), else null. Bare weekday ("в понедельник") = that day on/after today. "следующий/next" + weekday ("следующая пятница") = the upcoming such day; if today IS that weekday — the one a week later.
 - scheduledTime / endTime: HH:MM (24h). Ranges "14-15", "14:00-15:00", "с 14 до 15" → both. "в 9" → 09:00. Else null.
   When the user names a date but NO clock time, leave scheduledTime null. NEVER auto-place into a free slot.
   Set pickFreeSlot=true ONLY when the user explicitly asks to pick a free slot («подбери свободный слот», "pick a free slot", «найди время»).
@@ -126,16 +149,16 @@ For each task detect:
 Return shape:
 {"tasks":[{"title":"string","date":"YYYY-MM-DD|null","scheduledTime":"HH:MM|null","endTime":"HH:MM|null","priority":"medium","projectName":null,"isWorkTask":false,"noteName":null,"description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"rate":null,"paymentType":null,"recurrence":null,"subtasks":[],"pickFreeSlot":false}]}
 
-Examples (dates are illustrative — always use Current date):
+Examples (dates are computed from Current date — mirror that computation for other inputs):
 
 Input: "!Отчёт для клиента завтра 14:00 @Work рабочий, привязать к заметке Отчёты, каждый понедельник"
-Output: {"tasks":[{"title":"Отчёт для клиента","date":"<tomorrow>","scheduledTime":"14:00","endTime":null,"priority":"high","projectName":"Work","isWorkTask":true,"noteName":"Отчёты","description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"recurrence":{"type":"weekly","interval":1,"daysOfWeek":[1]}}]}
+Output: {"tasks":[{"title":"Отчёт для клиента","date":"${tomorrowISO}","scheduledTime":"14:00","endTime":null,"priority":"high","projectName":"Work","isWorkTask":true,"noteName":"Отчёты","description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"recurrence":{"type":"weekly","interval":1,"daysOfWeek":[1]}}]}
 
 Input: "купить молоко; созвон с командой в 10-11 и спортзал завтра"
-Output: {"tasks":[{"title":"Купить молоко","priority":"low"},{"title":"Созвон с командой","scheduledTime":"10:00","endTime":"11:00","priority":"medium","isWorkTask":true,"estimatedMinutes":60},{"title":"Спортзал","date":"<tomorrow>","priority":"medium"}]}
+Output: {"tasks":[{"title":"Купить молоко","priority":"low"},{"title":"Созвон с командой","scheduledTime":"10:00","endTime":"11:00","priority":"medium","isWorkTask":true,"estimatedMinutes":60},{"title":"Спортзал","date":"${tomorrowISO}","priority":"medium"}]}
 
 Input: "сдать отчёт до пятницы 18:00 на 2 часа @Work"
-Output: {"tasks":[{"title":"Сдать отчёт","date":null,"scheduledTime":null,"endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"noteName":null,"description":null,"estimatedMinutes":120,"deadline":"<friday>","deadlineTime":"18:00","recurrence":null}]}
+Output: {"tasks":[{"title":"Сдать отчёт","date":null,"scheduledTime":null,"endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"noteName":null,"description":null,"estimatedMinutes":120,"deadline":"${fridayISO}","deadlineTime":"18:00","recurrence":null}]}
 
 Input: "Дизайн лендинга, 400р в час @Work"
 Output: {"tasks":[{"title":"Дизайн лендинга","date":null,"scheduledTime":null,"endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"noteName":null,"description":null,"estimatedMinutes":null,"deadline":null,"deadlineTime":null,"rate":400,"paymentType":"hour","recurrence":null}]}
@@ -152,7 +175,7 @@ Output: {"tasks":[{"title":"Team standup","date":null,"scheduledTime":"09:30","e
 Input: "пн: созвон с командой в 10:00 @Work; отписать клиенту
 вт: черновик статьи на 2 часа
 пт: спортзал 18-19"
-Output: {"tasks":[{"title":"Созвон с командой","date":"<next Monday>","scheduledTime":"10:00","endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"estimatedMinutes":null},{"title":"Отписать клиенту","date":"<next Monday>","priority":"medium","isWorkTask":true},{"title":"Черновик статьи","date":"<next Tuesday>","priority":"medium","estimatedMinutes":120},{"title":"Спортзал","date":"<next Friday>","scheduledTime":"18:00","endTime":"19:00","priority":"medium","estimatedMinutes":60}]}`;
+Output: {"tasks":[{"title":"Созвон с командой","date":"${nextMondayISO}","scheduledTime":"10:00","endTime":null,"priority":"medium","projectName":"Work","isWorkTask":true,"estimatedMinutes":null},{"title":"Отписать клиенту","date":"${nextMondayISO}","priority":"medium","isWorkTask":true},{"title":"Черновик статьи","date":"${nextTuesdayISO}","priority":"medium","estimatedMinutes":120},{"title":"Спортзал","date":"${nextFridayISO}","scheduledTime":"18:00","endTime":"19:00","priority":"medium","estimatedMinutes":60}]}`;
 }
 
 /** Normalize "9", "9.30", "09:5", "23:59" → "HH:MM"; invalid → null. */
@@ -168,11 +191,11 @@ export function normalizeAiTime(raw: unknown): string | null {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
-/** Validate absolute YYYY-MM-DD; invalid → null. */
+/** Validate absolute date "YYYY-M-D" / "YYYY-MM-DD"; invalid → null. Returns padded form. */
 export function normalizeAiDate(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
   const s = raw.trim();
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(s);
   if (!m) return null;
   const y = parseInt(m[1], 10);
   const mo = parseInt(m[2], 10);
@@ -180,7 +203,7 @@ export function normalizeAiDate(raw: unknown): string | null {
   if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
   const dt = new Date(y, mo - 1, d);
   if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
-  return s;
+  return `${String(y).padStart(4, "0")}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 
 export function normalizeAiMinutes(raw: unknown): number | null {
@@ -204,8 +227,9 @@ export function normalizeAiPaymentType(raw: unknown): "hour" | "day" | null {
   if (raw === "hour" || raw === "day") return raw;
   if (typeof raw !== "string") return null;
   const s = raw.toLowerCase();
-  if (/час|hour|\bhr?\b|\bч\b|h\b/.test(s)) return "hour";
-  if (/день|сутки|day|\bд\b|d\b/.test(s)) return "day";
+  // NB: \b is ASCII-only — standalone Cyrillic "ч"/"д" need lookarounds instead
+  if (/(?<![а-яёa-z])(?:час[а-яё]*|hour|hr|h|ч)(?![а-яёa-z])/iu.test(s)) return "hour";
+  if (/(?<![а-яёa-z])(?:день|дня|дней|дню|сутки|day|д|d)(?![а-яёa-z])/iu.test(s)) return "day";
   return null;
 }
 
@@ -227,8 +251,8 @@ export function extractRateFromText(text: string): {
     const paymentType = normalizeAiPaymentType(m[2]);
     return { rate, paymentType, matched: rate ? m[0] : null };
   }
-  // bare "400р" / "400 руб" without period → hour
-  const bare = /(\d[\d\s]*(?:[.,]\d{1,2})?)\s*(?:₽|р\.|руб(?:лей|ля)?)/i.exec(text);
+  // bare "400р" / "400 руб" without period → hour ("400р" has no dot, "р\." alone missed it)
+  const bare = /(\d[\d\s]*(?:[.,]\d{1,2})?)\s*(?:₽|р\.?|руб(?:лей|ля)?)(?![а-яёa-z])/i.exec(text);
   if (!bare) return { rate: null, paymentType: null, matched: null };
   const rate = normalizeAiRate(bare[1]);
   return {
@@ -419,15 +443,22 @@ export function parseAiQuickTasks(raw: string): AiQuickTaskDraft[] {
       // try next candidate
     }
   }
-  // Fallback: one task per non-empty line
-  return text
-    .split(/\n+/)
-    .map((l) => l.replace(/^\s*[-*•]\s+/, "").replace(/^\s*\d+[.)]\s+/, "").trim())
-    .filter((l) => l && !l.startsWith("{") && !l.startsWith("```"))
-    .map((title) => ({
-      title: cleanAiTitle(title),
-      priority: "medium" as const,
-    }))
+  // Fallback (model JSON unparseable): one task per line via the shared regex
+  // parser so dates/times/projects survive — title-only drafts used to drop them.
+  return splitTaskLines(text)
+    .map((line) => {
+      const parsed = parseQuickInput(line);
+      const title = cleanAiTitle(parsed.title || line);
+      return {
+        title,
+        date: parsed.date ? parsed.date.format("YYYY-MM-DD") : null,
+        scheduledTime: parsed.scheduledTime,
+        endTime: parsed.endTime,
+        priority: (parsed.priority ?? "medium") as "low" | "medium" | "high",
+        projectName: parsed.projectName,
+        estimatedMinutes: parseDurationFromText(line),
+      };
+    })
     .filter((t) => t.title);
 }
 

@@ -18,10 +18,10 @@
     checklists,
     updateTask,
     updateTaskStatus,
-    removeTask,
     resetTaskTimer,
     carryOverOverdueTasks,
   } from "../task-tracker/stores";
+  import { requestTaskDeletion } from "../task-tracker/taskDeletion";
   import { TaskModal } from "../task-tracker/TaskModal";
   import { getDateUID } from "obsidian-daily-notes-interface";
   import { tasksToEvents, getStatusColor } from "./scheduleUtils";
@@ -1816,18 +1816,21 @@
     const task = contextMenuTask;
     closeContextMenu();
     if (!task) return;
-    // Точечное удаление событий задачи (включая дедлайн) без полного refetch.
-    commitLocalMutation(() => {
-      if (calendar) {
-        for (const ev of calendar.getEvents()) {
-          const tid = ev.extendedProps?.taskId || ev.id;
-          const isDeadline = ev.id === `deadline-${task.id}` || ev.extendedProps?.isDeadlineEvent;
-          if (tid === task.id || (isDeadline && ev.extendedProps?.taskId === task.id)) {
-            ev.remove();
+    // Recurring tasks ask "this occurrence / whole series" first; the calendar
+    // events are cleaned only after a real deletion (onDeleted), never on cancel.
+    requestTaskDeletion(plugin.app, task.id, () => {
+      commitLocalMutation(() => {
+        if (calendar) {
+          for (const ev of calendar.getEvents()) {
+            const tid = ev.extendedProps?.taskId || ev.id;
+            const isDeadline = ev.id === `deadline-${task.id}` || ev.extendedProps?.isDeadlineEvent;
+            if (tid === task.id || (isDeadline && ev.extendedProps?.taskId === task.id)) {
+              ev.remove();
+            }
           }
         }
-      }
-      removeTask(task.id);
+      });
+      scheduleRefetch();
     });
   }
 

@@ -840,7 +840,7 @@ export class AiAskChat {
       aiTone?: string;
     };
     if (!opts.ollamaEnabled) {
-      new Notice(tRaw("ai.summaryNeedOllama"));
+      new Notice(tRaw("ai.needOllama"));
       return;
     }
 
@@ -857,6 +857,7 @@ export class AiAskChat {
 
     try {
       const context = await this.loadContext();
+      // Plain-text history is still needed for the web-search query context
       const history = this.messages
         .slice(0, -1)
         .map((m) => `${m.role === "user" ? this.userLabel : this.aiLabel}: ${m.text}`)
@@ -871,8 +872,7 @@ export class AiAskChat {
       const blocks: string[] = [];
       if (context) blocks.push(`Note context:\n${context}`);
       if (webContext) blocks.push(webContext);
-      if (history) blocks.push(`Conversation so far:\n${history}`);
-      blocks.push(`User message:\n${text}`);
+      blocks.push(text);
       const userContent = blocks.join("\n\n");
 
       const about = (opts.userAbout || "").trim();
@@ -899,13 +899,24 @@ export class AiAskChat {
         );
       }
 
+      // Prior turns travel as real role messages — flattening them into one user
+      // payload lost role semantics and degraded multi-turn answers.
+      const chatMessages = [
+        { role: "system" as const, content: systemParts.join("\n\n") },
+        ...this.messages
+          .slice(0, -1)
+          .filter((m) => m.text.trim())
+          .map((m) => ({
+            role: m.role as "user" | "assistant",
+            content: m.text.slice(0, MAX_MSG_CHARS),
+          })),
+        { role: "user" as const, content: userContent },
+      ];
+
       const result = await streamOllamaChat(
         opts.ollamaUrl || "http://localhost:11434",
         resolveModel("reason", opts),
-        [
-          { role: "system", content: systemParts.join("\n\n") },
-          { role: "user", content: userContent },
-        ],
+        chatMessages,
         {
           signal: this.abort.signal,
           temperature: 0.4,

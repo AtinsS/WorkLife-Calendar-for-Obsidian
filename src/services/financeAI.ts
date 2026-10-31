@@ -226,13 +226,11 @@ function parseExpensesRuleBased(
 
 const FORECAST_SYSTEM = `You are a personal finance assistant. Analyze the month snapshot and forecast the remainder.
 Write in the SAME language as the category names (Russian if they are Russian).
-Return ONLY markdown (no code fences). Be concrete with numbers. Structure:
-## Прогноз
-- 2–4 sentences: will the month close, what is left, pace per day
-## Риски
-- 2–4 bullets
-## Что сделать
-- 3 short actionable tips
+Return ONLY markdown (no code fences). Be concrete with numbers.
+Use exactly three sections as "## " headings — title them IN THE OUTPUT LANGUAGE (e.g. Прогноз/Риски/Что сделать or Forecast/Risks/What to do):
+- Forecast: 2–4 sentences — will the month close, what is left, pace per day
+- Risks: 2–4 bullets
+- What to do: 3 short actionable tips
 Keep it under 200 words.`;
 
 export async function forecastBalance(

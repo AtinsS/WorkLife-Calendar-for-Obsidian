@@ -4,7 +4,7 @@ import { momentFn, type Moment } from "../utils/moment";
 import type CalendarPlugin from "src/main";
 import { getDateUID } from "obsidian-daily-notes-interface";
 
-import type { ITask, IProject, ITaskTrackerData, IChecklistItem, TimeLog, TaskStatus, DateUID, IKanbanBoard, IKanbanColumnDef } from "./types";
+import type { ITask, IProject, ITaskTrackerData, IChecklistItem, TimeLog, TaskStatus, DateUID, IKanbanBoard, IKanbanColumnDef, RecurrenceConfig } from "./types";
 import { TASK_TRACKER_DATA_VERSION } from "./types";
 import { loadTaskData, saveTaskData, generateId } from "./storage";
 import { startTimer, resumeTimer, stopTimer, addTimeLog } from "./TimerManager";
@@ -497,7 +497,60 @@ export function setTaskKanbanColumn(taskId: string, columnId: string | null): vo
 export function removeTask(id: string): void {
   stopTimer(id);
   tasks.update((current) => current.filter((t) => t.id !== id));
-  debouncedSave();
+  // Deletions save immediately: the 300ms debounce meant quitting Obsidian right
+  // after a delete lost it, and the task "came back" on the next start.
+  immediateSave();
+}
+
+/**
+ * Remember a user-deleted occurrence on the recurring parent so the generators
+ * (generateMonthlyRecurringTasks / createNextRecurringInstance) never recreate it.
+ */
+export function tombstoneOccurrenceDate(parentId: string, date: string): void {
+  if (!parentId || !date) return;
+  tasks.update((current) =>
+    current.map((t) => {
+      if (t.id !== parentId || !t.recurrence) return t;
+      const deleted = t.recurrence.deletedDates ?? [];
+      if (deleted.includes(date)) return t;
+      return {
+        ...t,
+        recurrence: { ...t.recurrence, deletedDates: [...deleted, date] },
+        updatedAt: Date.now(),
+      };
+    }),
+  );
+  immediateSave();
+}
+
+/**
+ * Delete a whole recurring series: the parent (template) and every generated instance.
+ * Used by the delete confirmation flow and mirrors clearAllRecurringTasks' shape.
+ */
+export function clearRecurringSeries(rootId: string): { parentCount: number; instanceCount: number } {
+  const allTasks = get(tasks);
+  const idsToRemove = new Set<string>([rootId]);
+  // Instances can chain off other instances (createNextRecurringInstance uses the
+  // completed task's id as parent) — sweep the whole chain iteratively.
+  let grew = true;
+  while (grew) {
+    grew = false;
+    for (const t of allTasks) {
+      if (t.isRecurringInstance && t.parentTaskId && idsToRemove.has(t.parentTaskId) && !idsToRemove.has(t.id)) {
+        idsToRemove.add(t.id);
+        grew = true;
+      }
+    }
+  }
+
+  const removed = allTasks.filter((t) => idsToRemove.has(t.id));
+  const parentCount = removed.filter((t) => !t.isRecurringInstance).length;
+  const instanceCount = removed.length - parentCount;
+
+  for (const t of removed) stopTimer(t.id);
+  tasks.update((current) => current.filter((t) => !idsToRemove.has(t.id)));
+  immediateSave();
+  return { parentCount, instanceCount };
 }
 
 export function resetTaskTimer(id: string): void {
@@ -526,6 +579,22 @@ export function resetTaskTimer(id: string): void {
   timeLogs.update((current) => current.filter((l) => l.taskId !== id));
 
   debouncedSave();
+}
+
+/**
+ * Recurrence config of the series ROOT. Instances carry a copy of the parent's
+ * config taken at creation time — tombstones (deletedDates) live on the root only,
+ * so look them up through the parent chain, never from a stale instance copy.
+ */
+function rootRecurrence(task: ITask): RecurrenceConfig | undefined {
+  let cur: ITask | undefined = task;
+  const seen = new Set<string>();
+  while (cur && cur.isRecurringInstance && cur.parentTaskId && !seen.has(cur.id)) {
+    seen.add(cur.id);
+    const pid = cur.parentTaskId;
+    cur = get(tasks).find((t) => t.id === pid);
+  }
+  return cur?.recurrence ?? task.recurrence;
 }
 
 export function createNextRecurringInstance(taskId: string): void {
@@ -582,6 +651,12 @@ export function createNextRecurringInstance(taskId: string): void {
     if (untilMoment.isValid() && nextDate.isAfter(untilMoment)) {
       return; // повторение завершено
     }
+  }
+
+  // Дата удалена пользователем — не воссоздаём (надгробия живут на корне серии)
+  const rootRec = rootRecurrence(task);
+  if (rootRec?.deletedDates?.includes(nextDate.format("YYYY-MM-DD"))) {
+    return;
   }
 
   const newDateUID = getDateUID(nextDate, "day");
@@ -691,6 +766,12 @@ export function generateMonthlyRecurringTasks(taskId: string): void {
 
     // Если следующая дата выходит за пределы периода — останавливаемся
     if (nextDate.isAfter(endOfPeriod)) break;
+
+    // Даты, которые пользователь удалил, не воссоздаём
+    if (task.recurrence.deletedDates?.includes(nextDate.format("YYYY-MM-DD"))) {
+      currentDate = nextDate;
+      continue;
+    }
 
     const newDateUID = getDateUID(nextDate, "day");
 

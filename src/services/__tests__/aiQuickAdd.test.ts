@@ -57,9 +57,16 @@ describe("parseAiQuickTasks", () => {
     expect(tasks[1].isWorkTask).toBe(true);
   });
 
-  it("falls back to line split on invalid JSON", () => {
+  it("falls back to line split on invalid JSON — and keeps dates/times", () => {
     const tasks = parseAiQuickTasks("Первая задача\n- Вторая задача");
     expect(tasks.map((t) => t.title)).toEqual(["Первая задача", "Вторая задача"]);
+    // enriched fallback: regex tokens survive a model JSON failure
+    const rich = parseAiQuickTasks("созвон завтра 14:00 @Work\nспортзал в пятницу");
+    expect(rich).toHaveLength(2);
+    expect(rich[0].scheduledTime).toBe("14:00");
+    expect(rich[0].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(rich[0].projectName).toBe("Work");
+    expect(rich[1].date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("drops empty titles", () => {
@@ -194,6 +201,7 @@ describe("normalizeAiTime / normalizeAiDate / normalizeAiMinutes", () => {
 
   it("validates dates", () => {
     expect(normalizeAiDate("2026-10-05")).toBe("2026-10-05");
+    expect(normalizeAiDate("2026-7-5")).toBe("2026-07-05"); // loose month/day from models
     expect(normalizeAiDate("2026-02-29")).toBeNull(); // 2026 is not a leap year
     expect(normalizeAiDate("5.10.2026")).toBeNull();
   });
