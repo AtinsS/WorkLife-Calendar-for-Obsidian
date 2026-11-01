@@ -237,6 +237,12 @@ The plugin stores data as JSON files in the `calendar-data/` folder at the root 
 
 Optionally, enable **auto-sync** to update the Gist whenever tasks change.
 
+### Calendar subscriptions.
+
+- **Calendar subscriptions (ICS)** — add .ics feeds (holidays, birthdays, etc.) in settings: name, color, enable/disable, refresh individually or all at once. Events from feeds are displayed in the schedule. A built-in "Russian Holidays" preset is included.
+- **"My events"** — your own events directly in the plugin: title, "all day", color, date or date range, start and end time, description, location. A "＋ Event" button in the schedule, editing and deletion.
+- **Calendar event notifications** — reminders for events from ICS subscriptions and "My events": N days or hours before the event (0 — on the day of the event), a separate notification hour setting for all-day events.
+
 </details>
 
 <details>
