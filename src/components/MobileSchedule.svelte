@@ -2,9 +2,9 @@
   import { onMount, onDestroy } from "svelte";
   import moment from "moment";
   import type { ITask } from "../task-tracker/types";
-  import { tasks, projects, updateTaskStatus, updateTask, resetTaskTimer, carryOverOverdueTasks } from "../task-tracker/stores";
+  import { tasks, projects, updateTaskStatus, resetTaskTimer, carryOverOverdueTasks } from "../task-tracker/stores";
   import { requestTaskDeletion } from "../task-tracker/taskDeletion";
-  import { TaskModal } from "../task-tracker/TaskModal";
+  import { requestTaskEdit } from "../task-tracker/taskEdit";
   import type CalendarPlugin from "../main";
   import { settings } from "../ui/stores";
   import { fetchWeekWeather, type DayWeather } from "../services/weatherService";
@@ -307,7 +307,8 @@
   function contextEditTask() {
     const task = contextMenuTask;
     if (task) {
-      new TaskModal(plugin.app, (updates) => updateTask(task.id, updates), task).open();
+      // Recurring tasks ask "this task / whole series" — see taskEdit.ts
+      requestTaskEdit(plugin.app, task);
     }
     closeContextMenu();
   }
@@ -919,7 +920,10 @@
   :global(.ms-context-menu) {
     position: fixed;
     z-index: 9999;
-    min-width: 200px;
+    /* Fixed width — keeps the menu stable regardless of open position */
+    width: 220px;
+    min-width: 220px;
+    max-width: 220px;
     background: var(--background-primary, #1e1e2e);
     border: 1px solid var(--background-modifier-border, rgba(255,255,255,0.08));
     border-radius: 12px;

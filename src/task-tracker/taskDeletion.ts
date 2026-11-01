@@ -16,7 +16,7 @@ interface ConfirmButton {
   action?: () => void;
 }
 
-class ConfirmModal extends Modal {
+export class ConfirmModal extends Modal {
   constructor(
     app: App,
     private heading: string,

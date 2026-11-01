@@ -20,10 +20,8 @@
       } else if (task.status === "paused") {
         result.paused++;
       }
-      // «Все задачи» (без даты) — все статусы; на дне — только активные
-      if (!currentDate || (task.status !== "done" && task.status !== "failed")) {
-        result.all++;
-      }
+      // «Все» — все статусы: и выполненные, и невыполненные
+      result.all++;
     }
     return result;
   })();

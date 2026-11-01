@@ -60,6 +60,8 @@ import HelloView from "./components/HelloView.svelte";
 import { NotificationService } from "./services/NotificationService";
 import { checkForPluginUpdate } from "./services/updateCheck";
 import { initGistSync } from "./services/GistSyncService";
+import { refreshAllSubscriptions } from "./services/calendarSubscriptions";
+import { loadCustomEvents, customEventsStore } from "./services/customEvents";
 import { AIExtractModal } from "./services/AIExtractModal";
 import {
   AISummaryModal,
@@ -647,6 +649,12 @@ export default class CalendarPlugin extends Plugin {
 
     // Initialize GitHub Gist sync
     initGistSync(this);
+
+    // «Мои события» — из calendar-data/events.json (с миграцией из data.json)
+    customEventsStore.set(await loadCustomEvents(this));
+
+    // Warm up subscribed ICS calendars (cached; network fetch only when stale)
+    void refreshAllSubscriptions(this.app, this.options.calendarSubscriptions ?? []);
 
     // Initialize notification service
     this.notificationService = new NotificationService(this);

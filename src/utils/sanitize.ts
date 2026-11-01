@@ -62,3 +62,13 @@ export function errorMessage(e: unknown): string {
     return "Unknown error";
   }
 }
+
+/** Escape text for interpolation into HTML strings (e.g. data from external ICS feeds). */
+export function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}

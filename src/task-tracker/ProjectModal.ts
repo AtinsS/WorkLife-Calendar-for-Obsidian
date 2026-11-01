@@ -32,7 +32,7 @@ function addRecentIcon(app: App, emoji: string): void {
   app.saveLocalStorage(RECENT_ICONS_KEY, JSON.stringify(recent));
 }
 
-function renderColorPicker(
+export function renderColorPicker(
   container: HTMLElement,
   currentColor: string,
   onSelect: (hex: string) => void,
@@ -361,7 +361,7 @@ export class ProjectModal extends CustomModal {
 
   private openEditProject(project: IProject): void {
     // Keep the list open underneath — just refresh it after save
-    const modal = new EditProjectModal(this.app, project, () => {
+    const modal = new ProjectFormModal(this.app, project, () => {
       this.rerender();
     });
     modal.open();
@@ -373,11 +373,12 @@ export class ProjectModal extends CustomModal {
   }
 }
 
-class EditProjectModal extends CustomModal {
-  private project: IProject;
+/** Create (`project === null`) or edit a project — used by the project list and the task-view sidebar. */
+export class ProjectFormModal extends CustomModal {
+  private project: IProject | null;
   private onClosed: () => void;
 
-  constructor(app: App, project: IProject, onClosed: () => void) {
+  constructor(app: App, project: IProject | null, onClosed: () => void = () => undefined) {
     super(app);
     this.project = project;
     this.onClosed = onClosed;
@@ -387,18 +388,21 @@ class EditProjectModal extends CustomModal {
     this.containerEl.addClass("wf-project-modal");
     this.containerEl.addClass("wf-edit-modal");
 
-    this.contentEl.createEl("h2", { text: tRaw("tasks.project.editProject") });
+    const isEdit = this.project !== null;
+    this.contentEl.createEl("h2", {
+      text: isEdit ? tRaw("tasks.project.editProject") : tRaw("tasks.project.newProject"),
+    });
 
-    let name = this.project.name;
-    let color = this.project.color;
-    let icon = this.project.icon;
+    let name = this.project?.name ?? "";
+    let color = this.project?.color ?? DEFAULT_PROJECT_COLORS[0];
+    let icon = this.project?.icon ?? "📁";
 
     // Name
     const nameField = this.contentEl.createDiv("pm-field");
     nameField.createEl("label", { text: tRaw("tasks.project.name"), cls: "pm-label" });
     const nameInput = nameField.createEl("input", {
       cls: "pm-input",
-      attr: { type: "text", placeholder: tRaw("tasks.project.name"), value: name, maxlength: "50" },
+      attr: { type: "text", placeholder: tRaw("tasks.project.namePlaceholder"), value: name, maxlength: "60" },
     });
     nameInput.addEventListener("input", () => { name = nameInput.value; });
 
@@ -421,7 +425,10 @@ class EditProjectModal extends CustomModal {
     const cancelBtn = buttonsEl.createEl("button", { text: tRaw("common.cancel"), cls: "pm-cancel-btn" });
     cancelBtn.addEventListener("click", () => this.close());
 
-    const saveBtn = buttonsEl.createEl("button", { text: tRaw("common.save"), cls: "pm-save-btn" });
+    const saveBtn = buttonsEl.createEl("button", {
+      text: isEdit ? tRaw("common.save") : tRaw("tasks.project.create"),
+      cls: "pm-save-btn",
+    });
     saveBtn.addEventListener("click", () => {
       if (!name.trim()) {
         nameInput.focus();
@@ -430,14 +437,27 @@ class EditProjectModal extends CustomModal {
         return;
       }
       addRecentIcon(this.app, icon);
-      updateProject(this.project.id, {
-        name: name.trim(),
-        color,
-        icon: icon || "📁",
-        folder: null,
-      });
+      if (this.project) {
+        updateProject(this.project.id, {
+          name: name.trim(),
+          color,
+          icon: icon || "📁",
+          folder: null,
+        });
+      } else {
+        addProject({
+          name: name.trim(),
+          color,
+          icon: icon || "📁",
+          folder: null,
+          archived: false,
+          sortOrder: get(projects).length,
+        });
+      }
       this.close();
     });
+
+    window.setTimeout(() => nameInput.focus(), 50);
   }
 
   onClose(): void {
@@ -445,7 +465,7 @@ class EditProjectModal extends CustomModal {
   }
 }
 
-class DeleteConfirmModal extends CustomModal {
+export class DeleteConfirmModal extends CustomModal {
   private name: string;
   private onConfirm: () => void;
 

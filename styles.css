@@ -961,6 +961,191 @@
   gap: 0;
 }
 
+/* ── Форма своего события («Мои события») ── */
+.wl-event-modal {
+  width: 440px;
+}
+
+.wl-event-allday {
+  margin-bottom: 14px;
+}
+
+.wl-event-allday-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.wl-event-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wl-event-cell {
+  flex: 1 1 140px;
+  min-width: 120px;
+  margin-bottom: 14px;
+}
+
+.wl-event-textarea {
+  resize: vertical;
+  min-height: 64px;
+  font-family: var(--font-interface);
+}
+
+/* ── Подключаемые ICS-календари (настройки) ── */
+.wl-cal-subs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.wl-cal-sub-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.wl-cal-sub-input {
+  flex: 1 1 180px;
+  min-width: 140px;
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.wl-cal-sub-input-url {
+  flex: 2 1 260px;
+  font-family: var(--font-monospace);
+  font-size: 12px;
+}
+
+.wl-cal-sub-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wl-cal-sub-empty {
+  padding: 10px 4px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.wl-cal-sub-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-left: 3px solid var(--cal-color, var(--mcp-accent));
+  background: color-mix(in srgb, var(--cal-color, var(--mcp-accent)) 7%, transparent);
+}
+
+.wl-cal-sub-color {
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.wl-cal-sub-color input[type="color"] {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.wl-cal-sub-info {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.wl-cal-sub-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wl-cal-sub-name {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-normal);
+}
+
+.wl-cal-sub-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.wl-cal-sub-url {
+  font-family: var(--font-monospace);
+  font-size: 11px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wl-cal-sub-status {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.wl-cal-sub-status.is-error {
+  color: var(--text-error);
+}
+
+.wl-cal-sub-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.wl-cal-sub-btn {
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+}
+
+.wl-cal-sub-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.wl-cal-sub-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.wl-cal-sub-btn-danger:hover {
+  color: var(--text-error);
+  border-color: color-mix(in srgb, var(--text-error) 45%, transparent);
+}
+
 .wl-settings-note {
   margin: 0.35rem 0;
   padding: 0.75rem 0.95rem;
@@ -1201,6 +1386,20 @@
     0 1px 3px rgba(245, 166, 35, 0.16),
     0 4px 12px rgba(245, 166, 35, 0.2),
     0 0 18px rgba(245, 166, 35, 0.18);
+}
+
+/* Дни с событиями из подключённых ICS-календарей (праздники и т.п.) */
+#calendar-container .day.is-ical-event {
+  color: #e2574c;
+  font-weight: 700;
+}
+
+#calendar-container .day.is-ical-event.today {
+  color: var(--color-text-today, #e2574c);
+}
+
+#calendar-container .day.is-ical-event .dot.filled.cal-event-dot {
+  fill: #e2574c;
 }
 
 @keyframes pulse-danger {
@@ -1975,6 +2174,108 @@
 .task-tracker-empty .empty-cta:hover {
   background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 28%, transparent);
   transform: translateY(-1px);
+}
+
+/* ============================================
+   DAY EVENTS BLOCK (List section)
+   ============================================ */
+.task-tracker-events {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.task-events-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mcp-text-muted);
+}
+
+.task-events-title {
+  flex: 1;
+}
+
+.task-events-count {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: var(--mcp-accent, #7c5cfc);
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 16%, transparent);
+}
+
+.task-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.task-event-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border-left: 3px solid var(--event-color, var(--mcp-accent, #7c5cfc));
+  font-size: 12px;
+  color: var(--mcp-text);
+  min-width: 0;
+}
+
+.task-event-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--event-color, var(--mcp-accent, #7c5cfc));
+  flex-shrink: 0;
+}
+
+.task-event-time {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 650;
+  color: var(--mcp-text-muted);
+  font-family: var(--font-monospace, monospace);
+}
+
+.task-event-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 550;
+}
+
+.task-event-cal {
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--mcp-text-muted);
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.task-event-allday .task-event-time {
+  font-family: inherit;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .task-group-header {
@@ -2791,6 +3092,11 @@
 .task-actions-menu.sch-float-menu,
 body > .task-actions-menu {
   position: fixed;
+  /* Fixed width: shrink-to-fit + width:100% items stretched the menu
+     proportionally to its distance from the left viewport edge. */
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
   max-height: min(70vh, 480px);
   overflow-x: hidden;
   overflow-y: auto;
@@ -2800,7 +3106,6 @@ body > .task-actions-menu {
   border-radius: 12px;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
   padding: 6px;
-  min-width: 180px;
   z-index: 9999;
 }
 
@@ -5792,6 +6097,13 @@ h2.tm-title.tm-title {
   min-width: 140px;
 }
 
+.task-actions-menu.sch-float-menu,
+body > .task-actions-menu {
+  width: 200px;
+  min-width: 200px;
+  max-width: 200px;
+}
+
 .task-actions-item {
   padding: 6px 10px;
   font-size: 12px;
@@ -6645,6 +6957,13 @@ h2.tm-title.tm-title {
 
   .task-actions-menu {
     min-width: 120px;
+  }
+
+  .task-actions-menu.sch-float-menu,
+  body > .task-actions-menu {
+    width: 180px;
+    min-width: 180px;
+    max-width: 180px;
   }
 
   .task-actions-item {
@@ -8960,7 +9279,7 @@ h2.tm-title.tm-title {
 .task-view-sidebar {
   flex: 0 0 200px;
   min-width: 160px;
-  max-width: 240px;
+  max-width: 560px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -8971,7 +9290,37 @@ h2.tm-title.tm-title {
   align-self: stretch;
 }
 
+/* Drag handle: resize the projects sidebar width */
+.task-view-sidebar-resize {
+  flex: 0 0 5px;
+  align-self: stretch;
+  margin: 0 -2px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s ease;
+  position: relative;
+  z-index: 5;
+}
+
+.task-view-sidebar-resize:hover,
+.task-view-sidebar-resize.dragging {
+  background: color-mix(in srgb, var(--mcp-accent) 45%, transparent);
+}
+
+body.task-view-sidebar-resizing {
+  user-select: none;
+  cursor: col-resize;
+}
+
+body.task-view-sidebar-resizing iframe {
+  pointer-events: none;
+}
+
 .task-view-sidebar-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 12px;
   font-weight: 700;
   color: var(--mcp-text-muted);
@@ -8980,6 +9329,32 @@ h2.tm-title.tm-title {
   padding: 0 8px 12px;
   border-bottom: 1px solid var(--mcp-glass-border);
   margin-bottom: 4px;
+}
+
+.task-view-sidebar-add-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+  color: var(--mcp-text-muted);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--mcp-glass-border);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  text-transform: none;
+}
+
+.task-view-sidebar-add-btn:hover {
+  color: #fff;
+  background: var(--mcp-accent);
+  border-color: transparent;
 }
 
 .task-view-sidebar-list {
@@ -9034,8 +9409,62 @@ h2.tm-title.tm-title {
 }
 
 .task-view-sidebar-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.task-view-sidebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.task-view-sidebar-action-btn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--mcp-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.55;
+  transition: all 0.15s ease;
+}
+
+.task-view-sidebar-action-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--mcp-text);
+}
+
+.task-view-sidebar-delete-btn:hover {
+  color: #e5484d;
+  background: rgba(229, 72, 77, 0.15);
+}
+
+.task-view-sidebar-btn.active .task-view-sidebar-action-btn {
+  color: rgba(255, 255, 255, 0.85);
+  opacity: 0.75;
+}
+
+.task-view-sidebar-btn.active .task-view-sidebar-action-btn:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.task-view-sidebar-btn.active .task-view-sidebar-delete-btn:hover {
+  background: rgba(0, 0, 0, 0.28);
+  color: #fff;
 }
 
 .task-view-panels {
@@ -9096,6 +9525,7 @@ h2.tm-title.tm-title {
 
 @media (max-width: 860px) {
   .task-view-sidebar { display: none; }
+  .task-view-sidebar-resize { display: none; }
   .task-view-panels { padding: 8px; }
 }
 

@@ -13,6 +13,8 @@ import { getActiveTimer } from "src/task-tracker/TimerManager";
 import { isTaskOverdue } from "src/task-tracker/overdue";
 import { habits as habitStore } from "src/habit-tracker/stores";
 import { recordNotificationEvent } from "./notificationTelemetry";
+import type { ICalendarSubscription } from "./calendarSubscriptions";
+import { collectAllCalendarOccurrences, customEventsStore } from "./customEvents";
 import { tRaw } from "../i18n";
 import { errorMessage } from "../utils/sanitize";
 
@@ -27,6 +29,12 @@ export interface NotificationSettings {
   notifyOverdue: boolean;
   notifyEstimateExceeded: boolean;
   notifyDeadlines: boolean;
+  notifyCalendarEvents: boolean;
+  /** Advance notice before calendar events: N × unit (0 — day-of only). */
+  notifyCalendarBefore: number;
+  notifyCalendarBeforeUnit: "days" | "hours";
+  /** Hour of day (0-23) for the day-of notification of all-day events. */
+  notifyCalendarHour: number;
 }
 
 export const defaultNotificationSettings: NotificationSettings = {
@@ -37,6 +45,10 @@ export const defaultNotificationSettings: NotificationSettings = {
   notifyOverdue: true,
   notifyEstimateExceeded: true,
   notifyDeadlines: true,
+  notifyCalendarEvents: true,
+  notifyCalendarBefore: 0,
+  notifyCalendarBeforeUnit: "days",
+  notifyCalendarHour: 9,
 };
 
 const NTFY_DEDUP_KEY = "worklife-ntfy-scheduled";
@@ -62,6 +74,7 @@ export class NotificationService {
   private firedOverdue = new Set<string>();
   private firedDeadline = new Set<string>();
   private firedEstimateExceeded = new Set<string>();
+  private firedCalendar = new Set<string>();
 
   constructor(plugin: CalendarPlugin) {
     this.plugin = plugin;
@@ -144,6 +157,7 @@ export class NotificationService {
     this.firedOverdue.clear();
     this.firedDeadline.clear();
     this.firedEstimateExceeded.clear();
+    this.firedCalendar.clear();
   }
 
   restart(): void {
@@ -163,6 +177,12 @@ export class NotificationService {
       notifyOverdue: opts.notifyOverdue ?? defaultNotificationSettings.notifyOverdue,
       notifyEstimateExceeded: opts.notifyEstimateExceeded ?? defaultNotificationSettings.notifyEstimateExceeded,
       notifyDeadlines: opts.notifyDeadlines ?? defaultNotificationSettings.notifyDeadlines,
+      notifyCalendarEvents: opts.notifyCalendarEvents ?? defaultNotificationSettings.notifyCalendarEvents,
+      notifyCalendarBefore: opts.notifyCalendarBefore
+        ?? (opts.notifyCalendarDaysBefore || opts.notifyCalendarHoursBefore || 0),
+      notifyCalendarBeforeUnit: opts.notifyCalendarBeforeUnit
+        ?? (opts.notifyCalendarHoursBefore ? "hours" : "days"),
+      notifyCalendarHour: opts.notifyCalendarHour ?? defaultNotificationSettings.notifyCalendarHour,
     };
   }
 
@@ -314,7 +334,145 @@ export class NotificationService {
       }
     }
 
+    this.checkCalendarEvents(now);
     this.cleanupFiredKeys(allTasks);
+  }
+
+  /** Reminders for events from subscribed ICS calendars and «Мои события». */
+  private checkCalendarEvents(now: number): void {
+    const settings = this.getSettings();
+    if (!settings.notifyCalendarEvents) return;
+    const subs = (this.plugin.options.calendarSubscriptions ?? []).filter((s) => s.enabled);
+    const customEvents = get(customEventsStore);
+    if (subs.length === 0 && customEvents.length === 0) return;
+
+    // The look-ahead must cover the longest advance lead, otherwise far-ahead
+    // reminders («за 2 дня») are never collected at their fire moment.
+    const leadMs = this.calendarLeadMs(settings);
+    const aheadMs = Math.max(24 * 3600_000, leadMs + 24 * 3600_000);
+    const occurrences = collectAllCalendarOccurrences(
+      subs,
+      customEvents,
+      tRaw("customEvents.calendarName"),
+      new Date(now - 24 * 3600_000),
+      new Date(now + aheadMs),
+    );
+    const nowDate = new Date(now);
+    const today = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    const dayHour = Math.min(23, Math.max(0, settings.notifyCalendarHour));
+
+    for (const { subscription, occurrence } of occurrences) {
+      const title = occurrence.summary;
+      const name = subscription.name;
+
+      // Timed events — lead reminder before start
+      if (!occurrence.allDay && occurrence.startMs) {
+        const leadMs = this.calendarTimedLeadMs(settings);
+        const key = `cal:${subscription.id}:${occurrence.uid}:reminder:${occurrence.startDate}`;
+        if (
+          now >= occurrence.startMs - leadMs &&
+          now < occurrence.startMs &&
+          !this.firedCalendar.has(key)
+        ) {
+          this.firedCalendar.add(key);
+          this.notify(
+            tRaw("taskStore.notificationTitle"),
+            tRaw("notifications.calendarLead", {
+              title,
+              name,
+              lead: this.formatLeadLabel(leadMs),
+            }),
+            "calendar-reminder",
+            key,
+          );
+        }
+        continue;
+      }
+
+      // All-day events (holidays): optional advance reminder + day-of at the configured hour
+      if (occurrence.allDay) {
+        const start = new Date(`${occurrence.startDate}T00:00:00`);
+        const diffDays = Math.round((start.getTime() - today.getTime()) / 86400000);
+        const dayOfFire = new Date(start);
+        dayOfFire.setHours(dayHour, 0, 0, 0);
+
+        const leadMs = this.calendarLeadMs(settings);
+        if (leadMs > 0) {
+          // days — at dayHour on the earlier day; hours — exactly N hours before midnight
+          let leadFireMs = start.getTime() - leadMs;
+          if (settings.notifyCalendarBeforeUnit === "days") {
+            const d = new Date(dayOfFire);
+            d.setDate(d.getDate() - settings.notifyCalendarBefore);
+            leadFireMs = d.getTime();
+          }
+          const leadKey = `cal:${subscription.id}:${occurrence.uid}:lead:${occurrence.startDate}`;
+          if (
+            now >= leadFireMs &&
+            now < dayOfFire.getTime() &&
+            !this.firedCalendar.has(leadKey)
+          ) {
+            this.firedCalendar.add(leadKey);
+            this.notify(
+              tRaw("taskStore.notificationTitle"),
+              tRaw("notifications.calendarLead", {
+                title,
+                name,
+                lead: this.formatLeadLabel(leadMs),
+              }),
+              "calendar-lead",
+              leadKey,
+            );
+          }
+        }
+
+        const key = `cal:${subscription.id}:${occurrence.uid}:allday:${occurrence.startDate}`;
+        if (diffDays === 0 && nowDate.getHours() >= dayHour && !this.firedCalendar.has(key)) {
+          this.firedCalendar.add(key);
+          this.notify(
+            tRaw("taskStore.notificationTitle"),
+            tRaw("notifications.calendarToday", { title, name }),
+            "calendar-today",
+            key,
+          );
+        }
+      }
+    }
+  }
+
+  /** Configured advance lead for calendar events in ms (0 — not set). */
+  private calendarLeadMs(settings: NotificationSettings): number {
+    if (settings.notifyCalendarBefore > 0) {
+      return (
+        settings.notifyCalendarBefore *
+        (settings.notifyCalendarBeforeUnit === "days" ? 86400000 : 3600000)
+      );
+    }
+    return 0;
+  }
+
+  /** Lead time before a timed calendar event: configured lead, else task minutes. */
+  private calendarTimedLeadMs(settings: NotificationSettings): number {
+    return this.calendarLeadMs(settings) || settings.reminderMinutesBefore * 60_000;
+  }
+
+  /** "2 ч" / "45 м" / "1 день" — human-readable lead label. */
+  private formatLeadLabel(ms: number): string {
+    const totalMin = Math.round(ms / 60_000);
+    const days = Math.floor(totalMin / 1440);
+    const hours = Math.floor((totalMin % 1440) / 60);
+    const mins = totalMin % 60;
+    if (days > 0) {
+      const dayLabel = tRaw("notifications.durationD", { d: String(days), count: days });
+      return hours > 0
+        ? `${dayLabel} ${tRaw("notifications.durationH", { h: String(hours) })}`
+        : dayLabel;
+    }
+    if (hours > 0) {
+      return mins > 0
+        ? tRaw("notifications.durationHm", { h: String(hours), m: String(mins) })
+        : tRaw("notifications.durationH", { h: String(hours) });
+    }
+    return tRaw("notifications.durationM", { m: String(mins) });
   }
 
   private getScheduledMoment(task: ITask): Moment | null {
@@ -464,6 +622,97 @@ export class NotificationService {
         this.sendNtfyDelayed(title, body, dlDate.toISOString(), dedupeKey);
         scheduled[dedupeKey] = dlUnix;
         changed = true;
+      }
+    }
+
+    // Subscribed ICS calendar events — same lead times as the local check loop.
+    // X-Sequence-ID matches the immediate notify() path so an open Obsidian
+    // does not double-deliver (ntfy replaces the pending push).
+    const calSubs = (opts.calendarSubscriptions ?? []).filter(
+      (s): s is ICalendarSubscription => s.enabled,
+    );
+    const calCustom = get(customEventsStore);
+    if (calSubs.length > 0 || calCustom.length > 0) {
+      const beforeN =
+        opts.notifyCalendarBefore
+        ?? (opts.notifyCalendarDaysBefore || opts.notifyCalendarHoursBefore || 0);
+      const beforeUnit: "days" | "hours" =
+        opts.notifyCalendarBeforeUnit
+        ?? (opts.notifyCalendarHoursBefore ? "hours" : "days");
+      const dayHour = Math.min(
+        23,
+        Math.max(0, opts.notifyCalendarHour ?? defaultNotificationSettings.notifyCalendarHour),
+      );
+      const hourLabel = `${String(dayHour).padStart(2, "0")}:00`;
+      const configuredLeadMs =
+        beforeN > 0 ? beforeN * (beforeUnit === "days" ? 86400000 : 3600000) : 0;
+      const timedLeadMs = configuredLeadMs || reminderMin * 60_000;
+      // Pushes must be booked before their lead moment — extend the 3-day
+      // horizon so long leads («за 5 дней») are not skipped entirely.
+      const calHorizonMs = Math.max(
+        horizon.valueOf(),
+        now.valueOf() + configuredLeadMs + 3600_000,
+      );
+      const calOccurrences = collectAllCalendarOccurrences(
+        calSubs,
+        calCustom,
+        tRaw("customEvents.calendarName"),
+        now.toDate(),
+        new Date(calHorizonMs),
+      );
+
+      for (const { subscription, occurrence } of calOccurrences) {
+        const pushes: { key: string; fireAt: Moment; body: string }[] = [];
+        if (occurrence.allDay) {
+          const dayOf = momentFn(`${occurrence.startDate} ${hourLabel}`, "YYYY-MM-DD HH:mm", true);
+          if (configuredLeadMs > 0) {
+            const leadFire =
+              beforeUnit === "days"
+                ? dayOf.clone().subtract(beforeN, "days")
+                : momentFn(`${occurrence.startDate} 00:00`, "YYYY-MM-DD HH:mm", true).subtract(
+                    beforeN,
+                    "hours",
+                  );
+            pushes.push({
+              key: `cal:${subscription.id}:${occurrence.uid}:lead:${occurrence.startDate}`,
+              fireAt: leadFire,
+              body: tRaw("notifications.calendarLead", {
+                title: occurrence.summary,
+                name: subscription.name,
+                lead: this.formatLeadLabel(configuredLeadMs),
+              }),
+            });
+          }
+          pushes.push({
+            key: `cal:${subscription.id}:${occurrence.uid}:allday:${occurrence.startDate}`,
+            fireAt: dayOf,
+            body: tRaw("notifications.calendarToday", {
+              title: occurrence.summary,
+              name: subscription.name,
+            }),
+          });
+        } else if (occurrence.startMs) {
+          pushes.push({
+            key: `cal:${subscription.id}:${occurrence.uid}:reminder:${occurrence.startDate}`,
+            fireAt: momentFn(occurrence.startMs).subtract(timedLeadMs, "milliseconds"),
+            body: tRaw("notifications.calendarLead", {
+              title: occurrence.summary,
+              name: subscription.name,
+              lead: this.formatLeadLabel(timedLeadMs),
+            }),
+          });
+        }
+
+        for (const push of pushes) {
+          if (!push.fireAt.isValid() || push.fireAt.isBefore(now) || push.fireAt.valueOf() > calHorizonMs) {
+            continue;
+          }
+          const fireUnix = Math.floor(push.fireAt.valueOf() / 1000);
+          if (scheduled[push.key] === fireUnix) continue;
+          this.sendNtfyDelayed(tRaw("taskStore.notificationTitle"), push.body, push.fireAt.toISOString(), push.key);
+          scheduled[push.key] = fireUnix;
+          changed = true;
+        }
       }
     }
 
@@ -1003,6 +1252,17 @@ export class NotificationService {
         this.firedEstimateExceeded.delete(key);
       }
     }
+    // Calendar keys end with the occurrence date — drop entries older than a week
+    const weekAgo = Date.now() - 7 * 24 * 3600_000;
+    for (const key of this.firedCalendar) {
+      const dateStr = key.slice(key.lastIndexOf(":") + 1);
+      const keyDate = /^\d{4}-\d{2}-\d{2}$/.test(dateStr)
+        ? new Date(`${dateStr}T00:00:00`).getTime()
+        : NaN;
+      if (!Number.isFinite(keyDate) || keyDate < weekAgo) {
+        this.firedCalendar.delete(key);
+      }
+    }
     this.saveFiredState();
   }
 
@@ -1015,6 +1275,7 @@ export class NotificationService {
       this.firedOverdue = new Set(fired.overdue ?? []);
       this.firedDeadline = new Set(fired.deadline ?? []);
       this.firedEstimateExceeded = new Set(fired.estimateExceeded ?? []);
+      this.firedCalendar = new Set(fired.calendar ?? []);
     } catch {
       // ignore
     }
@@ -1027,6 +1288,7 @@ export class NotificationService {
       overdue: [...this.firedOverdue],
       deadline: [...this.firedDeadline],
       estimateExceeded: [...this.firedEstimateExceeded],
+      calendar: [...this.firedCalendar],
     };
     void this.plugin.loadData().then((existing: unknown) => {
       const updated: Record<string, unknown> = { ...((existing as Record<string, unknown>) ?? {}) };

@@ -22,7 +22,8 @@
     carryOverOverdueTasks,
   } from "../task-tracker/stores";
   import { requestTaskDeletion } from "../task-tracker/taskDeletion";
-  import { TaskModal } from "../task-tracker/TaskModal";
+  import { requestTaskEdit } from "../task-tracker/taskEdit";
+  import { escapeHtml } from "../utils/sanitize";
   import { getDateUID } from "obsidian-daily-notes-interface";
   import { tasksToEvents, getStatusColor } from "./scheduleUtils";
   import { getTaskSlotEndMs } from "../task-tracker/overdue";
@@ -32,7 +33,20 @@
   } from "../services/weatherService";
   import { isDesktopAI } from "../services/aiQuickAdd";
   import { app } from "../stores/appStore";
-  // holidays —暂时隐藏
+  import {
+    collectAllCalendarOccurrences,
+    customEventsStore,
+    saveCustomEvents,
+    CUSTOM_EVENTS_CALENDAR_ID,
+    type ICustomEvent,
+  } from "../services/customEvents";
+  import {
+    subscriptionCalendars,
+    type ICalendarSubscription,
+    type SubscriptionOccurrence,
+  } from "../services/calendarSubscriptions";
+  import { EventFormModal } from "../modals/EventFormModal";
+  import { ConfirmModal } from "../task-tracker/taskDeletion";
   export let plugin: CalendarPlugin;
   export let scheduleDisplay: {
     scheduleShowTime?: boolean;
@@ -128,6 +142,24 @@
   const SWIPE_THRESHOLD = 60;
   const SWIPE_DIRECTION_RATIO = 1.2;
 
+  /** Состояние календарных событий для хэша — без него refetch пропускал их правки. */
+  function calendarEventsFingerprint(): unknown {
+    const subs = ($settings as { calendarSubscriptions?: ICalendarSubscription[] })
+      .calendarSubscriptions ?? [];
+    const fetched = get(subscriptionCalendars);
+    return {
+      custom: get(customEventsStore).map((e) => [
+        e.id, e.title, e.startDate, e.endDate, e.startTime, e.endTime, e.allDay, e.color,
+        e.description, e.location,
+      ]),
+      subs: subs.map((s) => [s.id, s.name, s.color, s.url, s.enabled ? 1 : 0]),
+      fetched: Array.from(fetched.entries()).map(([id, cal]) => [
+        id,
+        cal.events.map((ev) => `${ev.uid}|${ev.startDate}|${ev.summary}`),
+      ]),
+    };
+  }
+
   /** Ключ снапшота событий — чтобы не перерисовывать календарь без изменений */
   function computeEventsKey(
     events: ReturnType<typeof tasksToEvents>,
@@ -135,6 +167,7 @@
     const taskById = new Map(get(tasks).map((t) => [t.id, t]));
     return JSON.stringify({
       loc: get(locale),
+      cal: calendarEventsFingerprint(),
       d: [
         scheduleDisplay.scheduleShowTime,
         scheduleDisplay.scheduleShowStatus,
@@ -301,6 +334,7 @@
   // Подписываемся и на tasks, и на projects
   const unsubTasks = tasks.subscribe(() => scheduleRefetch());
   const unsubProjects = projects.subscribe(() => scheduleRefetch());
+  const unsubCalendars = subscriptionCalendars.subscribe(() => scheduleRefetch());
 
   // Re-render events when schedule display settings change
   $: if (scheduleDisplay && calendar) {
@@ -598,6 +632,8 @@
     if (dropDebounceTimer) clearTimeout(dropDebounceTimer);
     unsubTasks();
     unsubProjects();
+    unsubCalendars();
+    closeCalPopup();
     window.removeEventListener("resize", handleResize);
     mqlMobile?.removeEventListener("change", handleBreakpointChange);
     mqlSmallPhone?.removeEventListener("change", handleBreakpointChange);
@@ -681,8 +717,8 @@
       left: "prev,next",
       center: "title",
       right: aiEnabled
-        ? "aiActions,dayGridMonth,timeGridWeek,timeGridDay"
-        : "dayGridMonth,timeGridWeek,timeGridDay",
+        ? "addEvent,aiActions,dayGridMonth,timeGridWeek,timeGridDay"
+        : "addEvent,dayGridMonth,timeGridWeek,timeGridDay",
     };
     const mirrorParent = document.body;
 
@@ -695,6 +731,10 @@
       locale: tRaw("locale.momentLocale"),
       headerToolbar,
       customButtons: {
+        addEvent: {
+          text: `＋ ${tRaw("customEvents.addButton")}`,
+          click: () => openCreateEventModal(),
+        },
         aiActions: {
           text: `✨ ${tRaw("schedule.aiActions")}`,
           click: () => openAiScheduleActions(),
@@ -704,6 +744,7 @@
         month: tRaw("schedule.month"),
         week: tRaw("schedule.week"),
         day: tRaw("schedule.day"),
+        addEvent: tRaw("customEvents.addButton"),
         aiActions: tRaw("schedule.aiActions"),
       },
       slotMinTime: "06:00:00",
@@ -866,6 +907,7 @@
         });
       },
       eventClassNames: (arg: any) => {
+        if (arg.event.extendedProps?.isCalendarEvent) return ["sch-cal-event"];
         if (arg.event.extendedProps?.isDeadlineEvent)
           return ["sch-event-deadline-marker"];
         return [];
@@ -897,6 +939,77 @@
     calendar.render();
   }
 
+  /** События из ICS-календарей и «Мои события» — визуально отделены от задач. */
+  function buildCalendarEvents(occurrences: SubscriptionOccurrence[]): any[] {
+    return occurrences.map(({ subscription, occurrence }) => {
+      const base = {
+        id: `cal-${subscription.id}-${occurrence.uid}-${occurrence.startDate}`,
+        title: occurrence.summary,
+        allDay: occurrence.allDay,
+        backgroundColor: subscription.color,
+        borderColor: subscription.color,
+        textColor: "#fff",
+        startEditable: false,
+        durationEditable: false,
+        extendedProps: {
+          isCalendarEvent: true,
+          calendarId: subscription.id,
+          eventUid: occurrence.uid,
+          calendarName: subscription.name,
+          calendarColor: subscription.color,
+          description: occurrence.description,
+          location: occurrence.location,
+        },
+      };
+      return occurrence.allDay
+        ? { ...base, start: occurrence.startDate, end: occurrence.endDate }
+        : {
+            ...base,
+            start: new Date(occurrence.startMs ?? 0),
+            end: new Date(occurrence.endMs ?? occurrence.startMs ?? 0),
+          };
+    });
+  }
+
+  /** Сохранение «Моих событий» в calendar-data + перерисовка расписания. */
+  function persistCustomEvents(next: ICustomEvent[]): void {
+    void saveCustomEvents(plugin, next).then(() => scheduleRefetch());
+  }
+
+  function openCreateEventModal(): void {
+    new EventFormModal(plugin.app, null, (ev) => {
+      persistCustomEvents([...get(customEventsStore), ev]);
+    }).open();
+  }
+
+  function openEditEventModal(eventId: string): void {
+    const list = get(customEventsStore);
+    const target = list.find((e) => e.id === eventId);
+    if (!target) return;
+    new EventFormModal(plugin.app, target, (saved) => {
+      persistCustomEvents(list.map((e) => (e.id === saved.id ? saved : e)));
+    }).open();
+  }
+
+  function deleteCustomEvent(eventId: string): void {
+    const list = get(customEventsStore);
+    const target = list.find((e) => e.id === eventId);
+    if (!target) return;
+    new ConfirmModal(
+      plugin.app,
+      tRaw("customEvents.deleteTitle"),
+      tRaw("customEvents.deleteConfirm", { title: target.title }),
+      [
+        { label: tRaw("common.cancel") },
+        {
+          label: tRaw("common.delete"),
+          danger: true,
+          action: () => persistCustomEvents(list.filter((e) => e.id !== eventId)),
+        },
+      ],
+    ).open();
+  }
+
   async function fetchEvents(
     _fetchInfo: { start: Date; end: Date },
     successCallback: (events: any[]) => void,
@@ -904,14 +1017,23 @@
     try {
       const allTasks = get(tasks);
       const allProjects = get(projects);
-      let events = tasksToEvents(allTasks, allProjects);
+      let events = tasksToEvents(allTasks, allProjects) as any[];
       if (scheduleDisplay.scheduleShowDeadlineEvents === false) {
         events = events.filter((e) => !e.extendedProps?.isDeadlineEvent);
       }
 
-      const appInstance = get(app);
-      if (appInstance) {
-        // Weather fetching handled elsewhere
+      const subs = ($settings as { calendarSubscriptions?: ICalendarSubscription[] })
+        .calendarSubscriptions ?? [];
+      const customEvents = get(customEventsStore);
+      if (subs.length > 0 || customEvents.length > 0) {
+        const occurrences = collectAllCalendarOccurrences(
+          subs,
+          customEvents,
+          tRaw("customEvents.calendarName"),
+          _fetchInfo.start,
+          _fetchInfo.end,
+        );
+        events = events.concat(buildCalendarEvents(occurrences));
       }
 
       successCallback(events);
@@ -962,6 +1084,27 @@
     // «залипала» на старом значении, пока не было refetch.
     const event = eventInfo.event;
     const timeText: string = (eventInfo.timeText ?? eventInfo.time ?? "").trim();
+
+    // События подключённых ICS-календарей — «событийный» вид с цветом календаря
+    if (event.extendedProps?.isCalendarEvent) {
+      const calColor = escapeHtml((event.extendedProps?.calendarColor as string) || "");
+      const safeTitle = escapeHtml(event.title || "");
+      const safeTime = escapeHtml(timeText);
+      if (currentViewType === "dayGridMonth") {
+        return {
+          html: `<div class="sch-event-inline sch-event-inline-cal" style="--cal-color:${calColor}"><span class="sch-cal-dot"></span><span class="sch-inline-title">${safeTitle}</span></div>`,
+        };
+      }
+      return {
+        html: `
+          <div class="sch-event sch-event-cal" style="--cal-color:${calColor}">
+            <span class="sch-cal-dot"></span>
+            ${safeTime ? `<span class="sch-event-time">${safeTime}</span>` : ""}
+            <span class="sch-event-title">${safeTitle}</span>
+          </div>
+        `,
+      };
+    }
 
     const task = resolveTask(event);
     if (!task) {
@@ -1157,6 +1300,19 @@
       ?.isDeadlineEvent as boolean;
     const task = resolveTask(info.event);
 
+    // События подключённых ICS-календарей: цвет календаря, тултип, без статусной окраски
+    if (info.event.extendedProps?.isCalendarEvent) {
+      const calColor =
+        (info.event.extendedProps?.calendarColor as string) || "var(--mcp-accent)";
+      el.style.setProperty("--cal-color", calColor);
+      el.style.setProperty("--event-project-color", calColor);
+      el.style.backgroundColor = "transparent";
+      const desc = info.event.extendedProps?.description as string | undefined;
+      const tip = [info.event.title, desc].filter(Boolean).join("\n");
+      if (tip) el.title = tip;
+      return;
+    }
+
     // Цвет всегда до early return: CSS :has() с !important иначе
     // перекрывает backgroundColor и задачи визуально «теряют» окраску.
     if (isDeadlineEvent) {
@@ -1276,7 +1432,120 @@
     // Task editor is now opened on single left-click via eventClick handler
   }
 
+  // ── Инфо-попап события из подключённого календаря ──
+  let calPopupEl: HTMLElement | null = null;
+
+  function closeCalPopup(): void {
+    calPopupEl?.remove();
+    calPopupEl = null;
+  }
+
+  function formatCalDate(d: Date | null | undefined, allDay: boolean): string {
+    if (!d) return "";
+    return d.toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      ...(allDay ? {} : { hour: "2-digit", minute: "2-digit" }),
+    });
+  }
+
+  function showCalendarEventPopup(event: any, jsEvent?: MouseEvent): void {
+    closeCalPopup();
+    const props = event.extendedProps || {};
+    const overlay = document.createElement("div");
+    overlay.className = "sch-cal-popup-overlay";
+    const card = overlay.createDiv({ cls: "sch-cal-popup" });
+    const calColor = (props.calendarColor as string) || "var(--mcp-accent)";
+    card.style.setProperty("--cal-color", calColor);
+
+    const head = card.createDiv({ cls: "sch-cal-popup-head" });
+    head.createSpan({ cls: "sch-cal-popup-dot" });
+    head.createSpan({ cls: "sch-cal-popup-title", text: event.title || "" });
+
+    const meta = card.createDiv({ cls: "sch-cal-popup-meta" });
+    const start = event.start as Date | null;
+    const end = event.end as Date | null;
+    let when = formatCalDate(start, !!event.allDay);
+    if (event.allDay && start && end) {
+      const lastDay = new Date(end.getTime() - 86400000);
+      if (lastDay.toDateString() !== start.toDateString()) {
+        when += ` — ${formatCalDate(lastDay, true)}`;
+      }
+    }
+    meta.setText(
+      [when, props.calendarName, props.location].filter(Boolean).join(" · "),
+    );
+
+    const desc = props.description as string | undefined;
+    if (desc) {
+      card.createDiv({ cls: "sch-cal-popup-desc", text: desc });
+    }
+
+    // «Мои события» — редактирование и удаление прямо из попапа
+    if (props.calendarId === CUSTOM_EVENTS_CALENDAR_ID && props.eventUid) {
+      const eventId = props.eventUid as string;
+      const actions = card.createDiv({ cls: "sch-cal-popup-actions" });
+      const editBtn = actions.createEl("button", {
+        cls: "sch-cal-popup-action",
+        text: tRaw("common.edit"),
+        attr: { type: "button" },
+      });
+      editBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeCalPopup();
+        openEditEventModal(eventId);
+      });
+      const delBtn = actions.createEl("button", {
+        cls: "sch-cal-popup-action sch-cal-popup-action-danger",
+        text: tRaw("common.delete"),
+        attr: { type: "button" },
+      });
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        closeCalPopup();
+        deleteCustomEvent(eventId);
+      });
+    }
+
+    const closeBtn = card.createEl("button", {
+      cls: "sch-cal-popup-close",
+      text: tRaw("common.close"),
+      attr: { type: "button" },
+    });
+    closeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeCalPopup();
+    });
+
+    overlay.addEventListener("mousedown", (e) => {
+      if (e.target === overlay) closeCalPopup();
+    });
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        closeCalPopup();
+        document.removeEventListener("keydown", onKey, true);
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+
+    document.body.appendChild(overlay);
+    calPopupEl = overlay;
+
+    // Position near the click (clamped to the viewport)
+    const rect = card.getBoundingClientRect();
+    const x = jsEvent?.clientX ?? (window.innerWidth - rect.width) / 2;
+    const y = jsEvent?.clientY ?? (window.innerHeight - rect.height) / 2;
+    card.style.left = `${Math.max(8, Math.min(x, window.innerWidth - rect.width - 8))}px`;
+    card.style.top = `${Math.max(8, Math.min(y, window.innerHeight - rect.height - 8))}px`;
+  }
+
   function handleEventClick(info: any): void {
+    // Событие из подключённого календаря — инфо-попап, а не редактор задачи
+    if (info.event.extendedProps?.isCalendarEvent) {
+      showCalendarEventPopup(info.event, info.jsEvent);
+      return;
+    }
     // Deadline event → blink the parent task in the schedule
     if (info.event.extendedProps?.isDeadlineEvent) {
       const task = resolveTask(info.event);
@@ -1567,15 +1836,11 @@
 
   async function openTaskEditor(task: ITask): Promise<void> {
     suppressRefetch = true;
-    new TaskModal(
-      plugin.app,
-      async (updates) => {
-        updateTask(task.id, updates);
-        suppressRefetch = false;
-        scheduleRefetch();
-      },
-      task,
-    ).open();
+    // Recurring tasks ask "this task / whole series" — see taskEdit.ts
+    requestTaskEdit(plugin.app, task, () => {
+      suppressRefetch = false;
+      scheduleRefetch();
+    });
     // If modal is closed without submitting, restore refetch
     setTimeout(() => {
       suppressRefetch = false;
@@ -1935,8 +2200,11 @@
   :global(.sch-context-menu) {
     position: fixed;
     z-index: 9999;
-    min-width: 200px;
-    max-width: min(320px, calc(100vw - 24px));
+    /* Fixed width: shrink-to-fit + width:100% items stretched the menu
+       depending on how far from the left edge it opened. */
+    width: 240px;
+    min-width: 240px;
+    max-width: 240px;
     max-height: min(70vh, 480px);
     overflow-x: hidden;
     overflow-y: auto;
@@ -2780,6 +3048,141 @@
   }
   :global(.sch-event-inline-deadline .sch-inline-time) {
     color: rgba(255, 150, 150, 0.95);
+  }
+
+  /* ── События подключённых ICS-календарей — «событийный» вид ── */
+  :global(.sch-cal-event) {
+    cursor: pointer !important;
+  }
+  :global(.sch-cal-event .fc-event-main),
+  :global(.sch-cal-event .fc-event-main-frame) {
+    background: transparent;
+  }
+  :global(.sch-event-cal) {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: 100%;
+    padding: 2px 8px;
+    border-radius: 8px;
+    border-left: 3px solid var(--cal-color, var(--mcp-accent));
+    background: color-mix(in srgb, var(--cal-color, var(--mcp-accent)) 20%, rgba(0, 0, 0, 0.28));
+    color: var(--text-normal, var(--mcp-text));
+    font-size: 12px;
+    font-weight: 600;
+    min-width: 0;
+  }
+  :global(.sch-event-cal .sch-event-title) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  :global(.sch-cal-dot) {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cal-color, var(--mcp-accent));
+    flex-shrink: 0;
+    box-shadow: 0 0 5px color-mix(in srgb, var(--cal-color, var(--mcp-accent)) 55%, transparent);
+  }
+  :global(.sch-event-inline-cal) {
+    border-left: 2px solid var(--cal-color, var(--mcp-accent));
+    background: color-mix(in srgb, var(--cal-color, var(--mcp-accent)) 22%, transparent);
+    border-radius: 4px;
+  }
+  :global(.sch-event-inline-cal .sch-inline-title) {
+    color: var(--text-normal, var(--mcp-text));
+    font-weight: 600;
+  }
+
+  /* Инфо-попап события календаря */
+  :global(.sch-cal-popup-overlay) {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: transparent;
+  }
+  :global(.sch-cal-popup) {
+    position: fixed;
+    z-index: 9999;
+    width: 280px;
+    max-width: calc(100vw - 24px);
+    padding: 14px;
+    background: var(--background-primary, #1e1e2e);
+    border: 1px solid
+      color-mix(in srgb, var(--cal-color, var(--mcp-accent)) 45%, rgba(255, 255, 255, 0.08));
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+    font-family: var(--font-interface);
+    font-size: 13px;
+  }
+  :global(.sch-cal-popup-head) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  :global(.sch-cal-popup-dot) {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--cal-color, var(--mcp-accent));
+    flex-shrink: 0;
+  }
+  :global(.sch-cal-popup-title) {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-normal, var(--mcp-text));
+  }
+  :global(.sch-cal-popup-meta) {
+    color: var(--text-muted, var(--mcp-text-muted));
+    font-size: 11px;
+    margin-bottom: 8px;
+    line-height: 1.5;
+  }
+  :global(.sch-cal-popup-desc) {
+    color: var(--text-normal, var(--mcp-text));
+    font-size: 12px;
+    line-height: 1.5;
+    margin-bottom: 10px;
+    white-space: pre-wrap;
+  }
+  :global(.sch-cal-popup-close) {
+    display: block;
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    background: var(--background-secondary, rgba(255, 255, 255, 0.05));
+    color: var(--text-normal, var(--mcp-text));
+    cursor: pointer;
+    font-size: 12px;
+  }
+  :global(.sch-cal-popup-close:hover) {
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.1));
+  }
+  :global(.sch-cal-popup-actions) {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  :global(.sch-cal-popup-action) {
+    flex: 1 1 0;
+    padding: 7px 10px;
+    border: 1px solid var(--background-modifier-border, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    background: var(--background-secondary, rgba(255, 255, 255, 0.05));
+    color: var(--text-normal, var(--mcp-text));
+    cursor: pointer;
+    font-size: 12px;
+  }
+  :global(.sch-cal-popup-action:hover) {
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.1));
+  }
+  :global(.sch-cal-popup-action-danger:hover) {
+    color: var(--text-error, #e5484d);
+    border-color: color-mix(in srgb, var(--text-error, #e5484d) 45%, transparent);
   }
 
   :global(.sch-event-compact .sch-event-header) {

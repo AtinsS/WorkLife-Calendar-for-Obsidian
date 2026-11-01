@@ -380,10 +380,9 @@
   }
 
   function openEditTask(task: ITask): void {
-    void import("../task-tracker/TaskModal").then(({ TaskModal }) => {
-      new TaskModal(appInstance, (changes) => {
-        updateTask(task.id, changes);
-      }, task).open();
+    // Recurring tasks ask "this task / whole series" — see taskEdit.ts
+    void import("../task-tracker/taskEdit").then(({ requestTaskEdit }) => {
+      requestTaskEdit(appInstance, task);
     });
   }
 

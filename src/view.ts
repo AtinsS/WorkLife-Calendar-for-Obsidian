@@ -17,7 +17,8 @@ import type CalendarPlugin from "src/main";
 import Calendar from "./ui/Calendar.svelte";
 import { showNoteContextMenu } from "./ui/fileMenu";
 import { activeFile, dailyNotes, weeklyNotes, settings } from "./ui/stores";
-import { customTagsSource, streakSource, wordCountSource } from "./ui/sources";
+import { customTagsSource, streakSource, wordCountSource, holidaySource } from "./ui/sources";
+import { subscriptionCalendars } from "./services/calendarSubscriptions";
 
 import { tasks, selectedDate } from "./task-tracker/stores";
 import { taskDotSource } from "./task-tracker/taskDotSource";
@@ -29,6 +30,7 @@ export default class CalendarView extends ItemView {
   private settings: ISettings | null = null;
   private plugin: CalendarPlugin | undefined;
   private tasksUnsub: (() => void) | null = null;
+  private calUnsub: (() => void) | null = null;
   private isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
 
   constructor(leaf: WorkspaceLeaf, plugin?: CalendarPlugin) {
@@ -54,6 +56,7 @@ export default class CalendarView extends ItemView {
   onClose(): Promise<void> {
     this.removeTooltip();
     if (this.tasksUnsub) { this.tasksUnsub(); this.tasksUnsub = null; }
+    if (this.calUnsub) { this.calUnsub(); this.calUnsub = null; }
     if (this.calendar) { this.calendar.$destroy(); }
     return Promise.resolve();
   }
@@ -63,7 +66,7 @@ export default class CalendarView extends ItemView {
     if (this.calendar) { this.calendar.$destroy(); this.calendar = null; }
     selectedDate.set(getDateUID(momentFn(), "day"));
 
-    const sources = [customTagsSource, streakSource, wordCountSource, taskDotSource, habitSource];
+    const sources = [customTagsSource, streakSource, wordCountSource, taskDotSource, habitSource, holidaySource];
     this.app.workspace.trigger(TRIGGER_ON_OPEN, sources);
 
     this.calendar = new Calendar({
@@ -81,6 +84,9 @@ export default class CalendarView extends ItemView {
     });
 
     this.tasksUnsub = tasks.subscribe(() => {
+      if (this.calendar) this.calendar.$set({});
+    });
+    this.calUnsub = subscriptionCalendars.subscribe(() => {
       if (this.calendar) this.calendar.$set({});
     });
     return Promise.resolve();

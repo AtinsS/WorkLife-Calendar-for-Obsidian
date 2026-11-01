@@ -13,6 +13,7 @@ export const MODULES = [
   "financialAnalytics",
   "notifications",
   "weight",
+  "events",
 ] as const;
 
 export type ModuleName = (typeof MODULES)[number];

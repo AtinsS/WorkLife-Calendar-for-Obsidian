@@ -4,13 +4,20 @@ import { VIEW_TYPE_TASKS } from "../constants";
 import TaskPanel from "../task-tracker/TaskPanel.svelte";
 import { get } from "svelte/store";
 import { tRaw } from "../i18n";
-import { selectedDate, projects, taskFilter } from "../task-tracker/stores";
+import { selectedDate, projects, taskFilter, removeProject } from "../task-tracker/stores";
 import type { IProject } from "../task-tracker/types";
+import { ProjectFormModal, DeleteConfirmModal } from "../task-tracker/ProjectModal";
 import { getDateUID } from "obsidian-daily-notes-interface";
 import {
   createViewSwitcher,
   markViewEnter,
 } from "./viewSwitch";
+
+/** Persisted pixel width of the projects sidebar (localStorage). */
+const SIDEBAR_WIDTH_KEY = "task-view-sidebar-width";
+const SIDEBAR_MIN_WIDTH = 160;
+const SIDEBAR_MAX_WIDTH = 560;
+const SIDEBAR_DEFAULT_WIDTH = 200;
 
 export default class TaskView extends ItemView {
   private taskPanel: TaskPanel;
@@ -56,10 +63,43 @@ export default class TaskView extends ItemView {
     const body = this.contentEl.createDiv({ cls: "task-view-body" });
     const mainContent = body.createDiv({ cls: "task-view-main" });
 
-    // Sidebar: project list
+    // Sidebar: project list (user-resizable width)
     const sidebar = mainContent.createDiv({ cls: "task-view-sidebar" });
-    sidebar.createDiv({ cls: "task-view-sidebar-title", text: tRaw("tasks.panel.menuProjects").replace("📂 ", "") });
+    this.applySidebarWidth(sidebar, this.loadSidebarWidth());
+    const sidebarTitle = sidebar.createDiv({ cls: "task-view-sidebar-title" });
+    sidebarTitle.createSpan({ text: tRaw("tasks.panel.menuProjects").replace("📂 ", "") });
+    const addProjectBtn = sidebarTitle.createEl("button", {
+      cls: "task-view-sidebar-add-btn",
+      text: "+",
+      attr: { type: "button", title: tRaw("tasks.project.newProject"), "aria-label": tRaw("tasks.project.newProject") },
+    });
+    addProjectBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      new ProjectFormModal(this.app, null).open();
+    });
     this.projectSidebar = sidebar.createDiv({ cls: "task-view-sidebar-list" });
+
+    // Drag handle between sidebar and panels — resizes the projects sidebar
+    const resizeHandle = mainContent.createDiv({ cls: "task-view-sidebar-resize" });
+    resizeHandle.addEventListener("mousedown", (e: MouseEvent) => {
+      e.preventDefault();
+      resizeHandle.addClass("dragging");
+      document.body.classList.add("task-view-sidebar-resizing");
+      const startX = e.clientX;
+      const startWidth = sidebar.getBoundingClientRect().width;
+      const onMove = (ev: MouseEvent) => {
+        this.applySidebarWidth(sidebar, startWidth + (ev.clientX - startX));
+      };
+      const onUp = () => {
+        resizeHandle.removeClass("dragging");
+        document.body.classList.remove("task-view-sidebar-resizing");
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        this.app.saveLocalStorage(SIDEBAR_WIDTH_KEY, Math.round(sidebar.getBoundingClientRect().width));
+      };
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
 
     // Panels
     const panelsCard = mainContent.createDiv({ cls: "task-view-panels" });
@@ -76,6 +116,16 @@ export default class TaskView extends ItemView {
     // Project sidebar
     this.renderProjectSidebar();
     return Promise.resolve();
+  }
+
+  private loadSidebarWidth(): number {
+    const raw = Number(this.app.loadLocalStorage(SIDEBAR_WIDTH_KEY));
+    return Number.isFinite(raw) && raw > 0 ? raw : SIDEBAR_DEFAULT_WIDTH;
+  }
+
+  private applySidebarWidth(sidebar: HTMLElement, width: number): void {
+    const clamped = Math.max(SIDEBAR_MIN_WIDTH, Math.min(SIDEBAR_MAX_WIDTH, Math.round(width)));
+    sidebar.style.flex = `0 0 ${clamped}px`;
   }
 
   private renderProjectSidebar(): void {
@@ -103,6 +153,34 @@ export default class TaskView extends ItemView {
             ...f,
             projectId: f.projectId === project.id ? null : project.id,
           }));
+        });
+
+        // CRUD: update / delete (create lives in the sidebar "+" button)
+        const actions = btn.createDiv({ cls: "task-view-sidebar-actions" });
+        const editBtn = actions.createEl("button", {
+          cls: "task-view-sidebar-action-btn",
+          text: "✎",
+          attr: { type: "button", title: tRaw("common.edit"), "aria-label": tRaw("common.edit") },
+        });
+        editBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          new ProjectFormModal(this.app, project).open();
+        });
+
+        const deleteBtn = actions.createEl("button", {
+          cls: "task-view-sidebar-action-btn task-view-sidebar-delete-btn",
+          text: "✕",
+          attr: { type: "button", title: tRaw("common.delete"), "aria-label": tRaw("common.delete") },
+        });
+        deleteBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          new DeleteConfirmModal(this.app, project.name, () => {
+            const f: { projectId: string | null } = get(taskFilter);
+            if (f.projectId === project.id) {
+              taskFilter.update((s) => ({ ...s, projectId: null }));
+            }
+            removeProject(project.id);
+          }).open();
         });
       }
     });

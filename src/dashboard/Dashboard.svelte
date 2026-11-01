@@ -16,7 +16,7 @@
   import { tasks, projects, updateTaskStatus, updateTask } from "../task-tracker/stores";
   import { requestTaskDeletion } from "../task-tracker/taskDeletion";
   import { habits, habitLogs, toggleHabitCompletion, getHabitProgressOnDate, addHabit, updateHabit, removeHabit } from "../habit-tracker/stores";
-  import { TaskModal } from "../task-tracker/TaskModal";
+  import { requestTaskEdit } from "../task-tracker/taskEdit";
   import { HabitModal } from "../habit-tracker/HabitModal";
   import type { ITask } from "../task-tracker/types";
   import type { IHabit } from "../habit-tracker/types";
@@ -235,9 +235,8 @@
   }
 
   function openEditTask(task: ITask) {
-    new TaskModal(appInstance, (changes) => {
-      updateTask(task.id, changes);
-    }, task).open();
+    // Recurring tasks ask "this task / whole series" — see taskEdit.ts
+    requestTaskEdit(appInstance, task);
   }
 
   function deleteTask(taskId: string) {

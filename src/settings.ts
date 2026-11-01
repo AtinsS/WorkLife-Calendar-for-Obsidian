@@ -16,6 +16,16 @@ import { initLocale, tRaw } from "./i18n";
 import { testOllamaConnection, testOllamaModel } from "./services/OllamaService";
 import { normalizeSummaryStyle, summaryStyleDesc } from "./services/summaryStyle";
 import { checkForPluginUpdate, fetchLatestRelease, updatePluginNow, compareVersions, pluginUpdateInfo } from "./services/updateCheck";
+import {
+  type ICalendarSubscription,
+  subscriptionStatus,
+  refreshSubscription,
+  refreshAllSubscriptions,
+  forgetSubscription,
+  ruHolidaysSubscription,
+  nextCalendarColor,
+} from "./services/calendarSubscriptions";
+import type { ICustomEvent } from "./services/customEvents";
 
 export interface ISettings {
   wordsPerDot: number;
@@ -93,6 +103,17 @@ export interface ISettings {
   notifyOverdue: boolean;
   notifyEstimateExceeded: boolean;
   notifyDeadlines: boolean;
+  /** Напоминания о событиях из подключённых ICS-календарей */
+  notifyCalendarEvents: boolean;
+  /** За сколько единиц (дней/часов) оповещать заранее (0 — только в день события) */
+  notifyCalendarBefore?: number;
+  notifyCalendarBeforeUnit?: "days" | "hours";
+  /** Во сколько оповещать в день события (час 0–23) */
+  notifyCalendarHour?: number;
+  /** @deprecated legacy split fields — migrated into notifyCalendarBefore(+Unit) */
+  notifyCalendarDaysBefore?: number;
+  /** @deprecated */
+  notifyCalendarHoursBefore?: number;
 
   // ntfy.sh settings
   ntfyEnabled: boolean;
@@ -174,6 +195,11 @@ export interface ISettings {
   scheduleShowDescription: boolean;
   scheduleShowNowIndicator: boolean;
   scheduleShowDeadlineEvents: boolean;
+
+  /** Подключаемые ICS-календари (праздники и т.п.), отображаются в Расписании */
+  calendarSubscriptions?: ICalendarSubscription[];
+  /** Свои события пользователя («Мои события») */
+  customEvents?: ICustomEvent[];
 
   // Weather settings
   weatherEnabled: boolean;
@@ -271,6 +297,10 @@ export const defaultSettings = Object.freeze({
   notifyOverdue: true,
   notifyEstimateExceeded: true,
   notifyDeadlines: true,
+  notifyCalendarEvents: true,
+  notifyCalendarBefore: 0,
+  notifyCalendarBeforeUnit: "days" as const,
+  notifyCalendarHour: 9,
 
   ntfyEnabled: false,
   ntfyTopic: "",
@@ -326,6 +356,8 @@ export const defaultSettings = Object.freeze({
   scheduleShowDescription: true,
   scheduleShowNowIndicator: true,
   scheduleShowDeadlineEvents: true,
+
+  calendarSubscriptions: [],
 
   weatherEnabled: false,
   weatherLatitude: 55.75,
@@ -858,6 +890,14 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
     this.addGitHubGistSettings(sync);
 
+    // Подключаемые ICS-календари — источник внешних данных, как и Gist-синхронизация
+    const calendarsCard = this.section(sync, {
+      title: tRaw("settings.calendars.section"),
+      desc: tRaw("settings.calendars.sectionDesc"),
+      icon: "calendar-plus",
+    });
+    this.addCalendarSubscriptionsSettings(calendarsCard);
+
     // ── Notifications ──
     const notif = tabContainers["notifications"];
     this.addNotificationSettings(notif);
@@ -1149,6 +1189,187 @@ export class CalendarSettingsTab extends PluginSettingTab {
           });
         });
     }
+  }
+
+  /** Подключаемые ICS-календари: список, добавление (в т.ч. пресет «Праздники РФ»), обновление. */
+  addCalendarSubscriptionsSettings(container: HTMLElement): void {
+    const wrapper = container.createDiv({ cls: "wl-cal-subs" });
+
+    // ── add form ──
+    const form = wrapper.createDiv({ cls: "wl-cal-sub-form" });
+    const nameInput = form.createEl("input", {
+      cls: "wl-cal-sub-input",
+      attr: {
+        type: "text",
+        placeholder: tRaw("settings.calendars.namePlaceholder"),
+        maxlength: "60",
+      },
+    });
+    const urlInput = form.createEl("input", {
+      cls: "wl-cal-sub-input wl-cal-sub-input-url",
+      attr: {
+        type: "url",
+        placeholder: tRaw("settings.calendars.urlPlaceholder"),
+        spellcheck: "false",
+      },
+    });
+
+    const addBtn = form.createEl("button", {
+      cls: "mod-cta",
+      text: tRaw("settings.calendars.add"),
+      attr: { type: "button" },
+    });
+    const presetBtn = form.createEl("button", {
+      text: tRaw("settings.calendars.addRuHolidays"),
+      attr: { type: "button" },
+    });
+    const refreshAllBtn = form.createEl("button", {
+      text: tRaw("settings.calendars.refreshAll"),
+      attr: { type: "button" },
+    });
+
+    const listEl = wrapper.createDiv({ cls: "wl-cal-sub-list" });
+
+    const subsOf = (): ICalendarSubscription[] => this.plugin.options.calendarSubscriptions ?? [];
+
+    const saveSubs = async (subs: ICalendarSubscription[]): Promise<void> => {
+      await this.plugin.writeOptions({ calendarSubscriptions: subs });
+    };
+
+    const renderList = (): void => {
+      listEl.empty();
+      const subs = subsOf();
+      const statusMap = get(subscriptionStatus);
+
+      if (subs.length === 0) {
+        listEl.createDiv({ cls: "wl-cal-sub-empty", text: tRaw("settings.calendars.empty") });
+        return;
+      }
+
+      for (const sub of subs) {
+        const row = listEl.createDiv({ cls: "wl-cal-sub-row" });
+        row.style.setProperty("--cal-color", sub.color);
+
+        const colorWrap = row.createDiv({ cls: "wl-cal-sub-color" });
+        const colorInput = colorWrap.createEl("input", {
+          attr: { type: "color", value: sub.color, title: tRaw("settings.calendars.color") },
+        });
+        colorInput.addEventListener("input", () => {
+          row.style.setProperty("--cal-color", colorInput.value);
+        });
+        colorInput.addEventListener("change", async () => {
+          const next = subsOf().map((s) => (s.id === sub.id ? { ...s, color: colorInput.value } : s));
+          await saveSubs(next);
+          renderList();
+        });
+
+        const info = row.createDiv({ cls: "wl-cal-sub-info" });
+        const titleRow = info.createDiv({ cls: "wl-cal-sub-title-row" });
+        titleRow.createSpan({ text: sub.name, cls: "wl-cal-sub-name" });
+        const enabledLabel = titleRow.createEl("label", { cls: "wl-cal-sub-toggle" });
+        const enabledInput = enabledLabel.createEl("input", {
+          attr: { type: "checkbox", ...(sub.enabled ? { checked: "true" } : {}) },
+        });
+        enabledLabel.createSpan({ text: tRaw("settings.calendars.enabled") });
+        enabledInput.addEventListener("change", async () => {
+          const next = subsOf().map((s) => (s.id === sub.id ? { ...s, enabled: enabledInput.checked } : s));
+          await saveSubs(next);
+          if (enabledInput.checked) {
+            await refreshSubscription(this.app, { ...sub, enabled: true }, true);
+          } else {
+            forgetSubscription(sub.id);
+          }
+          renderList();
+        });
+
+        info.createDiv({ cls: "wl-cal-sub-url", text: sub.url });
+
+        const st = statusMap[sub.id];
+        const statusEl = info.createDiv({ cls: "wl-cal-sub-status" });
+        if (st?.loading) {
+          statusEl.setText(tRaw("settings.calendars.loading"));
+        } else if (st?.lastError) {
+          statusEl.setText(tRaw("settings.calendars.error", { message: st.lastError }));
+          statusEl.addClass("is-error");
+        } else if (st?.lastFetched) {
+          const time = new Date(st.lastFetched).toLocaleString();
+          statusEl.setText(
+            tRaw("settings.calendars.lastUpdated", {
+              time,
+              count: st.eventCount ?? 0,
+            }),
+          );
+        } else {
+          statusEl.setText(tRaw("settings.calendars.neverFetched"));
+        }
+
+        const actions = row.createDiv({ cls: "wl-cal-sub-actions" });
+        const refreshBtn = actions.createEl("button", {
+          cls: "wl-cal-sub-btn",
+          text: tRaw("settings.calendars.refresh"),
+          attr: { type: "button", title: tRaw("settings.calendars.refresh") },
+        });
+        refreshBtn.addEventListener("click", async () => {
+          refreshBtn.disabled = true;
+          await refreshSubscription(this.app, sub, true);
+          renderList();
+        });
+
+        const deleteBtn = actions.createEl("button", {
+          cls: "wl-cal-sub-btn wl-cal-sub-btn-danger",
+          text: tRaw("common.delete"),
+          attr: { type: "button", title: tRaw("common.delete") },
+        });
+        deleteBtn.addEventListener("click", async () => {
+          forgetSubscription(sub.id);
+          await saveSubs(subsOf().filter((s) => s.id !== sub.id));
+          renderList();
+        });
+      }
+    };
+
+    const addSubscription = async (sub: ICalendarSubscription): Promise<void> => {
+      const subs = subsOf();
+      if (subs.some((s) => s.url === sub.url)) {
+        new Notice(tRaw("settings.calendars.duplicateUrl"));
+        return;
+      }
+      await saveSubs([...subs, sub]);
+      nameInput.value = "";
+      urlInput.value = "";
+      await refreshSubscription(this.app, sub, true);
+      renderList();
+    };
+
+    addBtn.addEventListener("click", () => {
+      const name = nameInput.value.trim() || tRaw("settings.calendars.defaultName");
+      const url = urlInput.value.trim();
+      if (!/^https?:\/\//i.test(url)) {
+        new Notice(tRaw("settings.calendars.invalidUrl"));
+        urlInput.focus();
+        return;
+      }
+      void addSubscription({
+        id: `cal-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+        name,
+        url,
+        color: nextCalendarColor(subsOf()),
+        enabled: true,
+      });
+    });
+
+    presetBtn.addEventListener("click", () => {
+      void addSubscription(ruHolidaysSubscription());
+    });
+
+    refreshAllBtn.addEventListener("click", async () => {
+      refreshAllBtn.disabled = true;
+      await refreshAllSubscriptions(this.app, subsOf(), true);
+      refreshAllBtn.disabled = false;
+      renderList();
+    });
+
+    renderList();
   }
 
   addWeatherSettings(container: HTMLElement): void {
@@ -2171,6 +2392,57 @@ export class CalendarSettingsTab extends PluginSettingTab {
         toggle.setValue(this.plugin.options.notifyDeadlines);
         toggle.onChange(async (value) => {
           await this.plugin.writeOptions({ notifyDeadlines: value });
+        });
+      });
+
+    new Setting(types)
+      .setName(tRaw("settings.notifications.notifyCalendarEvents"))
+      .setDesc(tRaw("settings.notifications.notifyCalendarEventsDesc"))
+      .addToggle((toggle) => {
+        toggle.setValue(this.plugin.options.notifyCalendarEvents !== false);
+        toggle.onChange(async (value) => {
+          await this.plugin.writeOptions({ notifyCalendarEvents: value });
+        });
+      });
+
+    new Setting(types)
+      .setName(tRaw("settings.notifications.notifyCalendarBefore"))
+      .setDesc(tRaw("settings.notifications.notifyCalendarBeforeDesc"))
+      .addText((text) => {
+        text.inputEl.type = "number";
+        text.inputEl.min = "0";
+        text.inputEl.max = "30";
+        const current = this.plugin.options.notifyCalendarBefore
+          ?? (this.plugin.options.notifyCalendarDaysBefore || this.plugin.options.notifyCalendarHoursBefore || 0);
+        text.setValue(String(current));
+        text.onChange(async (value) => {
+          const num = Math.max(0, Math.min(30, parseInt(value, 10) || 0));
+          await this.plugin.writeOptions({ notifyCalendarBefore: num });
+        });
+      })
+      .addDropdown((dropdown) => {
+        dropdown.addOption("days", tRaw("settings.notifications.notifyCalendarBeforeUnitDays"));
+        dropdown.addOption("hours", tRaw("settings.notifications.notifyCalendarBeforeUnitHours"));
+        const unit = this.plugin.options.notifyCalendarBeforeUnit
+          ?? (this.plugin.options.notifyCalendarHoursBefore ? "hours" : "days");
+        dropdown.setValue(unit);
+        dropdown.onChange(async (value) => {
+          await this.plugin.writeOptions({
+            notifyCalendarBeforeUnit: value === "hours" ? "hours" : "days",
+          });
+        });
+      });
+
+    new Setting(types)
+      .setName(tRaw("settings.notifications.notifyCalendarHour"))
+      .setDesc(tRaw("settings.notifications.notifyCalendarHourDesc"))
+      .addDropdown((dropdown) => {
+        for (let h = 0; h < 24; h += 1) {
+          dropdown.addOption(String(h), `${String(h).padStart(2, "0")}:00`);
+        }
+        dropdown.setValue(String(this.plugin.options.notifyCalendarHour ?? 9));
+        dropdown.onChange(async (value) => {
+          await this.plugin.writeOptions({ notifyCalendarHour: parseInt(value, 10) || 9 });
         });
       });
 

@@ -2,11 +2,11 @@
   import { createEventDispatcher, onMount, onDestroy } from "svelte";
   import type { App } from "obsidian";
   import type { ITask, TaskStatus } from "./types";
-  import { updateTask, updateTaskStatus, resetTaskTimer, projects, activeTab, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem, updateChecklistItem } from "./stores";
+  import { updateTaskStatus, resetTaskTimer, projects, activeTab, checklists, toggleChecklistItem, addChecklistItem, removeChecklistItem, updateChecklistItem } from "./stores";
   import { requestTaskDeletion } from "./taskDeletion";
+  import { requestTaskEdit } from "./taskEdit";
   import { get } from "svelte/store";
   import { getActiveTimer, formatDuration, formatEstimate } from "./TimerManager";
-  import { TaskModal } from "./TaskModal";
   import { t } from "../i18n";
   import { settings } from "../ui/stores";
   import { errorMessage } from "../utils/sanitize";
@@ -163,10 +163,8 @@
   }
 
   function handleEdit() {
-    const modal = new TaskModal(appInstance, async (data) => {
-      updateTask(task.id, data);
-    }, task);
-    modal.open();
+    // Recurring tasks ask "this task / whole series" — see taskEdit.ts
+    requestTaskEdit(appInstance, task);
   }
 
   async function handleDelete() {
@@ -246,7 +244,7 @@
     menu.style.position = "fixed";
     menu.style.zIndex = "9999";
     menu.style.top = `${Math.min(y, Math.max(8, window.innerHeight - 240))}px`;
-    menu.style.left = `${Math.min(x, Math.max(8, window.innerWidth - 200))}px`;
+    menu.style.left = `${Math.min(x, Math.max(8, window.innerWidth - 248))}px`;
     menu.style.bottom = "auto";
     menu.style.right = "auto";
     menu.style.maxHeight = "min(70vh, 480px)";

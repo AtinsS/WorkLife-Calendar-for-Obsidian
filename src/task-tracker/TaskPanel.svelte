@@ -22,6 +22,9 @@
   import { settings } from "../ui/stores";
   import { errorMessage } from "../utils/sanitize";
   import { pluginUpdateInfo, updatePluginNow, fetchLatestRelease } from "../services/updateCheck";
+  import { collectAllCalendarOccurrences, customEventsStore, type ICustomEvent } from "../services/customEvents";
+  import { subscriptionCalendars, type ICalendarSubscription } from "../services/calendarSubscriptions";
+  import type { IcsCalendar } from "../services/icsFeed";
 
   export let appInstance: App;
 
@@ -87,10 +90,8 @@
     if ($taskFilter.projectId && t.projectId !== $taskFilter.projectId) return false;
     if (searchQuery && !t.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     if ($activeTab === "all") {
-      // «Все задачи» (все даты) — вообще все статусы
-      if (showAllDates) return true;
-      // Вкладка «Все» на дне — только активные (без done/failed)
-      return t.status !== "done" && t.status !== "failed";
+      // «Все» — все статусы: и выполненные, и невыполненные
+      return true;
     }
     if (t.deadline && t.status !== "done" && t.status !== "failed") return true;
     return t.status === $activeTab;
@@ -108,6 +109,75 @@
     : sortTasksChronologically(filteredTasks);
   $: totalCount = allTasksForDate.length;
   $: doneCount = allTasksForDate.filter((t) => t.status === "done").length;
+
+  // ── События выбранного дня: ICS-подписки + «Мои события» ──
+  interface DayEventRow {
+    key: string;
+    title: string;
+    color: string;
+    calendarName: string;
+    allDay: boolean;
+    timeLabel: string;
+    tooltip: string;
+  }
+
+  function dayRange(dateUID: string): { start: Date; end: Date } | null {
+    const match = dateUID.match(/(\d{4}-\d{2}-\d{2})/);
+    if (!match) return null;
+    const start = new Date(`${match[1]}T00:00:00`);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 1);
+    return { start, end };
+  }
+
+  function fmtClockMs(ms?: number): string {
+    if (!ms) return "";
+    const d = new Date(ms);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+
+  function buildDayEvents(
+    dateUID: string,
+    opts: { calendarSubscriptions?: ICalendarSubscription[] },
+    customEvents: ICustomEvent[],
+    feeds: Map<string, IcsCalendar>,
+  ): DayEventRow[] {
+    const range = dayRange(dateUID);
+    if (!range) return [];
+    const subs = opts.calendarSubscriptions ?? [];
+    if (feeds.size === 0 && customEvents.length === 0 && subs.length === 0) return [];
+    const occurrences = collectAllCalendarOccurrences(
+      subs,
+      customEvents,
+      $t("customEvents.calendarName"),
+      range.start,
+      range.end,
+    );
+    const rows: DayEventRow[] = occurrences.map(({ subscription, occurrence }) => {
+      const start = fmtClockMs(occurrence.startMs);
+      const end = fmtClockMs(occurrence.endMs);
+      return {
+        key: `${subscription.id}-${occurrence.uid}-${occurrence.startDate}`,
+        title: occurrence.summary,
+        color: subscription.color,
+        calendarName: subscription.name,
+        allDay: occurrence.allDay,
+        timeLabel: occurrence.allDay
+          ? $t("customEvents.allDay")
+          : end && end !== start
+            ? `${start} — ${end}`
+            : start,
+        tooltip: [occurrence.description, occurrence.location].filter(Boolean).join("\n"),
+      };
+    });
+    rows.sort((a, b) => {
+      if (a.allDay !== b.allDay) return a.allDay ? -1 : 1;
+      return a.timeLabel.localeCompare(b.timeLabel);
+    });
+    return rows;
+  }
+
+  $: dayEvents = buildDayEvents(currentDate, $settings, $customEventsStore, $subscriptionCalendars);
 
   function groupTasksByProject(taskList: ITask[], projectList: IProject[]): { project: IProject | null; tasks: ITask[] }[] {
     const groups = new Map<string, ITask[]>();
@@ -647,6 +717,29 @@
 
 
   <div class="task-tracker-body">
+    {#if dayEvents.length > 0}
+      <div class="task-tracker-events" role="region" aria-label={$t("tasks.panel.events")}>
+        <div class="task-events-header">
+          <span class="task-events-title">{$t("tasks.panel.events")}</span>
+          <span class="task-events-count">{dayEvents.length}</span>
+        </div>
+        <div class="task-events-list">
+          {#each dayEvents as ev (ev.key)}
+            <div
+              class="task-event-row"
+              class:task-event-allday={ev.allDay}
+              style="--event-color: {ev.color}"
+              title={ev.tooltip}
+            >
+              <span class="task-event-dot" aria-hidden="true"></span>
+              <span class="task-event-time">{ev.timeLabel}</span>
+              <span class="task-event-title">{ev.title}</span>
+              <span class="task-event-cal">{ev.calendarName}</span>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
     <div class="task-tracker-list">
       {#if filteredTasks.length === 0}
         <div class="task-tracker-empty">
