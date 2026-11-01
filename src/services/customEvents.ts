@@ -54,7 +54,7 @@ export async function saveCustomEvents(plugin: CalendarPlugin, events: ICustomEv
   await saveModuleData(plugin.app, "events", {
     events,
     version: 1,
-  } as unknown as Record<string, unknown>);
+  });
 }
 
 export function customEventsSubscription(name: string): ICalendarSubscription {

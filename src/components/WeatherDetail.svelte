@@ -1,7 +1,7 @@
 <script lang="ts">
   import { settings } from "../ui/stores";
   import { fetchDayDetail, type DayWeatherDetail, getWeatherAttribution } from "../services/weatherService";
-  import { t, tRaw } from "../i18n";
+  import { t } from "../i18n";
 
   export let date = "";
 

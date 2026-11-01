@@ -179,9 +179,9 @@ export class NotificationService {
       notifyDeadlines: opts.notifyDeadlines ?? defaultNotificationSettings.notifyDeadlines,
       notifyCalendarEvents: opts.notifyCalendarEvents ?? defaultNotificationSettings.notifyCalendarEvents,
       notifyCalendarBefore: opts.notifyCalendarBefore
-        ?? (opts.notifyCalendarDaysBefore || opts.notifyCalendarHoursBefore || 0),
+        ?? defaultNotificationSettings.notifyCalendarBefore,
       notifyCalendarBeforeUnit: opts.notifyCalendarBeforeUnit
-        ?? (opts.notifyCalendarHoursBefore ? "hours" : "days"),
+        ?? defaultNotificationSettings.notifyCalendarBeforeUnit,
       notifyCalendarHour: opts.notifyCalendarHour ?? defaultNotificationSettings.notifyCalendarHour,
     };
   }
@@ -635,10 +635,10 @@ export class NotificationService {
     if (calSubs.length > 0 || calCustom.length > 0) {
       const beforeN =
         opts.notifyCalendarBefore
-        ?? (opts.notifyCalendarDaysBefore || opts.notifyCalendarHoursBefore || 0);
+        ?? defaultNotificationSettings.notifyCalendarBefore;
       const beforeUnit: "days" | "hours" =
         opts.notifyCalendarBeforeUnit
-        ?? (opts.notifyCalendarHoursBefore ? "hours" : "days");
+        ?? defaultNotificationSettings.notifyCalendarBeforeUnit;
       const dayHour = Math.min(
         23,
         Math.max(0, opts.notifyCalendarHour ?? defaultNotificationSettings.notifyCalendarHour),

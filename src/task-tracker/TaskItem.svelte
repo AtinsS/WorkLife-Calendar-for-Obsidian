@@ -174,7 +174,6 @@
 
   // Actions menu
   let showActionsMenu = false;
-  let actionsMenuEl: HTMLDivElement | null = null;
   let splittingSubtasks = false;
 
   function optsAiSubtasksEnabled(): boolean {
@@ -309,7 +308,6 @@
 
     document.body.appendChild(el);
     document.body.appendChild(menu);
-    actionsMenuEl = el;
   }
 
   function toggleActionsMenu(e: MouseEvent) {
@@ -322,7 +320,6 @@
 
   function closeActionsMenu() {
     showActionsMenu = false;
-    actionsMenuEl = null;
     // Sweep EVERYWHERE, not just this component's reference: menus are appended to
     // document.body and outlive their TaskItem (re-filter/unmount while open). An
     // orphaned menu blocked cleanup of later ones and each open stacked one more

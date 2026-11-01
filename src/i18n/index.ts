@@ -54,6 +54,8 @@ export function ruPlural(n: number): "one" | "few" | "many" {
   return "many";
 }
 
+function resolvePluralValue(value: string, count: number | undefined): string;
+function resolvePluralValue(value: string | string[] | undefined, count: number | undefined): string | string[] | undefined;
 function resolvePluralValue(value: string | string[] | undefined, count: number | undefined): string | string[] | undefined {
   if (value == null || Array.isArray(value) || typeof value !== "string") return value;
   // Pipe forms: "one|few|many"
@@ -94,7 +96,7 @@ function createT() {
       if (Array.isArray(value)) {
         return value.join(", ");
       }
-      value = resolvePluralValue(value, pickCount(params)) as string;
+      value = resolvePluralValue(value, pickCount(params));
       if (params) {
         return Object.entries(params).reduce(
           (str, [k, v]) => str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v)),
@@ -141,7 +143,7 @@ export function tRaw(key: string, params?: Record<string, string | number>): str
   value = resolveCurrencyKey(key, value);
   if (value === undefined) return key;
   if (Array.isArray(value)) return value.join(", ");
-  value = resolvePluralValue(value, pickCount(params)) as string;
+  value = resolvePluralValue(value, pickCount(params));
   if (params) {
     return Object.entries(params).reduce(
       (str, [k, v]) => str.replace(new RegExp(`\\{${k}\\}`, "g"), String(v)),

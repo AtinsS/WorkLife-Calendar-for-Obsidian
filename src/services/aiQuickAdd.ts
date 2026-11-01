@@ -454,7 +454,7 @@ export function parseAiQuickTasks(raw: string): AiQuickTaskDraft[] {
         date: parsed.date ? parsed.date.format("YYYY-MM-DD") : null,
         scheduledTime: parsed.scheduledTime,
         endTime: parsed.endTime,
-        priority: (parsed.priority ?? "medium") as "low" | "medium" | "high",
+        priority: parsed.priority ?? "medium",
         projectName: parsed.projectName,
         estimatedMinutes: parseDurationFromText(line),
       };

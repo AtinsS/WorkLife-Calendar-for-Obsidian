@@ -29,16 +29,13 @@ export class ConfirmModal extends Modal {
   onOpen(): void {
     this.contentEl.createEl("h3", { text: this.heading });
     this.contentEl.createEl("p", { text: this.body });
-    const row = this.contentEl.createDiv({ cls: "modal-button-container" });
-    row.style.display = "flex";
-    row.style.gap = "8px";
-    row.style.justifyContent = "flex-end";
+    const row = this.contentEl.createDiv({ cls: "modal-button-container mcp-confirm-buttons" });
     for (const b of this.buttons) {
       const btn = row.createEl("button", {
         text: b.label,
         cls: b.primary ? "mod-cta" : "",
       });
-      if (b.danger) btn.style.color = "var(--mcp-danger, #e5484d)";
+      if (b.danger) btn.addClass("mcp-confirm-btn-danger");
       btn.addEventListener("click", () => {
         this.close();
         b.action?.();

@@ -33,6 +33,7 @@ import {
   applyPanelShape,
   applyChatBubbleColors,
   applyAllColors,
+  migrateLegacyNotifyCalendarBefore,
 } from "./settings";
 import { TFile, TFolder, Menu, type MenuItem } from "obsidian";
 import CalendarView from "./view";
@@ -997,6 +998,7 @@ export default class CalendarPlugin extends Plugin {
 
   async loadOptions(): Promise<void> {
     const options = await this.loadDataSafe();
+    migrateLegacyNotifyCalendarBefore(options);
     const old = { ...this.options };
     settings.update((current) => {
       return {

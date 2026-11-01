@@ -387,6 +387,31 @@ export const defaultSettings = Object.freeze({
   aiWorkoutEnabled: true,
 });
 
+/**
+ * Fold the pre-split legacy notification lead fields into the unified
+ * notifyCalendarBefore(+Unit) pair, then drop the legacy keys.
+ *
+ * Reads the fields off the raw loaded record rather than through ISettings, so
+ * the deprecated declarations are never referenced by the typed API. Runs once
+ * at load time (see CalendarPlugin.loadOptions) instead of at every read site.
+ */
+export function migrateLegacyNotifyCalendarBefore(raw: Record<string, unknown>): void {
+  const days = raw.notifyCalendarDaysBefore;
+  const hours = raw.notifyCalendarHoursBefore;
+  if (days === undefined && hours === undefined) return;
+
+  const daysN = typeof days === "number" ? days : 0;
+  const hoursN = typeof hours === "number" ? hours : 0;
+  if (raw.notifyCalendarBefore === undefined) {
+    raw.notifyCalendarBefore = daysN || hoursN || 0;
+  }
+  if (raw.notifyCalendarBeforeUnit === undefined) {
+    raw.notifyCalendarBeforeUnit = hoursN ? "hours" : "days";
+  }
+  delete raw.notifyCalendarDaysBefore;
+  delete raw.notifyCalendarHoursBefore;
+}
+
 export function applyAccentColor(hex: string): void {
   const root = document.documentElement;
   // Parse hex to rgb
@@ -1257,10 +1282,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
         colorInput.addEventListener("input", () => {
           row.style.setProperty("--cal-color", colorInput.value);
         });
-        colorInput.addEventListener("change", async () => {
-          const next = subsOf().map((s) => (s.id === sub.id ? { ...s, color: colorInput.value } : s));
-          await saveSubs(next);
-          renderList();
+        colorInput.addEventListener("change", () => {
+          void (async () => {
+            const next = subsOf().map((s) => (s.id === sub.id ? { ...s, color: colorInput.value } : s));
+            await saveSubs(next);
+            renderList();
+          })();
         });
 
         const info = row.createDiv({ cls: "wl-cal-sub-info" });
@@ -1271,15 +1298,17 @@ export class CalendarSettingsTab extends PluginSettingTab {
           attr: { type: "checkbox", ...(sub.enabled ? { checked: "true" } : {}) },
         });
         enabledLabel.createSpan({ text: tRaw("settings.calendars.enabled") });
-        enabledInput.addEventListener("change", async () => {
-          const next = subsOf().map((s) => (s.id === sub.id ? { ...s, enabled: enabledInput.checked } : s));
-          await saveSubs(next);
-          if (enabledInput.checked) {
-            await refreshSubscription(this.app, { ...sub, enabled: true }, true);
-          } else {
-            forgetSubscription(sub.id);
-          }
-          renderList();
+        enabledInput.addEventListener("change", () => {
+          void (async () => {
+            const next = subsOf().map((s) => (s.id === sub.id ? { ...s, enabled: enabledInput.checked } : s));
+            await saveSubs(next);
+            if (enabledInput.checked) {
+              await refreshSubscription(this.app, { ...sub, enabled: true }, true);
+            } else {
+              forgetSubscription(sub.id);
+            }
+            renderList();
+          })();
         });
 
         info.createDiv({ cls: "wl-cal-sub-url", text: sub.url });
@@ -1309,10 +1338,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
           text: tRaw("settings.calendars.refresh"),
           attr: { type: "button", title: tRaw("settings.calendars.refresh") },
         });
-        refreshBtn.addEventListener("click", async () => {
-          refreshBtn.disabled = true;
-          await refreshSubscription(this.app, sub, true);
-          renderList();
+        refreshBtn.addEventListener("click", () => {
+          void (async () => {
+            refreshBtn.disabled = true;
+            await refreshSubscription(this.app, sub, true);
+            renderList();
+          })();
         });
 
         const deleteBtn = actions.createEl("button", {
@@ -1320,10 +1351,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
           text: tRaw("common.delete"),
           attr: { type: "button", title: tRaw("common.delete") },
         });
-        deleteBtn.addEventListener("click", async () => {
-          forgetSubscription(sub.id);
-          await saveSubs(subsOf().filter((s) => s.id !== sub.id));
-          renderList();
+        deleteBtn.addEventListener("click", () => {
+          void (async () => {
+            forgetSubscription(sub.id);
+            await saveSubs(subsOf().filter((s) => s.id !== sub.id));
+            renderList();
+          })();
         });
       }
     };
@@ -1362,11 +1395,13 @@ export class CalendarSettingsTab extends PluginSettingTab {
       void addSubscription(ruHolidaysSubscription());
     });
 
-    refreshAllBtn.addEventListener("click", async () => {
-      refreshAllBtn.disabled = true;
-      await refreshAllSubscriptions(this.app, subsOf(), true);
-      refreshAllBtn.disabled = false;
-      renderList();
+    refreshAllBtn.addEventListener("click", () => {
+      void (async () => {
+        refreshAllBtn.disabled = true;
+        await refreshAllSubscriptions(this.app, subsOf(), true);
+        refreshAllBtn.disabled = false;
+        renderList();
+      })();
     });
 
     renderList();
@@ -2413,7 +2448,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         text.inputEl.min = "0";
         text.inputEl.max = "30";
         const current = this.plugin.options.notifyCalendarBefore
-          ?? (this.plugin.options.notifyCalendarDaysBefore || this.plugin.options.notifyCalendarHoursBefore || 0);
+          ?? defaultSettings.notifyCalendarBefore;
         text.setValue(String(current));
         text.onChange(async (value) => {
           const num = Math.max(0, Math.min(30, parseInt(value, 10) || 0));
@@ -2424,7 +2459,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
         dropdown.addOption("days", tRaw("settings.notifications.notifyCalendarBeforeUnitDays"));
         dropdown.addOption("hours", tRaw("settings.notifications.notifyCalendarBeforeUnitHours"));
         const unit = this.plugin.options.notifyCalendarBeforeUnit
-          ?? (this.plugin.options.notifyCalendarHoursBefore ? "hours" : "days");
+          ?? defaultSettings.notifyCalendarBeforeUnit;
         dropdown.setValue(unit);
         dropdown.onChange(async (value) => {
           await this.plugin.writeOptions({

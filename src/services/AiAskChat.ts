@@ -907,7 +907,7 @@ export class AiAskChat {
           .slice(0, -1)
           .filter((m) => m.text.trim())
           .map((m) => ({
-            role: m.role as "user" | "assistant",
+            role: m.role,
             content: m.text.slice(0, MAX_MSG_CHARS),
           })),
         { role: "user" as const, content: userContent },

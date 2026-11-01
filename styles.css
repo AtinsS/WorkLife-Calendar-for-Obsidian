@@ -3224,6 +3224,17 @@ body > .task-actions-menu {
   transform: translateY(-1px);
 }
 
+/* Confirm dialog (task deletion) */
+.mcp-confirm-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.mcp-confirm-btn-danger {
+  color: var(--mcp-danger, #e5484d);
+}
+
 /* ============================================
    CUSTOM MODAL BASE
    ============================================ */
