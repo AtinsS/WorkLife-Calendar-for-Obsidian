@@ -21,6 +21,7 @@ import {
   VIEW_TYPE_HABIT_PANEL,
   VIEW_TYPE_WEATHER_DETAIL,
   VIEW_TYPE_AI_ASK,
+  VIEW_TYPE_AI_EXTRACT,
 } from "./constants";
 import { settings } from "./ui/stores";
 import { installKeyboardOpenWatcher } from "./ui/keyboardViewport";
@@ -63,7 +64,7 @@ import { checkForPluginUpdate } from "./services/updateCheck";
 import { initGistSync } from "./services/GistSyncService";
 import { refreshAllSubscriptions } from "./services/calendarSubscriptions";
 import { loadCustomEvents, customEventsStore } from "./services/customEvents";
-import { AIExtractModal } from "./services/AIExtractModal";
+import AIExtractView from "./views/AIExtractView";
 import {
   AISummaryModal,
   resolveSummarySources,
@@ -332,6 +333,11 @@ export default class CalendarPlugin extends Plugin {
       (leaf: WorkspaceLeaf) => new AIAskView(leaf)
     );
 
+    safeRegisterView(
+      VIEW_TYPE_AI_EXTRACT,
+      (leaf: WorkspaceLeaf) => new AIExtractView(leaf)
+    );
+
     this.addCommand({
       id: "show-calendar-view",
       name: "Open view",
@@ -548,7 +554,10 @@ export default class CalendarPlugin extends Plugin {
             title: tRaw("ai.contextMenuExtract"),
             icon: "sparkles",
             onClick: () => {
-              new AIExtractModal(this.app, file.path).open();
+              // Detached window (popout leaf) — the note stays usable
+              void import("./services/AIExtractModal").then(({ openAiExtract }) =>
+                openAiExtract(this.app, file.path),
+              );
             },
           });
         }

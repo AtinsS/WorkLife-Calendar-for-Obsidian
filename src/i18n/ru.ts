@@ -148,7 +148,7 @@ export const ru = {
       aiTonePlaceholder: "Напр.: отвечать честно, без лести, по делу, коротко",
       sectionHello: "Кнопки навигации в приветствии",
       sectionHelloDesc: "Выберите, какие кнопки отображать в приветствии",
-      showTasksBtn: "Кнопка «Список»",
+      showTasksBtn: "Кнопка «Задачи»",
       showAnalyticsBtn: "Кнопка «Аналитика»",
       showFinanceBtn: "Кнопка «Финансы»",
       showScheduleBtn: "Кнопка «Расписание»",
@@ -170,7 +170,7 @@ export const ru = {
       habitModeSeparate: "Отдельная вкладка",
       habitModeHidden: "Скрыть",
       viewSwitcherMode: "Переключатель видов",
-      viewSwitcherModeDesc: "Где показывать панель Список / Канбан / Расписание / Привычки",
+      viewSwitcherModeDesc: "Где показывать панель Задачи / Канбан / Расписание / Привычки",
       viewSwitcherEverywhere: "Показывать везде",
       viewSwitcherDesktop: "Только на ПК",
       viewSwitcherMobile: "Только на мобильном",
@@ -224,7 +224,7 @@ export const ru = {
       blockDesc: "Чтобы добавить дашборд с виджетами, создайте блок кода в любой заметке:",
       blockHint: "Или вставьте через правое меню: ПКМ → Вставить дашборд",
       sectionHello: "Кнопки навигации в приветствии",
-      showTasksBtn: "Кнопка «Список»",
+      showTasksBtn: "Кнопка «Задачи»",
       showAnalyticsBtn: "Кнопка «Аналитика»",
       showFinanceBtn: "Кнопка «Финансы»",
       showScheduleBtn: "Кнопка «Расписание»",
@@ -573,7 +573,7 @@ export const ru = {
       createWorkoutPlan: "Создать план тренировок (ИИ)",
     },
     ribbon: {
-      tasks: "Список",
+      tasks: "Задачи",
       calendar: "Календарь",
       analytics: "Аналитика",
       finance: "Финансы",
@@ -589,7 +589,7 @@ export const ru = {
   // Task tracker
   tasks: {
     panel: {
-      title: "Список",
+      title: "Задачи",
       events: "События",
       allTasks: "Все задачи",
       today: "Сегодня",
@@ -1068,7 +1068,7 @@ export const ru = {
     goodMorning: "Доброе утро",
     goodAfternoon: "Добрый день",
     goodEvening: "Добрый вечер",
-    navTasks: "Список",
+    navTasks: "Задачи",
     navAnalytics: "Аналитика",
     navFinance: "Финансы",
     navSchedule: "Расписание",

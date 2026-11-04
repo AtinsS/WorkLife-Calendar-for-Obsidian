@@ -12652,6 +12652,24 @@ html.wl-keyboard-open .wf-dialog-container.kbm-board-modal {
   max-height: min(85vh, 820px);
 }
 
+/* Detached extract window (popout leaf) — fill the pane */
+.ai-extract-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  max-width: none;
+  width: 100%;
+}
+
+.ai-extract-view .wf-dialog-content {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  max-height: none;
+}
+
 /* Top bar */
 .ai-top {
   padding: 16px 16px 8px;
@@ -13496,13 +13514,6 @@ input.ai-task-time-input.ai-task-time-input {
 .ai-ask-input:disabled {
   cursor: not-allowed;
   opacity: 0.7;
-}
-
-/* Mobile: hide completely */
-@media (max-width: 768px) {
-  .ai-extract-modal {
-    display: none;
-  }
 }
 
 /* ===== AI Summary modal ===== */

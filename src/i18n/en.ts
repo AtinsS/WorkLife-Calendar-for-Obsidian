@@ -148,7 +148,7 @@ export const en = {
       aiTonePlaceholder: "e.g. be honest, no flattery, straight to the point, brief",
       sectionHello: "Navigation buttons in greeting",
       sectionHelloDesc: "Choose which buttons to display in the greeting",
-      showTasksBtn: "\"List\" button",
+      showTasksBtn: "\"Tasks\" button",
       showAnalyticsBtn: "\"Analytics\" button",
       showFinanceBtn: "\"Finance\" button",
       showScheduleBtn: "\"Schedule\" button",
@@ -170,7 +170,7 @@ export const en = {
       habitModeSeparate: "Separate tab",
       habitModeHidden: "Hidden",
       viewSwitcherMode: "View switcher",
-      viewSwitcherModeDesc: "Where to show List / Kanban / Schedule / Habits switcher",
+      viewSwitcherModeDesc: "Where to show Tasks / Kanban / Schedule / Habits switcher",
       viewSwitcherEverywhere: "Show everywhere",
       viewSwitcherDesktop: "Desktop only",
       viewSwitcherMobile: "Mobile only",
@@ -224,7 +224,7 @@ export const en = {
       blockDesc: "To add a dashboard with widgets, create a code block in any note:",
       blockHint: "Or insert via right-click menu: Right-click → Insert dashboard",
       sectionHello: "Navigation buttons in greeting",
-      showTasksBtn: "\"List\" button",
+      showTasksBtn: "\"Tasks\" button",
       showAnalyticsBtn: "\"Analytics\" button",
       showFinanceBtn: "\"Finance\" button",
       showScheduleBtn: "\"Schedule\" button",
@@ -573,7 +573,7 @@ export const en = {
       createWorkoutPlan: "Create workout plan (AI)",
     },
     ribbon: {
-      tasks: "List",
+      tasks: "Tasks",
       calendar: "Calendar",
       analytics: "Analytics",
       finance: "Finance",
@@ -589,7 +589,7 @@ export const en = {
   // Task tracker
   tasks: {
     panel: {
-      title: "List",
+      title: "Tasks",
       events: "Events",
       allTasks: "All tasks",
       today: "Today",
@@ -1068,7 +1068,7 @@ export const en = {
     goodMorning: "Good morning",
     goodAfternoon: "Good afternoon",
     goodEvening: "Good evening",
-    navTasks: "List",
+    navTasks: "Tasks",
     navAnalytics: "Analytics",
     navFinance: "Finance",
     navSchedule: "Schedule",
