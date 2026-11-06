@@ -10,7 +10,8 @@ import {
 import { get } from "svelte/store";
 import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
-import { streamOllamaChat, resolveModel } from "./OllamaService";
+import { resolveModel } from "./OllamaService";
+import { resolveAiConnection, streamAiChat } from "./aiProvider";
 import {
   analyzeModelInternetSupport,
   buildSearchQuery,
@@ -54,6 +55,19 @@ const STYLE_HINT_KEY: Record<ChatStyle, string> = {
 };
 
 /** Persist chat style via the plugin when available; always update the store. */
+/** Persist a chat option via the plugin when available; always update the store. */
+function writeChatOption(app: App, changes: Record<string, unknown>): void {
+  type PluginHost = {
+    plugins?: {
+      getPlugin?: (id: string) => {
+        writeOptions?: (changes: Record<string, unknown>) => Promise<void>;
+      } | null;
+    };
+  };
+  const plugin = (app as unknown as PluginHost).plugins?.getPlugin?.("worklife-calendar");
+  void plugin?.writeOptions?.(changes);
+}
+
 function persistChatStyle(app: App, style: ChatStyle): void {
   settings.update((s) => ({ ...s, aiChatStyle: style }));
   type PluginHost = {
@@ -93,6 +107,8 @@ export { MAX_FILES };
 interface ChatMsg {
   role: "user" | "assistant";
   text: string;
+  /** Reasoning trace kept with the answer (when thinking was on). */
+  thinking?: string;
 }
 
 /**
@@ -105,6 +121,8 @@ export class AiAskChat {
   private files: TFile[];
   private contextLabel: string;
   private contextCache: string | null = null;
+  /** Keeps the hosting view's pending context in sync when the chip is cleared. */
+  onContextChange?: (files: TFile[], label: string) => void;
   private messages: ChatMsg[] = [];
   private isRunning = false;
   private abort: AbortController | null = null;
@@ -128,26 +146,29 @@ export class AiAskChat {
   private chipsRowEl: HTMLElement | null = null;
   private selectionToolbarEl: HTMLElement | null = null;
   private styleRowEl: HTMLElement | null = null;
-  private webSearchRowEl: HTMLElement | null = null;
+  private barTogglesEl: HTMLElement | null = null;
   private chatStyle: ChatStyle;
   private webSearchOn: boolean;
+  private thinkingOn: boolean;
   private lastWebSources: Array<{ title: string; url: string; snippet: string }> = [];
 
   constructor(app: App, root: HTMLElement, files?: TFile[], label?: string) {
     this.app = app;
     this.root = root;
-    this.files = files?.length ? files.slice(0, MAX_FILES) : resolveActiveFiles(app);
+    this.files = files ? files.slice(0, MAX_FILES) : resolveActiveFiles(app);
     this.contextLabel = label || labelForFiles(this.files);
     const opts = get(settings) as {
       userName?: string;
       aiName?: string;
       aiChatStyle?: ChatStyle;
       aiWebSearchEnabled?: boolean;
+      aiChatThinking?: boolean;
     };
     this.userLabel = (opts.userName || "").trim() || tRaw("ai.askQa.you");
     this.aiLabel = (opts.aiName || "").trim() || tRaw("ai.askQa.ai");
     this.chatStyle = resolveChatStyle(opts.aiChatStyle);
     this.webSearchOn = opts.aiWebSearchEnabled === true;
+    this.thinkingOn = opts.aiChatThinking === true;
   }
 
   mount(): void {
@@ -160,10 +181,8 @@ export class AiAskChat {
     const headText = head.createDiv({ cls: "ai-sch-head-text" });
     headText.createEl("h2", { text: tRaw("ai.askQa.title"), cls: "ai-sch-title" });
     const ctx = headText.createDiv({ cls: "ai-ask-context" });
-    this.contextChipEl = ctx.createSpan({
-      text: this.contextChipText(),
-      cls: "ai-ask-context-chip",
-    });
+    this.contextChipEl = ctx.createSpan({ cls: "ai-ask-context-chip" });
+    this.renderContextChip();
 
     // Style switcher on the same row as «Чат с ИИ»
     this.styleRowEl = head.createDiv({ cls: "ai-ask-styles ai-ask-styles--head" });
@@ -198,8 +217,8 @@ export class AiAskChat {
     saveChatBtn.addEventListener("click", () => void this.saveChatNote());
 
     // Web toggle lives next to Copy/Save at the bottom
-    this.webSearchRowEl = bar.createDiv({ cls: "ai-ask-websearch ai-ask-websearch--bar" });
-    this.renderWebSearchToggle();
+    this.barTogglesEl = bar.createDiv({ cls: "ai-ask-websearch ai-ask-websearch--bar" });
+    this.renderBarToggles();
 
     const composer = this.root.createDiv({ cls: "ai-ask-composer" });
 
@@ -254,20 +273,48 @@ export class AiAskChat {
     this.streamBodyEl = null;
     this.contextChipEl = null;
     this.styleRowEl = null;
-    this.webSearchRowEl = null;
+    this.barTogglesEl = null;
     this.modelCaptionEl = null;
     this.root.empty();
   }
 
   /** Swap note context (e.g. re-open from another note). Keeps the conversation. */
   setContext(files?: TFile[], label?: string): void {
-    this.files = files?.length ? files.slice(0, MAX_FILES) : resolveActiveFiles(this.app);
+    this.files = files ? files.slice(0, MAX_FILES) : resolveActiveFiles(this.app);
     this.contextLabel = label || labelForFiles(this.files);
     this.contextCache = null;
-    if (this.contextChipEl) {
-      this.contextChipEl.setText(this.contextChipText());
-    }
+    this.renderContextChip();
+    this.onContextChange?.(this.files, this.contextLabel);
     this.renderChips();
+  }
+
+  /** Drop the note context (chat keeps the conversation). */
+  private clearContext(): void {
+    this.files = [];
+    this.contextLabel = "";
+    this.contextCache = null;
+    this.renderContextChip();
+    this.onContextChange?.(this.files, this.contextLabel);
+    this.renderChips();
+  }
+
+  private renderContextChip(): void {
+    const chip = this.contextChipEl;
+    if (!chip) return;
+    chip.empty();
+    chip.createSpan({ text: this.contextChipText() });
+    if (this.files.length > 0) {
+      const x = chip.createEl("button", {
+        cls: "ai-ask-chip-x",
+        text: "✕",
+        attr: {
+          type: "button",
+          "aria-label": tRaw("ai.askQa.ctxRemove"),
+          title: tRaw("ai.askQa.ctxRemove"),
+        },
+      });
+      x.addEventListener("click", () => this.clearContext());
+    }
   }
 
   /** Public send with an explicit message (used by editor context menu). */
@@ -392,8 +439,9 @@ export class AiAskChat {
   }
 
   /** Web search toggle (compact, in the bottom bar) + model internet capability. */
-  private renderWebSearchToggle(): void {
-    const row = this.webSearchRowEl;
+  /** Chat bar toggles (web search + thinking), icon-only, side by side. */
+  private renderBarToggles(): void {
+    const row = this.barTogglesEl;
     if (!row) return;
     row.empty();
 
@@ -401,29 +449,36 @@ export class AiAskChat {
     const intel = analyzeModelInternetSupport(opts);
     const hint = `${tRaw("ai.askQa.webSearchHint")}\n${intel.reason}`;
 
-    const btn = row.createEl("button", {
+    const webBtn = row.createEl("button", {
       cls: `ai-sch-btn ai-ask-bar-btn ai-ask-websearch-btn${this.webSearchOn ? " is-active" : ""}`,
-      text: `🌐 ${tRaw("ai.askQa.webSearch")}${this.webSearchOn ? " ●" : ""}`,
+      text: "\u{1F310}",
       attr: {
         type: "button",
         title: hint,
         "aria-pressed": this.webSearchOn ? "true" : "false",
       },
     });
-    btn.addEventListener("click", () => {
+    webBtn.addEventListener("click", () => {
       this.webSearchOn = !this.webSearchOn;
       settings.update((s) => ({ ...s, aiWebSearchEnabled: this.webSearchOn }));
-      type PluginHost = {
-        plugins?: {
-          getPlugin?: (id: string) => {
-            writeOptions?: (changes: Record<string, unknown>) => Promise<void>;
-          } | null;
-        };
-      };
-      const plugin = (this.app as unknown as PluginHost).plugins?.getPlugin?.("worklife-calendar");
-      void plugin?.writeOptions?.({ aiWebSearchEnabled: this.webSearchOn });
-      this.renderWebSearchToggle();
-      new Notice(this.webSearchOn ? tRaw("ai.askQa.webSearchOn") : tRaw("ai.askQa.webSearchOff"));
+      writeChatOption(this.app, { aiWebSearchEnabled: this.webSearchOn });
+      this.renderBarToggles();
+    });
+
+    const thinkBtn = row.createEl("button", {
+      cls: `ai-sch-btn ai-ask-bar-btn ai-ask-websearch-btn${this.thinkingOn ? " is-active" : ""}`,
+      text: "\u{1F4A1}",
+      attr: {
+        type: "button",
+        title: tRaw("settings.ai.chatThinkingDesc"),
+        "aria-pressed": this.thinkingOn ? "true" : "false",
+      },
+    });
+    thinkBtn.addEventListener("click", () => {
+      this.thinkingOn = !this.thinkingOn;
+      settings.update((s) => ({ ...s, aiChatThinking: this.thinkingOn }));
+      writeChatOption(this.app, { aiChatThinking: this.thinkingOn });
+      this.renderBarToggles();
     });
   }
 
@@ -478,7 +533,7 @@ export class AiAskChat {
     }
     el.empty();
     for (const m of this.messages) {
-      this.appendBubble(el, m.role, m.text);
+      this.appendBubble(el, m.role, m.text, false, m.thinking);
     }
     el.scrollTop = el.scrollHeight;
   }
@@ -499,11 +554,25 @@ export class AiAskChat {
     el.scrollTop = el.scrollHeight;
   }
 
+  /** Collapsible reasoning block shown above an answer. Click the head to fold. */
+  private createThinkingBlock(host: HTMLElement, text: string, collapsed: boolean): HTMLElement {
+    const block = host.createDiv({
+      cls: `ai-ask-thinking${collapsed ? " is-collapsed" : ""}`,
+    });
+    const head = block.createDiv({ cls: "ai-ask-thinking-head", text: tRaw("ai.askQa.thinkingLabel") });
+    block.createDiv({ cls: "ai-ask-thinking-text", text });
+    head.addEventListener("click", () =>
+      block.toggleClass("is-collapsed", !block.hasClass("is-collapsed")),
+    );
+    return block;
+  }
+
   private appendBubble(
     host: HTMLElement,
     role: "user" | "assistant",
     text: string,
     streaming = false,
+    thinking?: string,
   ): void {
     const row = host.createDiv({ cls: `ai-ask-msg ai-ask-msg--${role}` });
     const avatar = row.createDiv({ cls: "ai-ask-msg-avatar" });
@@ -514,6 +583,9 @@ export class AiAskChat {
       cls: "ai-ask-msg-who",
       text: role === "user" ? this.userLabel : this.aiLabel,
     });
+    if (thinking && thinking.trim()) {
+      this.createThinkingBlock(col, thinking, true);
+    }
     const body = col.createDiv({
       cls: `ai-ask-msg-body${streaming ? " is-streaming" : ""}`,
     });
@@ -551,48 +623,67 @@ export class AiAskChat {
       }
     }
 
-    // Hover action bar + right-click menu on selected text
-    this.mountMsgActions(row, body, role, text);
+    // Message actions live in the right-click menu (a hover bar squashes narrow panes)
+    this.mountMsgActions(body, role, text);
   }
 
-  /** Per-message actions: copy / to note / make task / shorter / longer. */
+  /** Right-click menu for a whole message: copy / to note / make task / rewrite. */
   private mountMsgActions(
-    row: HTMLElement,
     body: HTMLElement,
     role: "user" | "assistant",
     text: string,
   ): void {
-    const actions = row.createDiv({ cls: "ai-ask-msg-actions" });
-    const btn = (icon: string, label: string, fn: () => void) => {
-      const b = actions.createEl("button", {
-        cls: "ai-ask-msg-action",
-        text: icon,
-        attr: { type: "button", "aria-label": label, title: label },
-      });
-      b.addEventListener("click", (e) => {
-        e.preventDefault();
-        fn();
-      });
-    };
-
-    btn("📋", tRaw("ai.askQa.actCopy"), () => {
-      void navigator.clipboard.writeText(text);
-      new Notice(tRaw("ai.askQa.copied"));
-    });
-    if (role === "assistant") {
-      btn("📝", tRaw("ai.askQa.toNote"), () => void this.appendTextToNote(text));
-    }
-    btn("✅", tRaw("ai.askQa.actMakeTask"), () => void this.makeTaskFromText(text));
-    btn("➖", tRaw("ai.askQa.actShorter"), () => this.rewrite(text, "shorter"));
-    btn("➕", tRaw("ai.askQa.actLonger"), () => this.rewrite(text, "longer"));
-
-    // Right-click on a selection inside the message body
     body.addEventListener("contextmenu", (e) => {
       const view = body.ownerDocument.defaultView ?? window;
       const sel = view.getSelection()?.toString().trim() || "";
-      if (!sel) return;
-      this.showSelectionMenu(e, sel);
+      if (sel) {
+        this.showSelectionMenu(e, sel);
+        return;
+      }
+      this.showMessageMenu(e, role, text);
     });
+  }
+
+  private showMessageMenu(e: MouseEvent, role: "user" | "assistant", text: string): void {
+    e.preventDefault();
+    const menu = new Menu();
+    menu.addItem((item) => {
+      item
+        .setTitle(tRaw("ai.askQa.actCopy"))
+        .setIcon("copy")
+        .onClick(() => {
+          void navigator.clipboard.writeText(text);
+          new Notice(tRaw("ai.askQa.copied"));
+        });
+    });
+    if (role === "assistant") {
+      menu.addItem((item) => {
+        item
+          .setTitle(tRaw("ai.askQa.toNote"))
+          .setIcon("file-pen")
+          .onClick(() => void this.appendTextToNote(text));
+      });
+    }
+    menu.addItem((item) => {
+      item
+        .setTitle(tRaw("ai.askQa.actMakeTask"))
+        .setIcon("check-square")
+        .onClick(() => void this.makeTaskFromText(text));
+    });
+    menu.addSeparator();
+    menu.addItem((item) => {
+      item
+        .setTitle(tRaw("ai.askQa.actShorter"))
+        .setIcon("shrink")
+        .onClick(() => this.rewrite(text, "shorter"));
+    });
+    menu.addItem((item) => {
+      item
+        .setTitle(tRaw("ai.askQa.actLonger"))
+        .setIcon("expand")
+        .onClick(() => this.rewrite(text, "longer"));
+    });
+    menu.showAtMouseEvent(e);
   }
 
   /**
@@ -913,23 +1004,89 @@ export class AiAskChat {
         { role: "user" as const, content: userContent },
       ];
 
-      const result = await streamOllamaChat(
-        opts.ollamaUrl || "http://localhost:11434",
+      // Live "thinking" block above the streamed answer (plain divs; rAF-throttled).
+      let thinkBlock: HTMLElement | null = null;
+      let thinkTextEl: HTMLElement | null = null;
+      let answerEl: HTMLElement | null = null;
+      let pendingThink = "";
+      let thinkingText = "";
+      let thinkRaf = 0;
+      const flushThink = () => {
+        thinkRaf = 0;
+        if (!thinkTextEl || !pendingThink) return;
+        thinkTextEl.appendText(pendingThink);
+        pendingThink = "";
+        const el = this.messagesEl;
+        if (el) el.scrollTop = el.scrollHeight;
+      };
+      const ensureThinkBlock = () => {
+        if (thinkBlock) return;
+        const body = this.streamBodyEl;
+        if (!body) return;
+        body.empty();
+        thinkBlock = body.createDiv({ cls: "ai-ask-thinking" });
+        const head = thinkBlock.createDiv({
+          cls: "ai-ask-thinking-head",
+          text: tRaw("ai.askQa.thinkingLabel"),
+        });
+        thinkTextEl = thinkBlock.createDiv({ cls: "ai-ask-thinking-text" });
+        head.addEventListener("click", () => {
+          if (thinkBlock) {
+            thinkBlock.toggleClass("is-collapsed", !thinkBlock.hasClass("is-collapsed"));
+          }
+        });
+        answerEl = body.createDiv({ cls: "ai-ask-thinking-answer" });
+        showTypingDots(answerEl);
+      };
+      const onReasoningDelta = (delta: string) => {
+        ensureThinkBlock();
+        pendingThink += delta;
+        thinkingText += delta;
+        if (!thinkRaf) thinkRaf = window.requestAnimationFrame(flushThink);
+      };
+      const onAnswerStart = () => {
+        if (thinkRaf) {
+          window.cancelAnimationFrame(thinkRaf);
+          thinkRaf = 0;
+          flushThink();
+        }
+        if (thinkBlock && !thinkBlock.hasClass("is-collapsed")) {
+          thinkBlock.addClass("is-collapsed");
+          if (answerEl) showTypingDots(answerEl);
+        }
+      };
+
+      const result = await streamAiChat(
+        resolveAiConnection(opts),
         resolveModel("reason", opts),
         chatMessages,
         {
           signal: this.abort.signal,
           temperature: 0.4,
+          think: this.thinkingOn,
+          onReasoning: onReasoningDelta,
+          onDelta: onAnswerStart,
+          onProgress: (stage) => {
+            // Reasoning shell appears at once so thinking is visible even before
+            // the first reasoning token lands.
+            if (stage === "streaming" && this.thinkingOn) ensureThinkBlock();
+          },
         },
       );
 
-      this.messages.push({ role: "assistant", text: result.trim() });
+      this.messages.push({
+        role: "assistant",
+        text: result.trim(),
+        thinking: thinkingText.trim() || undefined,
+      });
       this.streamBodyEl = null;
       this.renderMessages();
       this.mountSourceList();
       this.setStatus("");
     } catch (e) {
-      if ((e as Error)?.name === "AbortError") {
+      // A killed request can surface as AbortError or as a plain network error
+      // depending on which layer noticed first — trust the signal over the name.
+      if ((e as Error)?.name === "AbortError" || this.abort?.signal.aborted) {
         this.setStatus("");
         this.streamBodyEl = null;
         this.renderMessages();

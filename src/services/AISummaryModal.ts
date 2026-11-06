@@ -4,7 +4,8 @@ import { CustomModal } from "../ui/CustomModal";
 import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
 import { get } from "svelte/store";
-import { streamOllamaChat, resolveModel } from "./OllamaService";
+import { resolveModel } from "./OllamaService";
+import { resolveAiConnection, streamAiChat } from "./aiProvider";
 import { errorMessage } from "../utils/sanitize";
 import { renderMarkdown } from "../ui/markdown";
 import { mountTypingBlock } from "../ui/typingDots";
@@ -420,8 +421,8 @@ export class AISummaryModal extends CustomModal {
         mountTypingBlock(this.typingHostEl, resolveModel("reason", opts), this.modelCaptionEl);
       }
 
-      const result = await streamOllamaChat(
-        opts.ollamaUrl || "http://localhost:11434",
+      const result = await streamAiChat(
+        resolveAiConnection(opts),
         resolveModel("reason", opts),
         [
           { role: "system", content: system },
@@ -437,6 +438,7 @@ export class AISummaryModal extends CustomModal {
         {
           signal: this.abort.signal,
           temperature: 0.3,
+          think: false,
           onDelta: (full) => {
             chars = full.length;
             this.setProgress(Math.min(0.92, chars / expectedChars));

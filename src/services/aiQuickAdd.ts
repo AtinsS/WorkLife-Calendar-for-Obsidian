@@ -500,17 +500,18 @@ export async function parseQuickTasksWithAI(
   if (!isDesktopAI() || !opts.ollamaEnabled || opts.aiQuickAddEnabled === false) {
     throw new Error("ai-quick-add-unavailable");
   }
-  const url = opts.ollamaUrl || "http://localhost:11434";
-  const { streamOllamaChat, resolveModel } = await import("./OllamaService");
+  const { resolveAiConnection, streamAiChat } = await import("./aiProvider");
+  const { resolveModel } = await import("./OllamaService");
+  const conn = resolveAiConnection(opts);
   const model = resolveModel("extract", opts);
-  const out = await streamOllamaChat(
-    url,
+  const out = await streamAiChat(
+    conn,
     model,
     [
       { role: "system", content: buildQuickAddSystem(context) },
       { role: "user", content: raw.trim() },
     ],
-    { temperature: 0.1, format: "json" },
+    { temperature: 0.1, format: "json", think: false },
   );
   return parseAiQuickTasks(out);
 }
@@ -535,18 +536,19 @@ export async function generateTaskDescription(
 ): Promise<string> {
   const opts = get(settings) as AiQuickAddOptions;
   if (!opts.ollamaEnabled) throw new Error("ai-quick-add-unavailable");
-  const url = opts.ollamaUrl || "http://localhost:11434";
-  const { streamOllamaChat, resolveModel } = await import("./OllamaService");
+  const { resolveAiConnection, streamAiChat } = await import("./aiProvider");
+  const { resolveModel } = await import("./OllamaService");
+  const conn = resolveAiConnection(opts);
   const model = resolveModel("reason", opts);
   const user = hint && hint.trim() ? `${title}\n\nHint: ${hint.trim()}` : title;
-  const out = await streamOllamaChat(
-    url,
+  const out = await streamAiChat(
+    conn,
     model,
     [
       { role: "system", content: DESCRIPTION_SYSTEM },
       { role: "user", content: user },
     ],
-    { temperature: 0.4 },
+    { temperature: 0.4, think: false },
   );
   return out.trim().replace(/^["']|["']$/g, "").trim();
 }

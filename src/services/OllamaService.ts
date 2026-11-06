@@ -1,43 +1,47 @@
-import { requestUrl } from "obsidian";
 import { errorMessage } from "../utils/sanitize";
-
-export interface OllamaSettings {
-  ollamaEnabled: boolean;
-  ollamaUrl: string;
-  ollamaModel: string;
-}
-
-export const defaultOllamaSettings: OllamaSettings = {
-  ollamaEnabled: false,
-  ollamaUrl: "http://localhost:11434",
-  ollamaModel: "llama3.1",
-};
+import {
+  streamAiChat,
+  type AiConnection,
+  type StreamChatOptions,
+} from "./aiProvider";
 
 /**
  * Model roles.
  * - "reason": long prompts, prose, analysis (summaries, forecasts, insights)
  * - "extract": structured JSON parsing (expenses, quick add, subtasks, task extract)
  */
+/** Chat/extraction options plus the existing calendar load for smart scheduling. */
+export interface ExtractionOptions extends StreamChatOptions {
+  scheduleContext?: string;
+}
+
 export type ModelRole = "reason" | "extract";
 
 export interface ModelSettingsShape {
+  aiProvider?: "ollama" | "lmstudio";
   ollamaModel?: string;
   ollamaModelExtract?: string;
+  lmstudioModel?: string;
+  lmstudioModelExtract?: string;
   /** "single" (default) — one model for all roles; "dual" — separate extract model. */
   ollamaModelMode?: "single" | "dual";
 }
 
 /**
- * Resolve which model to use for a role.
+ * Resolve which model to use for a role on the active provider.
  * Fallback chain: role model → main model → default.
  * In "single" mode (or when extract is unset) both roles share the main model.
+ * Each provider keeps its own model names, so switching providers never leaks
+ * a model id from one server to the other.
  */
 export function resolveModel(role: ModelRole, opts: ModelSettingsShape): string {
-  const main = (opts.ollamaModel || "").trim() || "llama3.1";
-  if (role === "reason") return main;
-  if (opts.ollamaModelMode !== "dual") return main;
-  const extract = (opts.ollamaModelExtract || "").trim();
-  return extract || main;
+  const lmstudio = opts.aiProvider === "lmstudio";
+  const main = ((lmstudio ? opts.lmstudioModel : opts.ollamaModel) || "").trim();
+  const primary = lmstudio ? main : main || "llama3.1";
+  if (role === "reason") return primary;
+  if (opts.ollamaModelMode !== "dual") return primary;
+  const extract = ((lmstudio ? opts.lmstudioModelExtract : opts.ollamaModelExtract) || "").trim();
+  return extract || primary;
 }
 
 export interface ExtractedSubtask {
@@ -124,6 +128,9 @@ RULES:
 - "— 2 ч", "(15 мин)", "2 часа" in heading/line → estimatedMinutes.
 - NEVER put checklist items or subtask titles into "description". Description is only a short prose note. Subtasks go only into the "subtasks" array.
 - Keep title/description in the SAME language as the source document. "weekday" must be in that language too (e.g. "Понедельник").
+
+- If CURRENT CALENDAR LOAD is provided and a task has no explicit time, propose "scheduledTime" that avoids busy windows and balances the load across days (morning for focus work, afternoon for calls, evening for light tasks). When the better slot (morning vs evening) is genuinely unclear, leave "scheduledTime" null.
+- When "scheduledTime" and "estimatedMinutes" are known but no explicit end range, set "endTime" = start + duration ("2 h" after "10:00" -> endTime 12:00). When start and end are known but the duration is missing, set "estimatedMinutes" = end - start.
 
 OUTPUT SCHEMA:
 {
@@ -580,7 +587,7 @@ function parseSingleTime(text: string): string | null {
   return `${String(h).padStart(2, "0")}:${String(min).padStart(2, "0")}`;
 }
 
-function parseDurationHint(text: string): number | null {
+export function parseDurationHint(text: string): number | null {
   const mMin = text.match(/(\d+)\s*(?:мин|min)(?!\p{L})/iu);
   if (mMin) return parseInt(mMin[1]);
   // NB: trailing \b never fires after Cyrillic (JS \b is ASCII-\w based) — use (?!\p{L}) with u flag
@@ -664,6 +671,14 @@ function enrichTask(t: ExtractedTask): ExtractedTask {
   }
   if (!endTime && scheduledTime && estimatedMinutes) {
     endTime = computeEndTime(scheduledTime, estimatedMinutes);
+  }
+
+  // Symmetric derivation: a known start+end implies the duration
+  if (!estimatedMinutes && scheduledTime && endTime) {
+    const [sh, sm] = scheduledTime.split(":").map(Number);
+    const [eh, em] = endTime.split(":").map(Number);
+    const diff = eh * 60 + em - (sh * 60 + sm);
+    if (diff > 0) estimatedMinutes = diff;
   }
 
   return { ...t, title, scheduledTime, estimatedMinutes, endTime, priority };
@@ -782,174 +797,6 @@ export function fixDayIndex(tasks: ExtractedTask[]): ExtractedTask[] {
 // Ollama API calls
 // ---------------------------------------------------------------------------
 
-export interface OllamaConnectionResult {
-  ok: boolean;
-  models?: string[];
-  error?: string;
-}
-
-export async function testOllamaConnection(url: string): Promise<OllamaConnectionResult> {
-  try {
-    const resp = await requestUrl({
-      url: `${url}/api/tags`,
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-      throw: false,
-    });
-    if (resp.status !== 200) {
-      return { ok: false, error: `HTTP ${resp.status}` };
-    }
-    const data = resp.json as { models?: Array<{ name?: string }> };
-    const models = data.models?.map((m) => m.name).filter((n): n is string => !!n) ?? [];
-    return { ok: true, models };
-  } catch (e) {
-    return { ok: false, error: errorMessage(e) };
-  }
-}
-
-export async function testOllamaModel(
-  url: string,
-  model: string,
-): Promise<{ ok: boolean; model?: string; response?: string; error?: string }> {
-  try {
-    const content = await streamOllamaChat(url, model, [
-      { role: "user", content: "Reply with the single word: ok" },
-    ], { temperature: 0 });
-    return { ok: true, model, response: content.trim().slice(0, 80) };
-  } catch (e) {
-    return { ok: false, model, error: errorMessage(e) };
-  }
-}
-
-export interface StreamChatOptions {
-  signal?: AbortSignal;
-  onDelta?: (delta: string, full: string) => void;
-  onProgress?: (stage: "connecting" | "streaming" | "fallback" | "done" | "parsing") => void;
-  format?: string;
-  temperature?: number;
-}
-
-/**
- * Rough token budget for the request: chars/3 + response headroom.
- * Without an explicit num_ctx Ollama keeps the model's default (often 2–4k) and
- * silently truncates long notes — tasks at the end of the file were missed.
- */
-function estimateNumCtx(messages: Array<{ role: string; content: string }>): number {
-  const chars = messages.reduce((n, m) => n + (m.content?.length ?? 0), 0);
-  const needed = Math.ceil(chars / 3) + 2048;
-  return Math.max(4096, Math.min(32768, needed));
-}
-
-export async function streamOllamaChat(
-  url: string,
-  model: string,
-  messages: Array<{ role: string; content: string }>,
-  opts: StreamChatOptions = {},
-): Promise<string> {
-  const body = {
-    model,
-    messages,
-    stream: true,
-    ...(opts.format ? { format: opts.format } : {}),
-    options: { temperature: opts.temperature ?? 0.1, num_ctx: estimateNumCtx(messages) },
-  };
-
-  opts.onProgress?.("connecting");
-
-  try {
-    // window.fetch is required: requestUrl cannot stream NDJSON chunks or honor AbortSignal.
-    // Falls back to requestUrl below when streaming is unavailable.
-    if (typeof window.fetch !== "function") throw new Error("fetch unavailable");
-
-    const resp = await window.fetch(`${url}/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: opts.signal,
-    });
-    if (!resp.ok) {
-      throw new Error(`Ollama HTTP ${resp.status}`);
-    }
-
-    const contentType = resp.headers.get("content-type") ?? "";
-    if (contentType.includes("application/json") && !resp.body) {
-      const data = (await resp.json()) as { message?: { content?: string } };
-      const content = data.message?.content ?? "";
-      if (content) opts.onDelta?.(content, content);
-      opts.onProgress?.("done");
-      return content;
-    }
-
-    if (!resp.body) throw new Error("Empty stream body");
-
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let full = "";
-    let buffer = "";
-    let started = false;
-
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!started) {
-        started = true;
-        opts.onProgress?.("streaming");
-      }
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        try {
-          const obj = JSON.parse(trimmed) as { message?: { content?: string } };
-          const delta = obj.message?.content ?? "";
-          if (delta) {
-            full += delta;
-            opts.onDelta?.(delta, full);
-          }
-        } catch {
-          // incomplete NDJSON line
-        }
-      }
-    }
-
-    if (buffer.trim()) {
-      try {
-        const obj = JSON.parse(buffer.trim()) as { message?: { content?: string } };
-        const delta = obj.message?.content ?? "";
-        if (delta) {
-          full += delta;
-          opts.onDelta?.(delta, full);
-        }
-      } catch {
-        /* ignore trailing garbage */
-      }
-    }
-
-    opts.onProgress?.("done");
-    return full;
-  } catch (e) {
-    if (opts.signal?.aborted) throw e;
-    opts.onProgress?.("fallback");
-    const resp = await requestUrl({
-      url: `${url}/api/chat`,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, stream: false }),
-      throw: false,
-    });
-    if (resp.status !== 200) {
-      throw new Error(`Ollama HTTP ${resp.status}: ${resp.text}`);
-    }
-    const data = resp.json as { message?: { content?: string } };
-    const content = data.message?.content ?? "";
-    if (content) opts.onDelta?.(content, content);
-    opts.onProgress?.("done");
-    return content;
-  }
-}
-
 /** Build task-list context for the Q&A prompt window */
 export function buildTasksContext(tasks: ExtractedTask[]): string {
   if (tasks.length === 0) return "(no tasks extracted yet)";
@@ -996,6 +843,7 @@ RULES:
 - "Group all tasks in 1 day" / "сгруппируй в 1 день" → same dayIndex (1) and same date for all.
 - Prefer real calendar "date" values when a concrete day is known.
 - Answer in the user's language. Be concise and specific to this list.
+- When CURRENT CALENDAR LOAD is provided, use it to answer scheduling questions (best time of day, which day is less loaded) and to place moved tasks into free windows.
 - NEVER put checklist items or subtask titles into "description". Subtasks live only in the "subtasks" array.
 
 Task schema:
@@ -1018,13 +866,13 @@ export type PromptWindowResult = TaskEditResult & {
 };
 
 export async function applyTasksInstruction(
-  url: string,
+  conn: AiConnection,
   model: string,
   instruction: string,
   tasks: ExtractedTask[],
   noteSlice: string,
   weekStart: string | undefined,
-  opts: StreamChatOptions = {},
+  opts: ExtractionOptions = {},
 ): Promise<PromptWindowResult> {
   const now = new Date();
   const currentDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -1039,18 +887,18 @@ ${buildTasksContext(tasks)}
 
 Note excerpt (context):
 ${noteSlice.slice(0, 2500)}
-
+${opts.scheduleContext ? `\nCurrent calendar load:\n${opts.scheduleContext}\n` : ""}
 User message:
 ${instruction}`;
 
-  const content = await streamOllamaChat(
-    url,
+  const content = await streamAiChat(
+    conn,
     model,
     [
       { role: "system", content: TASKS_EDITOR_SYSTEM },
       { role: "user", content: userContent },
     ],
-    { format: "json", temperature: 0.1, ...opts },
+    { format: "json", temperature: 0.1, ...opts, think: false },
   );
 
   const parsed = parseOllamaJson(content) as RawOllamaResponse & {
@@ -1183,11 +1031,11 @@ export interface StreamExtractionResult extends ExtractionResult {
 }
 
 export async function extractTasksFromNoteStream(
-  url: string,
+  conn: AiConnection,
   model: string,
   noteContent: string,
   contextSize = 0,
-  opts: StreamChatOptions = {},
+  opts: ExtractionOptions = {},
   maxRetries = 1,
 ): Promise<StreamExtractionResult> {
   const noteSlice =
@@ -1209,7 +1057,10 @@ export async function extractTasksFromNoteStream(
     };
   }
 
-  const userPrompt = buildUserPrompt(noteSlice);
+  const loadBlock = opts.scheduleContext
+    ? `\n\nCURRENT CALENDAR LOAD (already scheduled tasks):\n${opts.scheduleContext}`
+    : "";
+  const userPrompt = buildUserPrompt(noteSlice) + loadBlock;
 
   let lastError: Error | null = null;
   let usedFallback = false;
@@ -1220,8 +1071,8 @@ export async function extractTasksFromNoteStream(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let content = "";
     try {
-      content = await streamOllamaChat(
-        url,
+      content = await streamAiChat(
+        conn,
         model,
         [
           { role: "system", content: SYSTEM_PROMPT },
@@ -1230,6 +1081,7 @@ export async function extractTasksFromNoteStream(
         {
           format: "json",
           temperature: 0.1,
+          think: false,
           signal: opts.signal,
           onDelta: opts.onDelta,
           onProgress: (stage) => {
@@ -1282,12 +1134,12 @@ Rules:
 - Use the project name and task description as context: tailor subtasks to the domain and any constraints mentioned there.`;
 
 export async function generateSubtasks(
-  url: string,
+  conn: AiConnection,
   model: string,
   taskTitle: string,
   taskDescription?: string | null,
   projectName?: string | null,
-  opts: StreamChatOptions = {},
+  opts: ExtractionOptions = {},
 ): Promise<string[]> {
   const user = [
     `Task: ${taskTitle}`,
@@ -1297,14 +1149,14 @@ export async function generateSubtasks(
     .filter(Boolean)
     .join("\n");
 
-  const raw = await streamOllamaChat(
-    url,
+  const raw = await streamAiChat(
+    conn,
     model,
     [
       { role: "system", content: SUBTASKS_SYSTEM },
       { role: "user", content: user },
     ],
-    { ...opts, temperature: 0.2 },
+    { ...opts, temperature: 0.2, think: false },
   );
 
   return parseSubtasks(raw);

@@ -32,9 +32,10 @@ export async function splitTaskIntoSubtasks(
     ? get(projects).find((p) => p.id === task.projectId)?.name ?? null
     : null;
 
+  const { resolveAiConnection } = await import("./aiProvider");
   const { generateSubtasks, resolveModel } = await import("./OllamaService");
   const titles = await generateSubtasks(
-    opts.ollamaUrl || "http://localhost:11434",
+    resolveAiConnection(opts),
     resolveModel("extract", opts),
     task.title,
     task.description || null,

@@ -7,7 +7,8 @@ import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
 import { tasks } from "../task-tracker/stores";
 import type { ITask } from "../task-tracker/types";
-import { streamOllamaChat, resolveModel } from "./OllamaService";
+import { resolveModel } from "./OllamaService";
+import { resolveAiConnection, streamAiChat } from "./aiProvider";
 import { errorMessage } from "../utils/sanitize";
 import {
   applyScheduleOps,
@@ -952,8 +953,8 @@ export class AIScheduleModal extends CustomModal {
     const lang = tRaw("locale.momentLocale") === "ru" ? "ru" : "en";
 
     try {
-      const result = await streamOllamaChat(
-        opts.ollamaUrl || "http://localhost:11434",
+      const result = await streamAiChat(
+        resolveAiConnection(opts),
         resolveModel("reason", opts),
         [
           { role: "system", content: buildSystem(this.analysisKind, lang) },
@@ -962,6 +963,7 @@ export class AIScheduleModal extends CustomModal {
         {
           signal: this.abort.signal,
           temperature: 0.3,
+          think: false,
           onDelta: (full) => {
             this.resultText = full;
             this.analysisText = full;
@@ -1024,8 +1026,8 @@ export class AIScheduleModal extends CustomModal {
     this.renderTyping("extract");
 
     try {
-      const raw = await streamOllamaChat(
-        opts.ollamaUrl || "http://localhost:11434",
+      const raw = await streamAiChat(
+        resolveAiConnection(opts),
         resolveModel("extract", opts),
         [
           { role: "system", content: buildRecsToOpsSystem() },
@@ -1035,6 +1037,7 @@ export class AIScheduleModal extends CustomModal {
           signal: this.abort.signal,
           format: "json",
           temperature: 0.1,
+          think: false,
         },
       );
 
@@ -1111,8 +1114,8 @@ export class AIScheduleModal extends CustomModal {
     this.syncFooter();
 
     try {
-      const raw = await streamOllamaChat(
-        opts.ollamaUrl || "http://localhost:11434",
+      const raw = await streamAiChat(
+        resolveAiConnection(opts),
         resolveModel("extract", opts),
         [
           { role: "system", content: buildScheduleOpsSystem() },
@@ -1125,6 +1128,7 @@ export class AIScheduleModal extends CustomModal {
           signal: this.abort.signal,
           format: "json",
           temperature: 0.1,
+          think: false,
         },
       );
 

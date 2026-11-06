@@ -13241,6 +13241,46 @@ input.ai-task-time-input.ai-task-time-input {
   justify-content: center;
 }
 
+/* Live model output while the extractor streams */
+.ai-analysis-stream:has(.ai-analysis-raw) {
+  display: block;
+  max-height: 240px;
+}
+
+.ai-analysis-raw {
+  width: 100%;
+  max-height: 220px;
+  overflow-y: auto;
+  font-family: var(--font-monospace);
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+/* One-click day-part pick under a task's time inputs */
+.ai-task-daypart {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease;
+}
+
+.ai-task-daypart:hover {
+  color: var(--text-normal);
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 16%, transparent);
+}
+
+input.ai-task-time-input.ai-task-est-input {
+  width: 72px;
+}
+
 /* Empty result: AI found no tasks — red panel, no loader */
 .ai-analysis-panel.ai-analysis-empty {
   border-color: rgba(255, 82, 82, 0.55);
@@ -13628,8 +13668,6 @@ input.ai-task-time-input.ai-task-time-input {
 }
 
 /* UI chrome inside chat stays non-selectable so drags/clicks feel clean */
-.ai-ask-msg-actions,
-.ai-ask-msg-actions *,
 .ai-ask-chips,
 .ai-ask-chips *,
 .ai-ask-bar,
@@ -13727,6 +13765,16 @@ input.ai-task-time-input.ai-task-time-input {
   opacity: 0.8;
 }
 
+.ai-ask-context-chip > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ai-ask-context-chip .ai-ask-chip-x {
+  flex-shrink: 0;
+}
+
 .ai-ask-messages {
   flex: 1;
   min-height: 300px;
@@ -13811,6 +13859,7 @@ input.ai-task-time-input.ai-task-time-input {
 .ai-ask-msg--assistant .ai-ask-msg-avatar {
   background: var(--mcp-glass-bg, rgba(255, 255, 255, 0.05));
   border-color: var(--mcp-glass-border, rgba(255, 255, 255, 0.08));
+  margin-top: 4px;
 }
 
 .ai-ask-msg-col {
@@ -13856,13 +13905,17 @@ input.ai-task-time-input.ai-task-time-input {
   border-bottom-right-radius: 5px;
 }
 
+/* AI answer is plain readable text (document style), not a chat bubble */
 .ai-ask-msg--assistant .ai-ask-msg-body {
-  background: var(--mcp-chat-bot-bg);
-  border: 1px solid var(--mcp-chat-bot-border);
-  border-bottom-left-radius: 5px;
-  backdrop-filter: blur(6px);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  backdrop-filter: none;
   width: 100%;
   max-width: 100%;
+  padding: 2px 4px 18px;
+  font-size: 15.5px;
+  line-height: 1.72;
 }
 
 .ai-ask-msg--assistant .ai-ask-msg-col {
@@ -13871,12 +13924,9 @@ input.ai-task-time-input.ai-task-time-input {
   min-width: 0;
 }
 
-/* Thinking cloud stays compact; the bubble only grows with real text */
+/* Streaming placeholder stays compact until real text grows */
 .ai-ask-msg-body.is-streaming {
-  border-color: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 45%, transparent);
-  box-shadow:
-    0 0 0 1px color-mix(in srgb, var(--mcp-accent, #7c5cfc) 12%, transparent),
-    0 4px 20px color-mix(in srgb, var(--mcp-accent, #7c5cfc) 14%, transparent);
+  box-shadow: none;
   width: fit-content;
   max-width: 100%;
   min-width: 72px;
@@ -13897,9 +13947,58 @@ input.ai-task-time-input.ai-task-time-input {
   width: auto;
 }
 
+/* Live reasoning block (Qwen3 thinking) inside the streaming bubble */
+.ai-ask-msg-body.is-streaming:has(.ai-ask-thinking) {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  min-width: 200px;
+}
+
+.ai-ask-thinking {
+  width: 100%;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.ai-ask-thinking-head {
+  cursor: pointer;
+  font-style: italic;
+  opacity: 0.85;
+  user-select: none;
+}
+
+.ai-ask-thinking-head:hover {
+  opacity: 1;
+}
+
+.ai-ask-thinking.is-collapsed .ai-ask-thinking-text {
+  display: none;
+}
+
+.ai-ask-thinking-text {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-left: 2px solid color-mix(in srgb, var(--mcp-accent, #7c5cfc) 40%, transparent);
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 7%, transparent);
+  border-radius: 0 8px 8px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
+  overflow-y: auto;
+  font-style: italic;
+}
+
+.ai-ask-thinking-answer {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+}
+
 /* Markdown inside chat bubbles */
 .ai-ask-msg-body .ai-sch-out-p {
-  margin: 0 0 8px;
+  margin: 0 0 10px;
 }
 
 .ai-ask-msg-body .ai-sch-out-p:last-child {
@@ -14260,48 +14359,6 @@ input.ai-task-time-input.ai-task-time-input {
 
 .ai-ask-msg {
   position: relative;
-}
-
-.ai-ask-msg-actions {
-  display: flex;
-  gap: 2px;
-  margin-top: 2px;
-  padding: 2px 4px;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-  pointer-events: none;
-  align-self: flex-start;
-}
-
-.ai-ask-msg--user .ai-ask-msg-actions {
-  align-self: flex-end;
-}
-
-.ai-ask-msg:hover .ai-ask-msg-actions,
-.ai-ask-msg:focus-within .ai-ask-msg-actions {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.ai-ask-msg-action {
-  border: none;
-  background: transparent;
-  color: var(--text-faint);
-  cursor: pointer;
-  padding: 3px 7px;
-  border-radius: 8px;
-  font-size: 11px;
-  line-height: 1.2;
-  transition: color 0.12s ease, background 0.12s ease;
-}
-
-.ai-ask-msg-action:hover {
-  color: var(--text-normal);
-  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 16%, transparent);
-}
-
-.ai-ask-msg-action:active {
-  transform: scale(0.96);
 }
 
 /* Floating toolbar on text selection in chat */

@@ -40,4 +40,36 @@ describe("resolveModel", () => {
       expect(typeof resolveModel(role, {})).toBe("string");
     }
   });
+
+  it("lmstudio uses its own model names, not the ollama ones", () => {
+    expect(
+      resolveModel("reason", {
+        aiProvider: "lmstudio",
+        lmstudioModel: "qwen/qwen3-4b",
+        ollamaModel: "llama3.1:8b",
+      }),
+    ).toBe("qwen/qwen3-4b");
+  });
+
+  it("lmstudio extract falls back to lmstudio main in dual mode", () => {
+    expect(
+      resolveModel("extract", {
+        aiProvider: "lmstudio",
+        lmstudioModel: "qwen/qwen3-4b",
+        lmstudioModelExtract: "",
+        ollamaModelExtract: "qwen2.5:3b",
+        ollamaModelMode: "dual",
+      }),
+    ).toBe("qwen/qwen3-4b");
+  });
+
+  it("lmstudio has no llama3.1 fallback when unset", () => {
+    expect(resolveModel("reason", { aiProvider: "lmstudio" })).toBe("");
+    expect(resolveModel("reason", { aiProvider: "lmstudio", lmstudioModel: "  " })).toBe("");
+  });
+
+  it("ollama path is unchanged when provider is unset", () => {
+    expect(resolveModel("reason", { ollamaModel: "a" })).toBe("a");
+    expect(resolveModel("reason", { aiProvider: "ollama", ollamaModel: "a" })).toBe("a");
+  });
 });

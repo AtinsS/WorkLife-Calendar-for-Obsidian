@@ -711,10 +711,11 @@ export class QuickAddModal extends Modal {
     btn.addClass("is-busy");
     try {
       const { generateSubtasks, resolveModel } = await import("../services/OllamaService");
+      const { resolveAiConnection } = await import("../services/aiProvider");
       const { settings } = await import("../ui/stores");
       const opts = get(settings) as { ollamaUrl?: string; ollamaModel?: string; ollamaModelMode?: "single" | "dual"; ollamaModelExtract?: string };
       const titles = await generateSubtasks(
-        opts.ollamaUrl || "http://localhost:11434",
+        resolveAiConnection(opts),
         resolveModel("extract", opts),
         title,
         this.descEl?.value || null,

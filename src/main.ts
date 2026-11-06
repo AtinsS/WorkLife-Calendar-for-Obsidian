@@ -1068,6 +1068,7 @@ export default class CalendarPlugin extends Plugin {
       ["main.ribbon.analytics", "bar-chart", () => this.activateHabitAnalyticsView()],
       ["main.ribbon.finance", "coins", () => this.activateFinanceView()],
       ["main.ribbon.kanban", "layout-grid", () => this.activateKanbanView()],
+      ["main.ribbon.aiChat", "message-circle", () => this.openAiChatNoContext()],
       ["main.ribbon.habits", "flame", () => this.activateHabitPanelView()],
     ];
 
@@ -1081,6 +1082,13 @@ export default class CalendarPlugin extends Plugin {
     this.habitRibbonIcon = this.ribbonIcons[this.ribbonIcons.length - 1];
     this.updateHabitRibbonVisibility();
     this.ribbonIconsRegistered = true;
+  }
+
+  /** Ribbon shortcut: open AI chat with no note context — just talk. */
+  private openAiChatNoContext(): void {
+    if (this.options.ollamaEnabled !== true || this.options.aiChatEnabled === false) return;
+    if (typeof window !== "undefined" && window.innerWidth <= 768) return;
+    void import("./services/AIAskModal").then(({ openAiAsk }) => openAiAsk(this.app, []));
   }
 
   private updateRibbonLabels(): void {

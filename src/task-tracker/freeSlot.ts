@@ -9,6 +9,38 @@ export interface BusySlot {
   estimatedTime?: number;
 }
 
+export interface DayLoad {
+  date: string;
+  busy: BusySlot[];
+}
+
+/**
+ * Compact per-day busy summary for AI scheduling prompts, e.g.
+ * `2026-02-09: busy 10:00-11:00, 14:00-15:30 (2.5h booked)`.
+ */
+export function buildLoadSummary(entries: DayLoad[]): string {
+  const lines: string[] = [];
+  for (const { date, busy } of entries) {
+    const blocks: string[] = [];
+    let total = 0;
+    for (const t of busy) {
+      const start = parseHHMM(t.scheduledTime);
+      if (start === null) continue;
+      const end = slotEnd(start, t);
+      blocks.push(`${t.scheduledTime}-${fmtHHMM(end)}`);
+      total += end - start;
+    }
+    blocks.sort();
+    if (blocks.length === 0) {
+      lines.push(`${date}: free`);
+    } else {
+      const hours = Math.round((total / 60) * 10) / 10;
+      lines.push(`${date}: busy ${blocks.join(", ")} (${hours}h booked)`);
+    }
+  }
+  return lines.join("\n");
+}
+
 const DAY_START = 9 * 60;
 const DAY_END = 21 * 60;
 

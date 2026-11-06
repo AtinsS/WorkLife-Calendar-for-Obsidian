@@ -12,14 +12,32 @@ import { tRaw } from "../i18n";
 import { errorMessage } from "../utils/sanitize";
 import type { ExtractedTask } from "./OllamaService";
 import { resolveModel } from "./OllamaService";
+import { resolveAiConnection, type AiConnection } from "./aiProvider";
 import {
   extractTasksFromNoteStream,
   applyTasksInstruction,
   computeEndTime,
+  parseDurationHint,
 } from "./OllamaService";
-import { addTask, addChecklistItem, projects } from "../task-tracker/stores";
+import { addTask, addChecklistItem, projects, tasks } from "../task-tracker/stores";
+import {
+  buildLoadSummary,
+  dateStrFromUID,
+  findFreeSlot,
+  type BusySlot,
+  type DayLoad,
+} from "../task-tracker/freeSlot";
 import { settings } from "../ui/stores";
 import type { ISettings } from "../settings";
+
+/** Human duration for the estimate input, e.g. "2 \u{447}" or "30 \u{43C}\u{438}\u{43D}". */
+function formatEst(mins: number): string {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const hUnit = "\u{447}";
+  const mUnit = "\u{43C}\u{438}\u{43D}";
+  return h > 0 ? (m > 0 ? `${h} ${hUnit} ${m} ${mUnit}` : `${h} ${hUnit}`) : `${m} ${mUnit}`;
+}
 
 const momentFn = window.moment;
 
@@ -63,6 +81,9 @@ export class AiExtractPanel {
   private autoScheduleToggleEl: HTMLInputElement | null = null;
   private analysisPanelEl: HTMLDivElement | null = null;
   private analysisStreamEl: HTMLDivElement | null = null;
+  private analysisRawEl: HTMLDivElement | null = null;
+  private analysisRaf = 0;
+  private analysisPending = "";
   private modelCaptionEl: HTMLDivElement | null = null;
   private analysisSpinnerEl: HTMLDivElement | null = null;
   private askPanelEl: HTMLDivElement | null = null;
@@ -187,10 +208,10 @@ export class AiExtractPanel {
     this.root.empty();
   }
 
-  private getOllamaOpts(): { url: string; model: string; contextSize: number } {
+  private getOllamaOpts(): { conn: AiConnection; model: string; contextSize: number } {
     const opts: ISettings = get(settings);
     return {
-      url: opts.ollamaUrl || "http://localhost:11434",
+      conn: resolveAiConnection(opts),
       model: resolveModel("extract", opts),
       contextSize: opts.ollamaContextSize || 0,
     };
@@ -255,7 +276,52 @@ export class AiExtractPanel {
     }
   }
 
+  /** Existing calendar load (next 7 days) - feeds AI scheduling prompts. */
+  private buildScheduleContext(): string {
+    const all = get(tasks);
+    const entries: DayLoad[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(`${this.distributeStartDate}T00:00:00`);
+      d.setDate(d.getDate() + i);
+      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      entries.push({
+        date,
+        busy: all
+          .filter((t) => !t.completed && dateStrFromUID(t.dateUID) === date)
+          .map((t) => ({
+            scheduledTime: t.scheduledTime,
+            endTime: t.endTime,
+            estimatedTime: t.estimatedTime,
+          })),
+      });
+    }
+    return buildLoadSummary(entries);
+  }
+
+  /** Live model output during extraction (throttled to one DOM write per frame). */
+  private streamAnalysis(full: string): void {
+    this.analysisPending = full;
+    if (this.analysisRaf) return;
+    this.analysisRaf = window.requestAnimationFrame(() => {
+      this.analysisRaf = 0;
+      const host = this.analysisStreamEl;
+      if (!host) return;
+      if (!this.analysisRawEl) {
+        host.empty();
+        this.analysisRawEl = host.createDiv({ cls: "ai-analysis-raw" });
+      }
+      this.analysisRawEl.textContent = this.analysisPending;
+      host.scrollTop = host.scrollHeight;
+    });
+  }
+
   private resetAnalysisStream(): void {
+    if (this.analysisRaf) {
+      window.cancelAnimationFrame(this.analysisRaf);
+      this.analysisRaf = 0;
+    }
+    this.analysisRawEl = null;
+    this.analysisPending = "";
     if (this.analysisStreamEl) {
       // Spinner centered in the field; model label lives ABOVE the field
       const opts = get(settings) as {
@@ -298,7 +364,7 @@ export class AiExtractPanel {
       return;
     }
 
-    const { url, model, contextSize } = this.getOllamaOpts();
+    const { conn, model, contextSize } = this.getOllamaOpts();
 
     this.extractAbort?.abort();
     this.extractAbort = new AbortController();
@@ -309,12 +375,14 @@ export class AiExtractPanel {
 
     try {
       const result = await extractTasksFromNoteStream(
-        url,
+        conn,
         model,
         this.noteContent,
         contextSize,
         {
           signal: this.extractAbort.signal,
+          scheduleContext: this.autoScheduleTime ? this.buildScheduleContext() : undefined,
+          onDelta: (_delta, full) => this.streamAnalysis(full),
           onProgress: (stage) => {
             if (stage === "connecting") {
               this.setAnalyzing(true, tRaw("ai.stages.connecting"));
@@ -476,7 +544,7 @@ export class AiExtractPanel {
       return;
     }
 
-    const { url, model, contextSize } = this.getOllamaOpts();
+    const { conn, model, contextSize } = this.getOllamaOpts();
     this.chatInputEl.value = "";
     this.isAsking = true;
     this.setAskEnabled(false);
@@ -495,7 +563,7 @@ export class AiExtractPanel {
 
     try {
       const result = await applyTasksInstruction(
-        url,
+        conn,
         model,
         question,
         this.tasks,
@@ -503,6 +571,7 @@ export class AiExtractPanel {
         this.distributeStartDate || undefined,
         {
           signal: this.askAbort.signal,
+          scheduleContext: this.buildScheduleContext(),
           onDelta: () => {
             // Keep a live pulse in the bubble while the model works
             if (bubbleEl) {
@@ -582,23 +651,37 @@ export class AiExtractPanel {
     for (const [dateStr, dayTasks] of byDate) {
       // Auto-fill scheduledTime only when toggle is on and task has no time
       if (this.autoScheduleTime) {
-        let nextMinutes = 9 * 60;
+        // Fill only what the model left unplaced, into real free windows of the day
+        const storeBusy: BusySlot[] = get(tasks)
+          .filter((t) => !t.completed && dateStrFromUID(t.dateUID) === dateStr)
+          .map((t) => ({
+            scheduledTime: t.scheduledTime,
+            endTime: t.endTime,
+            estimatedTime: t.estimatedTime,
+          }));
+        const placed: BusySlot[] = [];
         for (const task of dayTasks) {
           if (task.scheduledTime) {
-            const [h, m] = task.scheduledTime.split(":").map(Number);
-            const taskEnd = h * 60 + m + (task.estimatedMinutes ?? 60);
-            if (taskEnd > nextMinutes) nextMinutes = taskEnd;
             if (!task.endTime && task.estimatedMinutes) {
               task.endTime = computeEndTime(task.scheduledTime, task.estimatedMinutes);
             }
+            placed.push({
+              scheduledTime: task.scheduledTime,
+              endTime: task.endTime,
+              estimatedTime: task.estimatedMinutes,
+            });
           } else {
-            const h = Math.floor(nextMinutes / 60);
-            const m = nextMinutes % 60;
-            task.scheduledTime = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+            const slot = findFreeSlot([...storeBusy, ...placed], task.estimatedMinutes || 60);
+            if (!slot) continue; // day is full - leave the time for the user
+            task.scheduledTime = slot.scheduledTime;
             if (task.estimatedMinutes) {
               task.endTime = computeEndTime(task.scheduledTime, task.estimatedMinutes);
             }
-            nextMinutes += task.estimatedMinutes ?? 60;
+            placed.push({
+              scheduledTime: slot.scheduledTime,
+              endTime: task.endTime ?? slot.endTime,
+              estimatedTime: task.estimatedMinutes,
+            });
           }
         }
       }
@@ -735,6 +818,8 @@ export class AiExtractPanel {
 
         meta.createSpan({ text: "—", cls: "ai-task-time-sep" });
 
+        let estInputEl: HTMLInputElement | null = null;
+
         // End time input
         let endTimeValue = task.endTime || "";
         if (!endTimeValue && task.scheduledTime && task.estimatedMinutes) {
@@ -761,17 +846,44 @@ export class AiExtractPanel {
             const diff = (eh * 60 + em) - (sh * 60 + sm);
             if (diff > 0) {
               this.tasks[taskIdx].estimatedMinutes = diff;
+              if (estInputEl) estInputEl.value = formatEst(diff);
             }
           }
         });
         guardTyping(endTimeInput);
 
-        if (task.estimatedMinutes) {
-          const estH = Math.floor(task.estimatedMinutes / 60);
-          const estM = task.estimatedMinutes % 60;
-          const estLabel = estH > 0 ? `${estH}ч${estM > 0 ? ` ${estM}м` : ""}` : `${estM}м`;
-          meta.createSpan({ text: estLabel, cls: "ai-task-est" });
-        }
+        // One-click day-part picks for tasks the AI left unplaced
+        const dayPart = (label: string, time: string) => {
+          const chip = meta.createEl("button", {
+            cls: "ai-task-daypart",
+            text: label,
+            attr: { type: "button" },
+          });
+          chip.addEventListener("click", () => {
+            this.tasks[taskIdx].scheduledTime = time;
+            timeInput.value = time;
+            this.updateEndTime(taskIdx, endTimeInput);
+          });
+        };
+        dayPart(tRaw("ai.timeMorning"), "09:00");
+        dayPart(tRaw("ai.timeDay"), "14:00");
+        dayPart(tRaw("ai.timeEvening"), "18:00");
+
+        // Duration input ("2 h", "2 hours", "120") - keeps endTime in sync
+        estInputEl = meta.createEl("input", {
+          type: "text",
+          cls: "ai-task-time-input ai-task-est-input",
+          placeholder: tRaw("ai.estPlaceholder"),
+          value: task.estimatedMinutes ? formatEst(task.estimatedMinutes) : "",
+        });
+        estInputEl.addEventListener("change", () => {
+          const raw = (estInputEl?.value ?? "").trim();
+          const mins = /^\d+$/.test(raw) ? parseInt(raw, 10) : (parseDurationHint(raw) ?? 0);
+          this.tasks[taskIdx].estimatedMinutes = mins > 0 ? mins : undefined;
+          if (estInputEl && mins > 0) estInputEl.value = formatEst(mins);
+          this.updateEndTime(taskIdx, endTimeInput);
+        });
+        guardTyping(estInputEl);
 
         // Subtasks badge
         if (task.subtasks.length > 0) {

@@ -629,3 +629,42 @@ describe("extractBalancedJson", () => {
     expect(parsed.tasks).toHaveLength(1);
   });
 });
+
+describe("duration <-> endTime derivation", () => {
+  const base = {
+    title: "Meeting",
+    priority: "medium",
+    dayIndex: 1,
+    subtasks: [],
+    selected: true,
+  };
+
+  it("fills endTime from start + estimatedMinutes", () => {
+    const { tasks } = normalizeExtractedTasks({
+      tasks: [{ ...base, scheduledTime: "10:00", estimatedMinutes: 120 }],
+    } as never);
+    expect(tasks[0].endTime).toBe("12:00");
+  });
+
+  it("fills estimatedMinutes from start + endTime", () => {
+    const { tasks } = normalizeExtractedTasks({
+      tasks: [{ ...base, scheduledTime: "10:00", endTime: "11:30" }],
+    } as never);
+    expect(tasks[0].estimatedMinutes).toBe(90);
+  });
+
+  it("keeps an explicit endTime over the computed one", () => {
+    const { tasks } = normalizeExtractedTasks({
+      tasks: [{ ...base, scheduledTime: "10:00", endTime: "13:00", estimatedMinutes: 60 }],
+    } as never);
+    expect(tasks[0].endTime).toBe("13:00");
+    expect(tasks[0].estimatedMinutes).toBe(60);
+  });
+
+  it("leaves both empty when there is no start time", () => {
+    const { tasks } = normalizeExtractedTasks({
+      tasks: [{ ...base, estimatedMinutes: 120 }],
+    } as never);
+    expect(tasks[0].endTime).toBeUndefined();
+  });
+});

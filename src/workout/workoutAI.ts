@@ -1,4 +1,4 @@
-import { streamOllamaChat } from "../services/OllamaService";
+import { streamAiChat, type AiConnection } from "../services/aiProvider";
 import {
   isStaticTitle,
   type WorkoutDayPlan,
@@ -91,7 +91,7 @@ function buildUserPrompt(
 }
 
 export interface GenerateWorkoutPlanArgs {
-  url: string;
+  conn: AiConnection;
   model: string;
   profile: WorkoutProfile;
   location: WorkoutLocation;
@@ -104,8 +104,8 @@ export interface GenerateWorkoutPlanArgs {
 export async function generateWorkoutPlan(
   args: GenerateWorkoutPlanArgs,
 ): Promise<WorkoutPlan> {
-  const raw = await streamOllamaChat(
-    args.url,
+  const raw = await streamAiChat(
+    args.conn,
     args.model,
     [
       { role: "system", content: SYSTEM_PROMPT },
@@ -119,7 +119,7 @@ export async function generateWorkoutPlan(
         ),
       },
     ],
-    { temperature: args.temperature ?? 0.4 },
+    { temperature: args.temperature ?? 0.4, think: true },
   );
   return parseWorkoutPlan(raw, args.location, args.weeks, args.profile.daysOfWeek, args.lang || "en", {
     bodyweightOnly: isBodyweightOnly(args.profile.equipment),

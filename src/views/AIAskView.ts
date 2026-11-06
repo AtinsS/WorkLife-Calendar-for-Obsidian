@@ -1,4 +1,4 @@
-import { ItemView } from "obsidian";
+import { ItemView, MarkdownView } from "obsidian";
 import type { TFile } from "obsidian";
 import { VIEW_TYPE_AI_ASK } from "../constants";
 import { tRaw } from "../i18n";
@@ -55,12 +55,38 @@ export default class AIAskView extends ItemView {
     this.pendingSend = false;
   }
 
+  /** Make the picked note the chat context (conversation is kept). */
+  private followNote(file: TFile | null): void {
+    if (!file || file.extension !== "md") return;
+    if (this.pendingFiles?.length === 1 && this.pendingFiles[0].path === file.path) return;
+    this.pendingFiles = [file];
+    this.pendingLabel = file.basename;
+    this.chat?.setContext([file], file.basename);
+  }
+
   onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("ai-ask-view");
     this.chat = new AiAskChat(this.app, container, this.pendingFiles ?? undefined, this.pendingLabel);
+    this.chat.onContextChange = (files, label) => {
+      this.pendingFiles = files;
+      this.pendingLabel = label;
+    };
     this.chat.mount();
+    // The chat reads the note the user selects: switching tabs/notes in the main
+    // window makes that note the context (the header chip shows which one).
+    this.registerEvent(
+      this.app.workspace.on("active-leaf-change", (leaf) => {
+        const view = leaf?.view;
+        if (view instanceof MarkdownView) this.followNote(view.file);
+      }),
+    );
+    this.registerEvent(
+      this.app.workspace.on("file-open", (file) => {
+        this.followNote(file);
+      }),
+    );
     if (this.pendingSelection) {
       this.chat.setSelection(this.pendingSelection);
       this.pendingSelection = null;

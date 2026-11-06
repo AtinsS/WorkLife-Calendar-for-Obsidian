@@ -1,5 +1,6 @@
 import { get } from "svelte/store";
-import { streamOllamaChat, parseOllamaJson, resolveModel, type ModelRole } from "./OllamaService";
+import { parseOllamaJson, resolveModel, type ModelRole } from "./OllamaService";
+import { resolveAiConnection, streamAiChat, type AiConnection } from "./aiProvider";
 import { isDesktopAI } from "./aiQuickAdd";
 import { settings } from "../ui/stores";
 import {
@@ -101,7 +102,7 @@ export function buildFinanceSummary(input: {
   };
 }
 
-function ollamaOpts(role: ModelRole = "reason"): { url: string; model: string; enabled: boolean } {
+function ollamaOpts(role: ModelRole = "reason"): { conn: AiConnection; model: string; enabled: boolean } {
   const s = get(settings) as {
     ollamaEnabled?: boolean;
     ollamaUrl?: string;
@@ -111,12 +112,12 @@ function ollamaOpts(role: ModelRole = "reason"): { url: string; model: string; e
   };
   return {
     enabled: s.ollamaEnabled === true && isDesktopAI(),
-    url: s.ollamaUrl || "http://localhost:11434",
+    conn: resolveAiConnection(s),
     model: resolveModel(role, s),
   };
 }
 
-export function getFinanceAiConfig(): { url: string; model: string; enabled: boolean } {
+export function getFinanceAiConfig(): { conn: AiConnection; model: string; enabled: boolean } {
   return ollamaOpts("reason");
 }
 
@@ -141,7 +142,7 @@ export async function parseExpensesFromText(
   categories: ExpenseCategoryDef[],
   signal?: AbortSignal,
 ): Promise<ParsedExpense[]> {
-  const { url, model, enabled } = ollamaOpts("extract");
+  const { conn, model, enabled } = ollamaOpts("extract");
 
   const catList = categories.map((c) => `${c.id}=${c.name} ${c.icon}`).join(", ");
   const userContent = `Categories: ${catList}\n\nText:\n${text.slice(0, 8000)}`;
@@ -149,14 +150,14 @@ export async function parseExpensesFromText(
   let raw = "";
   if (enabled) {
     try {
-      raw = await streamOllamaChat(
-        url,
+      raw = await streamAiChat(
+        conn,
         model,
         [
           { role: "system", content: PARSE_SYSTEM },
           { role: "user", content: userContent },
         ],
-        { signal, temperature: 0.1 },
+        { signal, temperature: 0.1, think: false },
       );
     } catch {
       raw = "";
@@ -238,12 +239,12 @@ export async function forecastBalance(
   signal?: AbortSignal,
   onDelta?: (full: string) => void,
 ): Promise<string> {
-  const { url, model, enabled } = ollamaOpts("reason");
+  const { conn, model, enabled } = ollamaOpts("reason");
   if (!enabled) throw new Error("ollama-disabled");
 
   const payload = JSON.stringify(summary);
-  return streamOllamaChat(
-    url,
+  return streamAiChat(
+    conn,
     model,
     [
       { role: "system", content: FORECAST_SYSTEM },
@@ -252,6 +253,7 @@ export async function forecastBalance(
     {
       signal,
       temperature: 0.3,
+      think: false,
       onDelta: (_d, full) => onDelta?.(full),
     },
   );
@@ -274,17 +276,17 @@ export async function suggestDistribution(
   summary: FinanceSummary,
   signal?: AbortSignal,
 ): Promise<DistributionSuggestion> {
-  const { url, model, enabled } = ollamaOpts("reason");
+  const { conn, model, enabled } = ollamaOpts("reason");
   if (!enabled) throw new Error("ollama-disabled");
 
-  const raw = await streamOllamaChat(
-    url,
+  const raw = await streamAiChat(
+    conn,
     model,
     [
       { role: "system", content: RULES_SYSTEM },
       { role: "user", content: `Month snapshot:\n${JSON.stringify(summary)}` },
     ],
-    { signal, temperature: 0.2 },
+    { signal, temperature: 0.2, think: false },
   );
 
   const parsed = parseOllamaJson(raw) as {
@@ -332,17 +334,17 @@ export async function suggestMonthInsights(
   summary: FinanceSummary,
   signal?: AbortSignal,
 ): Promise<string> {
-  const { url, model, enabled } = ollamaOpts("reason");
+  const { conn, model, enabled } = ollamaOpts("reason");
   if (!enabled) throw new Error("ollama-disabled");
 
-  const raw = await streamOllamaChat(
-    url,
+  const raw = await streamAiChat(
+    conn,
     model,
     [
       { role: "system", content: INSIGHTS_SYSTEM },
       { role: "user", content: `Month snapshot:\n${JSON.stringify(summary)}` },
     ],
-    { signal, temperature: 0.4 },
+    { signal, temperature: 0.4, think: false },
   );
   return raw.trim();
 }

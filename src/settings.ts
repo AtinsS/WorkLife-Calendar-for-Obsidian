@@ -13,7 +13,12 @@ import {
 import type CalendarPlugin from "./main";
 import { fetchWeekWeather, getWeatherAttribution, type WeatherProvider } from "./services/weatherService";
 import { initLocale, tRaw } from "./i18n";
-import { testOllamaConnection, testOllamaModel } from "./services/OllamaService";
+import {
+  resolveAiConnection,
+  testAiConnection,
+  testAiModel,
+  type AiProviderId,
+} from "./services/aiProvider";
 import { normalizeSummaryStyle, summaryStyleDesc } from "./services/summaryStyle";
 import { checkForPluginUpdate, fetchLatestRelease, updatePluginNow, compareVersions, pluginUpdateInfo } from "./services/updateCheck";
 import {
@@ -212,10 +217,17 @@ export interface ISettings {
   showStatusBar: boolean;
   dtwShowOnAllPages: boolean;
 
-  // Ollama AI settings
+  // AI settings (Ollama / LM Studio)
   ollamaEnabled: boolean;
+  /** Active AI backend. "ollama" (default) or "lmstudio" (OpenAI-compatible API). */
+  aiProvider?: "ollama" | "lmstudio";
   ollamaUrl: string;
   ollamaModel: string;
+  /** LM Studio base URL, OpenAI-compatible (typically http://localhost:1234/v1). */
+  lmstudioUrl: string;
+  lmstudioModel: string;
+  /** Model for structured extraction on LM Studio. Used only in "dual" mode. */
+  lmstudioModelExtract?: string;
   /** "single" — one model for all roles; "dual" — separate model for structured extraction. */
   ollamaModelMode?: "single" | "dual";
   /** Model for structured extraction (JSON parsing). Used only in "dual" mode. */
@@ -225,6 +237,8 @@ export interface ISettings {
   aiExtractEnabled: boolean;
   /** Живой чат «Задать вопрос ИИ» */
   aiChatEnabled?: boolean;
+  /** Model reasoning (thinking) in AI chat: requested on/off and shown live. */
+  aiChatThinking?: boolean;
   /** Саммари заметок (ПКМ → папка / выделение) */
   aiSummaryEnabled: boolean;
   /** Разбить задачу на подзадачи (ПКМ → задача) */
@@ -366,15 +380,20 @@ export const defaultSettings = Object.freeze({
   showStatusBar: true,
   dtwShowOnAllPages: false,
 
-  // Ollama AI defaults
+  // AI defaults (Ollama / LM Studio)
   ollamaEnabled: false,
+  aiProvider: "ollama" as const,
   ollamaUrl: "http://localhost:11434",
   ollamaModel: "llama3.1",
+  lmstudioUrl: "http://localhost:1234/v1",
+  lmstudioModel: "",
+  lmstudioModelExtract: "",
   ollamaModelMode: "single" as const,
   ollamaModelExtract: "",
   ollamaContextSize: 0,
   aiExtractEnabled: true,
   aiChatEnabled: true,
+  aiChatThinking: false,
   aiChatStyle: "open" as const,
   aiWebSearchEnabled: true,
   aiSummaryEnabled: true,
@@ -2808,6 +2827,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
     if (!this.plugin.options.ollamaEnabled) {
       this.note(power, tRaw("settings.ai.howToSteps"));
+      this.note(power, tRaw("settings.ai.howToStepsLmstudio"));
       return;
     }
 
@@ -2817,36 +2837,63 @@ export class CalendarSettingsTab extends PluginSettingTab {
       icon: "plug",
     });
 
+    const provider: AiProviderId =
+      this.plugin.options.aiProvider === "lmstudio" ? "lmstudio" : "ollama";
+    const isLmstudio = provider === "lmstudio";
+
+    new Setting(connection)
+      .setName(tRaw("settings.ai.provider"))
+      .setDesc(tRaw("settings.ai.providerDesc"))
+      .addDropdown((dropdown) => {
+        dropdown.addOption("ollama", tRaw("settings.ai.providerOllama"));
+        dropdown.addOption("lmstudio", tRaw("settings.ai.providerLmstudio"));
+        dropdown.setValue(provider);
+        dropdown.onChange(async (value) => {
+          await this.plugin.writeOptions({
+            aiProvider: value === "lmstudio" ? "lmstudio" : "ollama",
+          });
+          this.render();
+        });
+      });
+
     new Setting(connection)
       .setName(tRaw("settings.ai.url"))
-      .setDesc(tRaw("settings.ai.urlDesc"))
+      .setDesc(isLmstudio ? tRaw("settings.ai.urlDescLmstudio") : tRaw("settings.ai.urlDesc"))
       .addText((text) => {
         text
-          .setPlaceholder(tRaw("settings.ai.urlPlaceholder"))
-          .setValue(this.plugin.options.ollamaUrl || "http://localhost:11434")
+          .setPlaceholder(isLmstudio ? "http://localhost:1234/v1" : "http://localhost:11434")
+          .setValue(
+            isLmstudio
+              ? this.plugin.options.lmstudioUrl || "http://localhost:1234/v1"
+              : this.plugin.options.ollamaUrl || "http://localhost:11434",
+          )
           .onChange(async (value) => {
-            await this.plugin.writeOptions({ ollamaUrl: value });
+            await this.plugin.writeOptions(isLmstudio ? { lmstudioUrl: value } : { ollamaUrl: value });
           });
         text.inputEl.addClass("mcp-input-xl");
       });
 
-    new Setting(connection)
-      .setName(tRaw("settings.ai.contextSize"))
-      .setDesc(tRaw("settings.ai.contextSizeDesc"))
-      .addText((text) => {
-        text
-          .setPlaceholder("0")
-          .setValue(String(this.plugin.options.ollamaContextSize || 0))
-          .onChange(async (value) => {
-            const num = parseInt(value);
-            if (!isNaN(num) && num >= 0) {
-              await this.plugin.writeOptions({ ollamaContextSize: num });
-            }
-          });
-        text.inputEl.type = "number";
-        text.inputEl.min = "0";
-        text.inputEl.addClass("mcp-input-md");
-      });
+    if (!isLmstudio) {
+      new Setting(connection)
+        .setName(tRaw("settings.ai.contextSize"))
+        .setDesc(tRaw("settings.ai.contextSizeDesc"))
+        .addText((text) => {
+          text
+            .setPlaceholder("0")
+            .setValue(String(this.plugin.options.ollamaContextSize || 0))
+            .onChange(async (value) => {
+              const num = parseInt(value);
+              if (!isNaN(num) && num >= 0) {
+                await this.plugin.writeOptions({ ollamaContextSize: num });
+              }
+            });
+          text.inputEl.type = "number";
+          text.inputEl.min = "0";
+          text.inputEl.addClass("mcp-input-md");
+        });
+    } else {
+      this.note(connection, tRaw("settings.ai.contextSizeLmstudio"));
+    }
 
     const btnRow = connection.createDiv({ cls: "mcp-btn-row" });
     this.addTestConnectionButton(btnRow);
@@ -2879,8 +2926,12 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addModelPicker(models, {
       name: tRaw("settings.ai.model"),
       desc: tRaw("settings.ai.modelDesc"),
-      getValue: () => this.plugin.options.ollamaModel || "llama3.1",
-      setValue: (v) => this.plugin.writeOptions({ ollamaModel: v }),
+      getValue: () =>
+        isLmstudio
+          ? this.plugin.options.lmstudioModel || ""
+          : this.plugin.options.ollamaModel || "llama3.1",
+      setValue: (v) =>
+        this.plugin.writeOptions(isLmstudio ? { lmstudioModel: v } : { ollamaModel: v }),
     });
 
     // Extract model — only in dual mode
@@ -2888,8 +2939,14 @@ export class CalendarSettingsTab extends PluginSettingTab {
       this.addModelPicker(models, {
         name: tRaw("settings.ai.modelExtract"),
         desc: tRaw("settings.ai.modelExtractDesc"),
-        getValue: () => this.plugin.options.ollamaModelExtract || "",
-        setValue: (v) => this.plugin.writeOptions({ ollamaModelExtract: v }),
+        getValue: () =>
+          isLmstudio
+            ? this.plugin.options.lmstudioModelExtract || ""
+            : this.plugin.options.ollamaModelExtract || "",
+        setValue: (v) =>
+          this.plugin.writeOptions(
+            isLmstudio ? { lmstudioModelExtract: v } : { ollamaModelExtract: v },
+          ),
         emptyLabel: tRaw("settings.ai.modelExtractSame"),
       });
     }
@@ -3038,7 +3095,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     this.addCompactToggle(actionsSchedule, "aiScheduleActionsEnabled", "scheduleActionsEnabled", "scheduleActionsEnabledDesc");
 
     // ── 5. Privacy ───────────────────────────────────────────────────────
-    const url = (this.plugin.options.ollamaUrl || "http://localhost:11434").toLowerCase();
+    const url = resolveAiConnection(this.plugin.options).url.toLowerCase();
     const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
     const privacy = this.section(container, {
       title: tRaw("settings.ai.sectionPrivacy"),
@@ -3056,11 +3113,15 @@ export class CalendarSettingsTab extends PluginSettingTab {
       title: tRaw("settings.ai.howToTitle"),
       icon: "help-circle",
     });
-    this.note(howToCard, tRaw("settings.ai.howToSteps"));
+    this.note(
+      howToCard,
+      isLmstudio ? tRaw("settings.ai.howToStepsLmstudio") : tRaw("settings.ai.howToSteps"),
+    );
   }
 
   /** Chat identity + tone — lives under AI settings (moved from General). */
   private addChatSettings(container: HTMLElement): void {
+
     new Setting(container)
       .setName(tRaw("settings.general.aiName"))
       .setDesc(tRaw("settings.general.aiNameDesc"))
@@ -3187,8 +3248,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
       void (async () => {
         findBtn.disabled = true;
         findBtn.textContent = tRaw("settings.ai.finding");
-        const url = this.plugin.options.ollamaUrl || "http://localhost:11434";
-        const result = await testOllamaConnection(url);
+        const conn = resolveAiConnection(this.plugin.options);
+        const result = await testAiConnection(conn);
         findBtn.disabled = false;
         findBtn.textContent = tRaw("settings.ai.findModels");
         if (result.ok && result.models && result.models.length > 0) {
@@ -3207,8 +3268,8 @@ export class CalendarSettingsTab extends PluginSettingTab {
         testBtn.textContent = tRaw("settings.ai.checking");
         testBtn.removeClass("mcp-color-success", "mcp-color-danger");
 
-        const url = this.plugin.options.ollamaUrl || "http://localhost:11434";
-        const result = await testOllamaConnection(url);
+        const conn = resolveAiConnection(this.plugin.options);
+        const result = await testAiConnection(conn);
 
         if (result.ok && result.models) {
           const modelCount = result.models.length;
@@ -3216,7 +3277,11 @@ export class CalendarSettingsTab extends PluginSettingTab {
             testBtn.textContent = tRaw("settings.ai.modelsFound", { count: String(modelCount) });
             testBtn.addClass("mcp-color-success");
           } else {
-            testBtn.textContent = tRaw("settings.ai.noModels");
+            testBtn.textContent = tRaw(
+              resolveAiConnection(this.plugin.options).provider === "lmstudio"
+                ? "settings.ai.noModelsLmstudio"
+                : "settings.ai.noModels",
+            );
             testBtn.addClass("mcp-color-danger");
           }
         } else {
@@ -3242,10 +3307,9 @@ export class CalendarSettingsTab extends PluginSettingTab {
         aiTestBtn.textContent = tRaw("settings.ai.testing");
         aiTestBtn.removeClass("mcp-color-success", "mcp-color-danger");
 
-        const url = this.plugin.options.ollamaUrl || "http://localhost:11434";
         const { resolveModel } = await import("./services/OllamaService");
         const model = resolveModel("reason", this.plugin.options);
-        const result = await testOllamaModel(url, model);
+        const result = await testAiModel(resolveAiConnection(this.plugin.options), model);
 
         if (result.ok) {
           aiTestBtn.textContent = `✓ ${result.model}: "${(result.response || "").slice(0, 60)}"`;

@@ -6,6 +6,7 @@ import { tRaw, tArrayRaw, locale } from "../i18n";
 import { settings } from "../ui/stores";
 import { projects } from "../task-tracker/stores";
 import { resolveModel } from "../services/OllamaService";
+import { resolveAiConnection } from "../services/aiProvider";
 import { errorMessage } from "../utils/sanitize";
 import {
   defaultWorkoutProfile,
@@ -398,7 +399,7 @@ export class WorkoutPlanModal extends CustomModal {
     }
     try {
       const plan = await generateWorkoutPlan({
-        url: opts.ollamaUrl || "http://localhost:11434",
+        conn: resolveAiConnection(opts),
         model: resolveModel("reason", opts),
         profile: this.profile,
         location: this.profile.location,
