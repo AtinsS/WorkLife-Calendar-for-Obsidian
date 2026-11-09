@@ -225,6 +225,9 @@ export interface DayWeather {
   weatherCode: number;
   icon: string;
   label: string;
+  /** "HH:MM" local — provided by open-meteo, used for the sun arc. */
+  sunrise?: string;
+  sunset?: string;
 }
 
 export interface HourlyWeather {
@@ -589,7 +592,7 @@ async function fetchDayDetailVisualCrossing(
 async function fetchOpenMeteo(
   lat: number, lon: number, startDate: string, endDate: string
 ): Promise<DayWeather[]> {
-  const path = `/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&start_date=${startDate}&end_date=${endDate}&timezone=auto`;
+  const path = `/v1/forecast?latitude=${lat}&longitude=${lon}&current=weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset&start_date=${startDate}&end_date=${endDate}&timezone=auto`;
   const response = await requestOpenMeteo(path);
   const json = response.json as OpenMeteoResponse;
   if (!json?.daily?.time) return [];
@@ -620,6 +623,8 @@ async function fetchOpenMeteo(
       weatherCode: code,
       icon: info.icon,
       label: info.label,
+      sunrise: daily.sunrise?.[i] ? String(daily.sunrise[i]).slice(11, 16) : undefined,
+      sunset: daily.sunset?.[i] ? String(daily.sunset[i]).slice(11, 16) : undefined,
     });
   }
   return results;

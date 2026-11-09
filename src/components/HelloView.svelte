@@ -4,6 +4,14 @@
   import type { App } from "obsidian";
   import { settings } from "../ui/stores";
   import { fetchWeekWeather, type DayWeather } from "../services/weatherService";
+  import { sunArcPosition } from "../utils/sunPosition";
+  import {
+    makeRainLayers,
+    makeSnowLayers,
+    makeClouds,
+    makeFog,
+    LAYER_NAMES,
+  } from "../utils/weatherParticles";
   import { t, tArray } from "../i18n";
   import { weightData } from "../weight/stores";
   import { latestWeight } from "../weight/stats";
@@ -272,75 +280,12 @@
     return "";
   })();
 
-  // ── Stable particle fields (seeded once per scene, not on every re-render) ──
-  type Particle = {
-    left: number;
-    delay: number;
-    duration: number;
-    opacity: number;
-    size: number;
-    drift: number;
-  };
-
-  function mulberry32(seed: number) {
-    return () => {
-      let t = (seed += 0x6d2b79f5);
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-
-  function makeRain(count: number, heavy = false): Particle[] {
-    const rnd = mulberry32(heavy ? 0x51fa : 0x2c81);
-    return Array.from({ length: count }, () => ({
-      left: rnd() * 100,
-      delay: rnd() * (heavy ? 1.4 : 2.4),
-      duration: heavy ? 0.32 + rnd() * 0.38 : 0.55 + rnd() * 0.65,
-      opacity: 0.3 + rnd() * 0.55,
-      size: heavy ? 2.1 + rnd() * 1.3 : 1.1 + rnd() * 1.2,
-      drift: 6 + rnd() * 16,
-    }));
-  }
-
-  function makeSnow(count: number): Particle[] {
-    const rnd = mulberry32(0x7e11);
-    return Array.from({ length: count }, () => ({
-      left: rnd() * 100,
-      delay: rnd() * 5.5,
-      duration: 3.2 + rnd() * 4.2,
-      opacity: 0.35 + rnd() * 0.5,
-      size: 3.5 + rnd() * 7,
-      drift: (rnd() - 0.5) * 48,
-    }));
-  }
-
-  function makeClouds(count: number): Particle[] {
-    const rnd = mulberry32(0x3a09);
-    return Array.from({ length: count }, () => ({
-      left: rnd() * 70,
-      delay: rnd() * 18,
-      duration: 28 + rnd() * 22,
-      opacity: 0.14 + rnd() * 0.18,
-      size: 140 + rnd() * 140,
-      drift: 0,
-    }));
-  }
-
-  function makeFog(count: number): Particle[] {
-    const rnd = mulberry32(0x1f55);
-    return Array.from({ length: count }, () => ({
-      left: rnd() * 60,
-      delay: rnd() * 10,
-      duration: 16 + rnd() * 14,
-      opacity: 0.1 + rnd() * 0.14,
-      size: 180 + rnd() * 160,
-      drift: 0,
-    }));
-  }
-
-  $: rainDrops = weatherAnim === "weather-storm" ? makeRain(56, true) : makeRain(36, false);
-  $: snowflakes = makeSnow(44);
+  // ── Particle fields come from utils/weatherParticles (seeded, layered) ──
+  $: rainLayers = makeRainLayers(
+    weatherAnim === "weather-storm" ? 56 : 36,
+    weatherAnim === "weather-storm",
+  );
+  $: snowLayers = makeSnowLayers(44);
   $: cloudPuffs =
     weatherAnim === "weather-partly"
       ? makeClouds(3)
@@ -351,6 +296,9 @@
           : [];
   $: fogPuffs = weatherAnim === "weather-fog" ? makeFog(6) : [];
 
+  // Sun rides a time-driven arc (sunrise → noon apex → sunset)
+  $: sunPos = sunArcPosition(weather?.sunrise || "06:00", weather?.sunset || "20:00", now.toDate());
+
 </script>
 
 <div class="hello">
@@ -358,20 +306,29 @@
   {#if weatherAnim}
     <div class="hello-weather {weatherAnim}" aria-hidden="true">
       {#if weatherAnim === "weather-rain" || weatherAnim === "weather-storm"}
-        {#each rainDrops as d, i (i)}
-          <i
-            class="wx-drop"
-            class:is-heavy={weatherAnim === "weather-storm"}
-            style="left:{d.left}%;--fall-dur:{d.duration}s;--fall-delay:-{d.delay}s;--fall-op:{d.opacity};--drop-w:{d.size}px;--drift:{d.drift}px"
-          ></i>
+        {#each rainLayers as drops, li (li)}
+          <div class="wx-layer wx-layer--{LAYER_NAMES[li]}">
+            {#each drops as d, i (i)}
+              <i
+                class="wx-drop"
+                class:is-heavy={weatherAnim === "weather-storm"}
+                style="left:{d.left}%;--fall-dur:{d.duration}s;--fall-delay:-{d.delay}s;--fall-op:{d.opacity};--drop-w:{d.size}px;--drift:{d.drift}px"
+              ></i>
+            {/each}
+          </div>
         {/each}
         {#if weatherAnim === "weather-storm"}
           <div class="wx-lightning"></div>
           <div class="wx-lightning wx-lightning--delayed"></div>
         {/if}
       {:else if weatherAnim === "weather-partly"}
-        <div class="sun sun--minimal">
+        <div
+          class="sun sun--minimal"
+          class:sun-hidden={!sunPos.visible}
+          style="left:{sunPos.left}%;top:{sunPos.top}%"
+        >
           <div class="sun-glow"></div>
+          <div class="sun-rays"></div>
           <div class="sun-disc"></div>
         </div>
         {#each cloudPuffs as c, i (i)}
@@ -395,7 +352,6 @@
           ></div>
         {/each}
       {:else if weatherAnim === "weather-gloom"}
-        <div class="gloom-overlay"></div>
         {#each cloudPuffs as c, i (i)}
           <div
             class="wx-cloud"
@@ -403,15 +359,24 @@
           ></div>
         {/each}
       {:else if weatherAnim === "weather-snow"}
-        {#each snowflakes as s, i (i)}
-          <i
-            class="wx-flake"
-            style="left:{s.left}%;width:{s.size}px;height:{s.size}px;--fall-dur:{s.duration}s;--fall-delay:-{s.delay}s;--fall-op:{s.opacity};--drift:{s.drift}px"
-          ></i>
+        {#each snowLayers as flakes, li (li)}
+          <div class="wx-layer wx-layer--{LAYER_NAMES[li]}">
+            {#each flakes as s, i (i)}
+              <i
+                class="wx-flake"
+                style="left:{s.left}%;width:{s.size}px;height:{s.size}px;--fall-dur:{s.duration}s;--fall-delay:-{s.delay}s;--fall-op:{s.opacity};--drift:{s.drift}px"
+              ></i>
+            {/each}
+          </div>
         {/each}
       {:else if weatherAnim === "weather-sun"}
-        <div class="sun sun--minimal">
+        <div
+          class="sun sun--minimal"
+          class:sun-hidden={!sunPos.visible}
+          style="left:{sunPos.left}%;top:{sunPos.top}%"
+        >
           <div class="sun-glow"></div>
+          <div class="sun-rays"></div>
           <div class="sun-disc"></div>
         </div>
       {/if}
@@ -502,12 +467,68 @@
 
   .hello > *:not(.hello-weather) { position: relative; z-index: 1; }
 
+  /* Depth layers — far/mid/near fall at different speeds; each layer
+     carries its own gust (skew) and squall (intensity wave) so the
+     scene breathes instead of looping like a music box. */
+  .wx-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .wx-layer--far {
+    animation:
+      wx-gust-far 34s ease-in-out infinite,
+      wx-squall-far 27s ease-in-out infinite;
+  }
+  .wx-layer--mid {
+    animation:
+      wx-gust-mid 26s ease-in-out -7s infinite,
+      wx-squall-mid 19s ease-in-out -3s infinite;
+  }
+  .wx-layer--near {
+    animation:
+      wx-gust-near 19s ease-in-out -2s infinite,
+      wx-squall-near 14s ease-in-out -9s infinite;
+  }
+
+  @keyframes wx-gust-far {
+    0%, 100% { transform: skewX(-6deg); }
+    38% { transform: skewX(-13deg); }
+    71% { transform: skewX(-3deg); }
+  }
+  @keyframes wx-gust-mid {
+    0%, 100% { transform: skewX(-9deg); }
+    36% { transform: skewX(-18deg); }
+    70% { transform: skewX(-5deg); }
+  }
+  @keyframes wx-gust-near {
+    0%, 100% { transform: skewX(-12deg); }
+    33% { transform: skewX(-24deg); }
+    68% { transform: skewX(-7deg); }
+  }
+  @keyframes wx-squall-far {
+    0%, 100% { opacity: 0.55; }
+    42% { opacity: 1; }
+    77% { opacity: 0.68; }
+  }
+  @keyframes wx-squall-mid {
+    0%, 100% { opacity: 0.72; }
+    34% { opacity: 1; }
+    66% { opacity: 0.58; }
+  }
+  @keyframes wx-squall-near {
+    0%, 100% { opacity: 0.85; }
+    30% { opacity: 1; }
+    61% { opacity: 0.52; }
+  }
+
   /* Rain — container-relative fall via top% (transform % is self-relative and breaks) */
   .wx-drop {
     position: absolute;
     top: -6%;
     width: var(--drop-w, 1.6px);
-    height: 22px;
+    height: var(--drop-h, 18px);
     border-radius: 999px;
     background: linear-gradient(
       180deg,
@@ -520,8 +541,17 @@
     animation: wx-fall var(--fall-dur, 1s) linear var(--fall-delay, 0s) infinite;
     will-change: top, transform, opacity;
   }
+  .wx-layer--far .wx-drop {
+    --drop-h: 11px;
+    filter: blur(0.4px);
+  }
+  .wx-layer--mid .wx-drop {
+    --drop-h: 19px;
+  }
+  .wx-layer--near .wx-drop {
+    --drop-h: 30px;
+  }
   .wx-drop.is-heavy {
-    height: 30px;
     background: linear-gradient(
       180deg,
       transparent 0%,
@@ -529,6 +559,9 @@
       rgba(145, 190, 255, 0.7) 100%
     );
     box-shadow: 0 0 8px rgba(130, 180, 255, 0.28);
+  }
+  .wx-layer--near .wx-drop.is-heavy {
+    --drop-h: 42px;
   }
 
   @keyframes wx-fall {
@@ -538,16 +571,19 @@
     100% { top: 108%; transform: translateX(var(--drift, 10px)) scaleY(1.15); opacity: 0; }
   }
 
-  /* Clouds — multi-blob soft mass */
+  /* Clouds — cumulus silhouette: bumpy lobes on top, flatter base.
+     No border-radius clip — that read as a flying oval. */
   .wx-cloud {
     position: absolute;
-    height: 56px;
-    border-radius: 50%;
+    height: 68px;
     background:
-      radial-gradient(ellipse 58% 62% at 28% 55%, rgba(220, 232, 245, 0.32) 0%, transparent 72%),
-      radial-gradient(ellipse 52% 58% at 54% 42%, rgba(210, 224, 240, 0.26) 0%, transparent 74%),
-      radial-gradient(ellipse 48% 52% at 78% 58%, rgba(200, 216, 235, 0.2) 0%, transparent 76%);
-    filter: blur(14px);
+      radial-gradient(ellipse 24% 58% at 16% 60%, rgba(222, 234, 245, 0.32) 0%, transparent 72%),
+      radial-gradient(ellipse 28% 86% at 36% 40%, rgba(230, 240, 250, 0.4) 0%, transparent 70%),
+      radial-gradient(ellipse 24% 70% at 54% 32%, rgba(234, 243, 251, 0.44) 0%, transparent 70%),
+      radial-gradient(ellipse 22% 56% at 72% 50%, rgba(226, 237, 247, 0.34) 0%, transparent 72%),
+      radial-gradient(ellipse 17% 42% at 87% 62%, rgba(220, 232, 244, 0.26) 0%, transparent 74%),
+      linear-gradient(180deg, transparent 32%, rgba(224, 236, 247, 0.28) 46%, rgba(214, 228, 242, 0.24) 76%, transparent 88%);
+    filter: blur(12px);
     animation: wx-cloud-drift var(--cloud-dur, 32s) linear var(--cloud-delay, 0s) infinite;
     will-change: left;
   }
@@ -582,38 +618,35 @@
     background: linear-gradient(180deg, rgba(160, 175, 190, 0.07) 0%, rgba(145, 160, 175, 0.03) 100%);
   }
 
-  /* Gloom */
-  .gloom-overlay {
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse at 50% 0%, rgba(35, 40, 55, 0.16) 0%, transparent 70%),
-      linear-gradient(180deg, rgba(40, 42, 55, 0.1) 0%, rgba(50, 52, 65, 0.05) 100%);
-  }
-
-  /* Snow — soft glowing flakes */
+  /* Snow — matte flakes (no glow) that sway while falling */
   .wx-flake {
     position: absolute;
     top: -4%;
     border-radius: 50%;
     background: radial-gradient(
       circle at 35% 32%,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(230, 240, 255, 0.65) 45%,
-      rgba(200, 220, 250, 0.25) 100%
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(232, 240, 250, 0.58) 52%,
+      rgba(214, 228, 245, 0.2) 100%
     );
-    box-shadow:
-      0 0 6px rgba(210, 230, 255, 0.35),
-      0 0 16px rgba(180, 210, 255, 0.16);
     animation: wx-snow var(--fall-dur, 5s) linear var(--fall-delay, 0s) infinite;
     will-change: top, transform;
+  }
+  .wx-layer--far .wx-flake {
+    filter: blur(0.5px);
+  }
+  .wx-layer--near .wx-flake {
+    filter: blur(1px);
   }
 
   @keyframes wx-snow {
     0%   { top: -4%; transform: translateX(0) rotate(0deg); opacity: 0; }
-    10%  { opacity: var(--fall-op, 0.7); }
-    88%  { opacity: calc(var(--fall-op, 0.7) * 0.8); }
-    100% { top: 108%; transform: translateX(var(--drift, 18px)) rotate(320deg); opacity: 0; }
+    8%   { opacity: var(--fall-op, 0.7); }
+    25%  { transform: translateX(calc(var(--drift, 18px) * 0.55)) rotate(70deg); }
+    50%  { transform: translateX(calc(var(--drift, 18px) * -0.3)) rotate(150deg); }
+    75%  { transform: translateX(calc(var(--drift, 18px) * 0.85)) rotate(230deg); }
+    90%  { opacity: calc(var(--fall-op, 0.7) * 0.72); }
+    100% { top: 108%; transform: translateX(calc(var(--drift, 18px) * 0.2)) rotate(320deg); opacity: 0; }
   }
 
   .weather-snow {
@@ -654,34 +687,62 @@
     92% { opacity: 0; }
   }
 
-  /* Sun — quiet, minimal: soft glow + matte disc (no rays / spin) */
+  /* Sun — quiet, minimal: soft glow + matte disc (no rays / spin).
+     Position is driven by sunPos (time-of-day arc), background stays transparent. */
   .sun {
     position: absolute;
-    top: -12px;
-    right: 6%;
+    left: 50%;
+    top: 30%;
     width: 200px;
     height: 200px;
+    margin: -100px 0 0 -100px;
     pointer-events: none;
     --sun-size: 40px;
+    transition: left 1.6s linear, top 1.6s linear, opacity 1.2s ease;
+    opacity: 1;
+  }
+
+  .sun.sun-hidden {
+    opacity: 0;
   }
 
   .sun--minimal {
     --sun-size: 36px;
   }
 
+  /* Atmospheric halo — wide warm scattering, not a tight ring */
   .sun-glow {
     position: absolute;
-    inset: 18%;
+    inset: 0;
     border-radius: 50%;
     background: radial-gradient(
       circle,
-      rgba(255, 200, 120, 0.14) 0%,
-      rgba(255, 185, 100, 0.06) 40%,
-      transparent 70%
+      rgba(255, 214, 150, 0.3) 0%,
+      rgba(255, 196, 120, 0.17) 16%,
+      rgba(255, 182, 104, 0.08) 36%,
+      rgba(255, 172, 96, 0.035) 56%,
+      transparent 74%
     );
-    filter: blur(16px);
+    filter: blur(10px);
   }
 
+  /* Whisper ray hints — diffraction spokes, very low contrast, no spin */
+  .sun-rays {
+    position: absolute;
+    inset: -18%;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+      from 0deg,
+      rgba(255, 212, 152, 0.075) 0deg 3.2deg,
+      transparent 3.2deg 22.5deg
+    );
+    -webkit-mask-image: radial-gradient(circle, #000 6%, transparent 62%);
+    mask-image: radial-gradient(circle, #000 6%, transparent 62%);
+    filter: blur(3px);
+    animation: sun-rays-breathe 12s ease-in-out infinite;
+  }
+
+  /* Soft-edged disc — light source falloff, never a solid ball */
   .sun-disc {
     position: absolute;
     top: 50%;
@@ -691,12 +752,16 @@
     transform: translate(-50%, -50%);
     border-radius: 50%;
     background: radial-gradient(
-      circle at 40% 36%,
-      rgba(255, 236, 190, 0.72) 0%,
-      rgba(255, 214, 140, 0.58) 45%,
-      rgba(255, 190, 110, 0.42) 100%
+      circle at 42% 38%,
+      rgba(255, 244, 214, 0.82) 0%,
+      rgba(255, 228, 172, 0.52) 32%,
+      rgba(255, 208, 142, 0.24) 58%,
+      rgba(255, 192, 122, 0.09) 78%,
+      transparent 92%
     );
-    box-shadow: 0 0 24px rgba(255, 195, 115, 0.12);
+    box-shadow:
+      0 0 30px rgba(255, 202, 132, 0.2),
+      0 0 72px rgba(255, 190, 112, 0.11);
     animation: sun-breathe 12s ease-in-out infinite;
   }
 
@@ -709,6 +774,11 @@
       transform: translate(-50%, -50%) scale(1.02);
       opacity: 1;
     }
+  }
+
+  @keyframes sun-rays-breathe {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
   }
 
   /* ═══ HERO ═══════════════════════════════ */
@@ -736,7 +806,7 @@
     padding: 5px 12px 5px 8px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: none;
     box-shadow:
       0 1px 2px rgba(0, 0, 0, 0.06),
       0 4px 16px rgba(0, 0, 0, 0.08),
@@ -744,11 +814,10 @@
       0 0 56px rgba(160, 190, 255, 0.04);
     backdrop-filter: blur(10px) saturate(1.15);
     -webkit-backdrop-filter: blur(10px) saturate(1.15);
-    transition: border-color 0.2s ease, box-shadow 0.25s ease;
+    transition: box-shadow 0.25s ease;
   }
 
   .hello-weather-card:hover {
-    border-color: rgba(255, 255, 255, 0.18);
     box-shadow:
       0 2px 6px rgba(0, 0, 0, 0.08),
       0 8px 28px rgba(0, 0, 0, 0.1),

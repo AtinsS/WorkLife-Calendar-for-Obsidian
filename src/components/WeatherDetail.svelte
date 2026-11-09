@@ -1,6 +1,14 @@
 <script lang="ts">
   import { settings } from "../ui/stores";
   import { fetchDayDetail, type DayWeatherDetail, getWeatherAttribution } from "../services/weatherService";
+import {
+  makeRainLayers,
+  makeSnowLayers,
+  makeClouds,
+  makeFog,
+  LAYER_NAMES,
+  EMPTY_LAYERS,
+} from "../utils/weatherParticles";
   import { t } from "../i18n";
 
   export let date = "";
@@ -89,82 +97,16 @@
     return "wd-clear";
   }
 
-  // ── Stable particle fields ──
-  type Particle = {
-    left: number;
-    delay: number;
-    duration: number;
-    opacity: number;
-    size: number;
-    drift: number;
-  };
-
-  function mulberry32(seed: number) {
-    return () => {
-      let t = (seed += 0x6d2b79f5);
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-
-  function makeRain(count: number, heavy = false): Particle[] {
-    const rnd = mulberry32(heavy ? 0x51fa : 0x2c81);
-    return Array.from({ length: count }, () => ({
-      left: rnd() * 100,
-      delay: rnd() * (heavy ? 1.4 : 2.4),
-      duration: heavy ? 0.32 + rnd() * 0.38 : 0.55 + rnd() * 0.65,
-      opacity: 0.3 + rnd() * 0.55,
-      size: heavy ? 2.1 + rnd() * 1.3 : 1.1 + rnd() * 1.2,
-      drift: 6 + rnd() * 16,
-    }));
-  }
-
-  function makeSnow(count: number): Particle[] {
-    const rnd = mulberry32(0x7e11);
-    return Array.from({ length: count }, () => ({
-      left: rnd() * 100,
-      delay: rnd() * 5.5,
-      duration: 3.2 + rnd() * 4.2,
-      opacity: 0.35 + rnd() * 0.5,
-      size: 3.5 + rnd() * 7,
-      drift: (rnd() - 0.5) * 48,
-    }));
-  }
-
-  function makeClouds(count: number): Particle[] {
-    const rnd = mulberry32(0x3a09);
-    return Array.from({ length: count }, () => ({
-      left: rnd() * 70,
-      delay: rnd() * 18,
-      duration: 28 + rnd() * 22,
-      opacity: 0.16 + rnd() * 0.2,
-      size: 160 + rnd() * 160,
-      drift: 0,
-    }));
-  }
-
-  function makeFog(count: number): Particle[] {
-    const rnd = mulberry32(0x1f55);
-    return Array.from({ length: count }, () => ({
-      left: rnd() * 60,
-      delay: rnd() * 10,
-      duration: 16 + rnd() * 14,
-      opacity: 0.12 + rnd() * 0.16,
-      size: 200 + rnd() * 180,
-      drift: 0,
-    }));
-  }
-
-  $: rainDrops =
+  // ── Particle fields come from utils/weatherParticles (seeded, layered) ──
+  $: rainLayers =
     weatherClass === "wd-storm"
-      ? makeRain(52, true)
+      ? makeRainLayers(52, true)
       : weatherClass === "wd-rain"
-        ? makeRain(38, false)
+        ? makeRainLayers(38, false)
         : weatherClass === "wd-drizzle"
-          ? makeRain(22, false)
-          : [];
-  $: snowflakes = weatherClass === "wd-snow" ? makeSnow(40) : [];
+          ? makeRainLayers(22, false)
+          : EMPTY_LAYERS;
+  $: snowLayers = weatherClass === "wd-snow" ? makeSnowLayers(40) : EMPTY_LAYERS;
   $: cloudPuffs =
     weatherClass === "wd-partly-cloudy"
       ? makeClouds(3)
@@ -194,12 +136,16 @@
       <!-- Animated weather layer -->
       <div class="wd-hero-anim {weatherClass}" aria-hidden="true">
         {#if weatherClass === "wd-rain" || weatherClass === "wd-drizzle" || weatherClass === "wd-storm"}
-          {#each rainDrops as d, i (i)}
-            <i
-              class="wx-drop"
-              class:is-heavy={weatherClass === "wd-storm"}
-              style="left:{d.left}%;--fall-dur:{d.duration}s;--fall-delay:-{d.delay}s;--fall-op:{d.opacity};--drop-w:{d.size}px;--drift:{d.drift}px"
-            ></i>
+          {#each rainLayers as drops, li (li)}
+            <div class="wx-layer wx-layer--{LAYER_NAMES[li]}">
+              {#each drops as d, i (i)}
+                <i
+                  class="wx-drop"
+                  class:is-heavy={weatherClass === "wd-storm"}
+                  style="left:{d.left}%;--fall-dur:{d.duration}s;--fall-delay:-{d.delay}s;--fall-op:{d.opacity};--drop-w:{d.size}px;--drift:{d.drift}px"
+                ></i>
+              {/each}
+            </div>
           {/each}
           {#if weatherClass === "wd-storm"}
             <div class="wx-lightning"></div>
@@ -215,11 +161,9 @@
           {#if weatherClass === "wd-partly-cloudy"}
             <div class="sun">
               <div class="sun-glow"></div>
+              <div class="sun-rays"></div>
               <div class="sun-disc"></div>
             </div>
-          {/if}
-          {#if weatherClass === "wd-overcast"}
-            <div class="gloom-overlay"></div>
           {/if}
         {:else if weatherClass === "wd-fog"}
           {#each fogPuffs as f, i (i)}
@@ -229,15 +173,20 @@
             ></div>
           {/each}
         {:else if weatherClass === "wd-snow"}
-          {#each snowflakes as s, i (i)}
-            <i
-              class="wx-flake"
-              style="left:{s.left}%;width:{s.size}px;height:{s.size}px;--fall-dur:{s.duration}s;--fall-delay:-{s.delay}s;--fall-op:{s.opacity};--drift:{s.drift}px"
-            ></i>
+          {#each snowLayers as flakes, li (li)}
+            <div class="wx-layer wx-layer--{LAYER_NAMES[li]}">
+              {#each flakes as s, i (i)}
+                <i
+                  class="wx-flake"
+                  style="left:{s.left}%;width:{s.size}px;height:{s.size}px;--fall-dur:{s.duration}s;--fall-delay:-{s.delay}s;--fall-op:{s.opacity};--drift:{s.drift}px"
+                ></i>
+              {/each}
+            </div>
           {/each}
         {:else if weatherClass === "wd-clear"}
           <div class="sun sun--hero">
             <div class="sun-glow"></div>
+            <div class="sun-rays"></div>
             <div class="sun-disc"></div>
           </div>
         {/if}
@@ -550,7 +499,7 @@
     padding: 4px 10px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: none;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -569,12 +518,67 @@
     z-index: 1;
   }
 
+  /* Depth layers — far/mid/near fall at different speeds; each layer
+     carries its own gust (skew) and squall (intensity wave). */
+  .wx-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+  .wx-layer--far {
+    animation:
+      wx-gust-far 34s ease-in-out infinite,
+      wx-squall-far 27s ease-in-out infinite;
+  }
+  .wx-layer--mid {
+    animation:
+      wx-gust-mid 26s ease-in-out -7s infinite,
+      wx-squall-mid 19s ease-in-out -3s infinite;
+  }
+  .wx-layer--near {
+    animation:
+      wx-gust-near 19s ease-in-out -2s infinite,
+      wx-squall-near 14s ease-in-out -9s infinite;
+  }
+
+  @keyframes wx-gust-far {
+    0%, 100% { transform: skewX(-6deg); }
+    38% { transform: skewX(-13deg); }
+    71% { transform: skewX(-3deg); }
+  }
+  @keyframes wx-gust-mid {
+    0%, 100% { transform: skewX(-9deg); }
+    36% { transform: skewX(-18deg); }
+    70% { transform: skewX(-5deg); }
+  }
+  @keyframes wx-gust-near {
+    0%, 100% { transform: skewX(-12deg); }
+    33% { transform: skewX(-24deg); }
+    68% { transform: skewX(-7deg); }
+  }
+  @keyframes wx-squall-far {
+    0%, 100% { opacity: 0.55; }
+    42% { opacity: 1; }
+    77% { opacity: 0.68; }
+  }
+  @keyframes wx-squall-mid {
+    0%, 100% { opacity: 0.72; }
+    34% { opacity: 1; }
+    66% { opacity: 0.58; }
+  }
+  @keyframes wx-squall-near {
+    0%, 100% { opacity: 0.85; }
+    30% { opacity: 1; }
+    61% { opacity: 0.52; }
+  }
+
   /* Rain — container-relative fall via top% */
   .wx-drop {
     position: absolute;
     top: -6%;
     width: var(--drop-w, 1.6px);
-    height: 22px;
+    height: var(--drop-h, 18px);
     border-radius: 999px;
     background: linear-gradient(
       180deg,
@@ -587,8 +591,17 @@
     animation: wx-fall var(--fall-dur, 1s) linear var(--fall-delay, 0s) infinite;
     will-change: top, transform, opacity;
   }
+  .wx-layer--far .wx-drop {
+    --drop-h: 11px;
+    filter: blur(0.4px);
+  }
+  .wx-layer--mid .wx-drop {
+    --drop-h: 20px;
+  }
+  .wx-layer--near .wx-drop {
+    --drop-h: 32px;
+  }
   .wx-drop.is-heavy {
-    height: 32px;
     background: linear-gradient(
       180deg,
       transparent 0%,
@@ -596,6 +609,9 @@
       rgba(155, 195, 255, 0.75) 100%
     );
     box-shadow: 0 0 8px rgba(140, 185, 255, 0.3);
+  }
+  .wx-layer--near .wx-drop.is-heavy {
+    --drop-h: 44px;
   }
 
   @keyframes wx-fall {
@@ -605,16 +621,19 @@
     100% { top: 108%; transform: translateX(var(--drift, 10px)) scaleY(1.15); opacity: 0; }
   }
 
-  /* Clouds */
+  /* Clouds — cumulus silhouette: bumpy lobes on top, flatter base.
+     No border-radius clip — that read as a flying oval. */
   .wx-cloud {
     position: absolute;
-    height: 64px;
-    border-radius: 50%;
+    height: 74px;
     background:
-      radial-gradient(ellipse 58% 62% at 28% 55%, rgba(230, 238, 248, 0.34) 0%, transparent 72%),
-      radial-gradient(ellipse 52% 58% at 54% 42%, rgba(220, 232, 245, 0.28) 0%, transparent 74%),
-      radial-gradient(ellipse 48% 52% at 78% 58%, rgba(210, 224, 240, 0.22) 0%, transparent 76%);
-    filter: blur(16px);
+      radial-gradient(ellipse 24% 58% at 16% 60%, rgba(230, 238, 248, 0.34) 0%, transparent 72%),
+      radial-gradient(ellipse 28% 86% at 36% 40%, rgba(238, 245, 251, 0.44) 0%, transparent 70%),
+      radial-gradient(ellipse 24% 70% at 54% 32%, rgba(242, 248, 253, 0.48) 0%, transparent 70%),
+      radial-gradient(ellipse 22% 56% at 72% 50%, rgba(234, 242, 250, 0.38) 0%, transparent 72%),
+      radial-gradient(ellipse 17% 42% at 87% 62%, rgba(228, 238, 248, 0.3) 0%, transparent 74%),
+      linear-gradient(180deg, transparent 32%, rgba(232, 241, 249, 0.3) 46%, rgba(222, 233, 245, 0.26) 76%, transparent 88%);
+    filter: blur(13px);
     animation: wx-cloud-drift var(--cloud-dur, 32s) linear var(--cloud-delay, 0s) infinite;
     will-change: left;
   }
@@ -645,39 +664,35 @@
     100% { left: 118%; }
   }
 
-  /* Gloom */
-  .gloom-overlay {
-    position: absolute;
-    inset: 0;
-    background:
-      radial-gradient(ellipse at 50% 0%, rgba(20, 28, 40, 0.22) 0%, transparent 68%),
-      linear-gradient(180deg, rgba(18, 26, 38, 0.14) 0%, rgba(30, 40, 55, 0.06) 100%);
-    z-index: 1;
-  }
-
-  /* Snow */
+  /* Snow — matte flakes (no glow) that sway while falling */
   .wx-flake {
     position: absolute;
     top: -4%;
     border-radius: 50%;
     background: radial-gradient(
       circle at 35% 32%,
-      rgba(255, 255, 255, 0.95) 0%,
-      rgba(235, 245, 255, 0.7) 45%,
-      rgba(210, 228, 255, 0.28) 100%
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(236, 244, 252, 0.6) 52%,
+      rgba(216, 230, 248, 0.22) 100%
     );
-    box-shadow:
-      0 0 8px rgba(220, 235, 255, 0.4),
-      0 0 18px rgba(190, 215, 255, 0.2);
     animation: wx-snow var(--fall-dur, 5s) linear var(--fall-delay, 0s) infinite;
     will-change: top, transform;
+  }
+  .wx-layer--far .wx-flake {
+    filter: blur(0.5px);
+  }
+  .wx-layer--near .wx-flake {
+    filter: blur(1px);
   }
 
   @keyframes wx-snow {
     0%   { top: -4%; transform: translateX(0) rotate(0deg); opacity: 0; }
-    10%  { opacity: var(--fall-op, 0.7); }
-    88%  { opacity: calc(var(--fall-op, 0.7) * 0.8); }
-    100% { top: 108%; transform: translateX(var(--drift, 18px)) rotate(320deg); opacity: 0; }
+    8%   { opacity: var(--fall-op, 0.7); }
+    25%  { transform: translateX(calc(var(--drift, 18px) * 0.55)) rotate(70deg); }
+    50%  { transform: translateX(calc(var(--drift, 18px) * -0.3)) rotate(150deg); }
+    75%  { transform: translateX(calc(var(--drift, 18px) * 0.85)) rotate(230deg); }
+    90%  { opacity: calc(var(--fall-op, 0.7) * 0.72); }
+    100% { top: 108%; transform: translateX(calc(var(--drift, 18px) * 0.2)) rotate(320deg); opacity: 0; }
   }
 
   /* Storm lightning */
@@ -709,7 +724,7 @@
     92% { opacity: 0; }
   }
 
-  /* Sun — quiet, minimal: soft glow + matte disc (no rays / spin) */
+  /* Sun — atmospheric: wide scattering halo + whisper rays + soft-edged disc */
   .sun {
     position: absolute;
     top: -18px;
@@ -728,15 +743,32 @@
 
   .sun-glow {
     position: absolute;
-    inset: 16%;
+    inset: 0;
     border-radius: 50%;
     background: radial-gradient(
       circle,
-      rgba(255, 200, 120, 0.16) 0%,
-      rgba(255, 185, 100, 0.07) 40%,
-      transparent 70%
+      rgba(255, 214, 150, 0.32) 0%,
+      rgba(255, 196, 120, 0.18) 16%,
+      rgba(255, 182, 104, 0.09) 36%,
+      rgba(255, 172, 96, 0.04) 56%,
+      transparent 74%
     );
-    filter: blur(16px);
+    filter: blur(10px);
+  }
+
+  .sun-rays {
+    position: absolute;
+    inset: -18%;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+      from 0deg,
+      rgba(255, 212, 152, 0.08) 0deg 3.2deg,
+      transparent 3.2deg 22.5deg
+    );
+    -webkit-mask-image: radial-gradient(circle, #000 6%, transparent 62%);
+    mask-image: radial-gradient(circle, #000 6%, transparent 62%);
+    filter: blur(3px);
+    animation: sun-rays-breathe 12s ease-in-out infinite;
   }
 
   .sun-disc {
@@ -748,12 +780,16 @@
     transform: translate(-50%, -50%);
     border-radius: 50%;
     background: radial-gradient(
-      circle at 40% 36%,
-      rgba(255, 236, 190, 0.72) 0%,
-      rgba(255, 214, 140, 0.58) 45%,
-      rgba(255, 190, 110, 0.42) 100%
+      circle at 42% 38%,
+      rgba(255, 244, 214, 0.84) 0%,
+      rgba(255, 228, 172, 0.54) 32%,
+      rgba(255, 208, 142, 0.26) 58%,
+      rgba(255, 192, 122, 0.1) 78%,
+      transparent 92%
     );
-    box-shadow: 0 0 28px rgba(255, 195, 115, 0.14);
+    box-shadow:
+      0 0 34px rgba(255, 202, 132, 0.22),
+      0 0 80px rgba(255, 190, 112, 0.12);
     animation: sun-breathe 12s ease-in-out infinite;
   }
 
@@ -766,6 +802,11 @@
       transform: translate(-50%, -50%) scale(1.02);
       opacity: 1;
     }
+  }
+
+  @keyframes sun-rays-breathe {
+    0%, 100% { opacity: 0.55; }
+    50% { opacity: 1; }
   }
 
   /* ── INFO CARDS ── */

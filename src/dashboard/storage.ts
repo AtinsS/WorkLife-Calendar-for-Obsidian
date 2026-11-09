@@ -6,6 +6,7 @@ import {
   createEmptyDashboard,
   generateId,
 } from "./types";
+import { loadModuleData, saveModuleData } from "../io/vaultStorage";
 
 let cachedData: DashboardData | null = null;
 let cachedFilePath: string | null = null;
@@ -112,8 +113,44 @@ function updateFrontmatter(noteContent: string, dashboardYaml: string): string {
   }
 }
 
+/** Coerce stored JSON into DashboardData (home-view storage). */
+export function normalizeDashboardData(raw: unknown): DashboardData {
+  const data = createEmptyDashboard();
+  if (typeof raw !== "object" || raw === null) return data;
+  const cards = (raw as { cards?: unknown }).cards;
+  if (!Array.isArray(cards)) return data;
+  for (const entry of cards) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const c = entry as Record<string, unknown>;
+    const id = typeof c.id === "string" ? c.id : "";
+    if (!id) continue;
+    const card: DashboardCard = {
+      id,
+      title: typeof c.title === "string" ? c.title : "",
+      icon: typeof c.icon === "string" ? c.icon : "📁",
+      links: [],
+    };
+    if (Array.isArray(c.links)) {
+      for (const l of c.links) {
+        if (typeof l !== "object" || l === null) continue;
+        const link = l as Record<string, unknown>;
+        if (typeof link.id === "string" && link.id && typeof link.notePath === "string" && link.notePath) {
+          card.links.push({
+            id: link.id,
+            label: typeof link.label === "string" ? link.label : "",
+            notePath: link.notePath,
+          });
+        }
+      }
+    }
+    data.cards.push(card);
+  }
+  return data;
+}
+
 export async function loadDashboard(app: App, filePath?: string): Promise<DashboardData> {
-  if (cachedData && cachedFilePath === filePath) return cachedData;
+  const cacheKey = filePath ?? null;
+  if (cachedData && cachedFilePath === cacheKey) return cachedData;
 
   if (filePath) {
     try {
@@ -123,24 +160,37 @@ export async function loadDashboard(app: App, filePath?: string): Promise<Dashbo
         const parsed = parseYamlFrontmatter(content);
         if (parsed) {
           cachedData = parsed;
-          cachedFilePath = filePath;
+          cachedFilePath = cacheKey;
           return cachedData;
         }
       }
     } catch {
       // file doesn't exist
     }
+    cachedData = createEmptyDashboard();
+    cachedFilePath = cacheKey;
+    return cachedData;
   }
 
-  cachedData = createEmptyDashboard();
-  cachedFilePath = filePath || null;
+  // Home view → calendar-data/dashboard.json (note blocks keep their frontmatter)
+  try {
+    const raw = await loadModuleData(app, "dashboard");
+    cachedData = normalizeDashboardData(raw);
+  } catch {
+    cachedData = createEmptyDashboard();
+  }
+  cachedFilePath = cacheKey;
   return cachedData;
 }
 
 export async function saveDashboard(app: App, data: DashboardData, filePath?: string): Promise<void> {
   cachedData = data;
+  cachedFilePath = filePath ?? null;
 
-  if (!filePath) return;
+  if (!filePath) {
+    await saveModuleData(app, "dashboard", data as unknown as Record<string, unknown>);
+    return;
+  }
 
   const file = app.vault.getAbstractFileByPath(filePath);
   if (!(file instanceof TFile)) return;

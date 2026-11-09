@@ -10,6 +10,7 @@ const registeredMarkdownCodeBlocks = new Set<string>();
 
 import {
   VIEW_TYPE_CALENDAR,
+  VIEW_TYPE_HOME,
   VIEW_TYPE_TASKS,
   VIEW_TYPE_SCHEDULE,
   VIEW_TYPE_MOBILE_SCHEDULE,
@@ -48,6 +49,7 @@ import FinanceView from "./views/FinanceView";
 import FinancialAnalyticsView from "./views/FinancialAnalyticsView";
 import KanbanView from "./views/KanbanView";
 import HabitPanelView from "./views/HabitPanelView";
+import HomeView from "./views/HomeView";
 import WeatherDetailView from "./views/WeatherDetailView";
 import AIAskView from "./views/AIAskView";
 import { initTaskStores, reloadTaskStores, immediateSave as immediateTaskSave } from "./task-tracker/stores";
@@ -193,6 +195,9 @@ export default class CalendarPlugin extends Plugin {
       .getLeavesOfType(VIEW_TYPE_HABIT_ANALYTICS)
       .forEach((leaf) => leaf.detach());
     this.app.workspace
+      .getLeavesOfType(VIEW_TYPE_HOME)
+      .forEach((leaf) => leaf.detach());
+    this.app.workspace
       .getLeavesOfType(VIEW_TYPE_FINANCE)
       .forEach((leaf) => leaf.detach());
     this.app.workspace
@@ -325,6 +330,11 @@ export default class CalendarPlugin extends Plugin {
     );
 
     safeRegisterView(
+      VIEW_TYPE_HOME,
+      (leaf: WorkspaceLeaf) => new HomeView(leaf, this)
+    );
+
+    safeRegisterView(
       VIEW_TYPE_WEATHER_DETAIL,
       (leaf: WorkspaceLeaf) => new WeatherDetailView(leaf, this)
     );
@@ -395,6 +405,12 @@ export default class CalendarPlugin extends Plugin {
       id: "open-habit-panel",
       name: tRaw("main.commands.openHabitPanel"),
       callback: () => this.activateHabitPanelView(),
+    });
+
+    this.addCommand({
+      id: "open-home-view",
+      name: tRaw("main.commands.openHome"),
+      callback: () => this.activateHomeView(),
     });
 
     this.addCommand({
@@ -931,6 +947,10 @@ export default class CalendarPlugin extends Plugin {
     return this.activateView(VIEW_TYPE_HABIT_PANEL);
   }
 
+  async activateHomeView(): Promise<void> {
+    return this.activateView(VIEW_TYPE_HOME);
+  }
+
   async activateWeatherDetailView(date?: string): Promise<void> {
     const { workspace } = this.app;
     const existing = workspace.getLeavesOfType(VIEW_TYPE_WEATHER_DETAIL);
@@ -1067,6 +1087,7 @@ export default class CalendarPlugin extends Plugin {
 
   private registerRibbonIcons(): void {
     const defs: [string, IconName, () => void][] = [
+      ["main.ribbon.home", "home", () => this.activateHomeView()],
       ["main.ribbon.tasks", "checkbox-glyph", () => this.activateTaskView()],
       ["main.ribbon.calendar", "calendar-with-checkmark", () => this.activateCalendarView()],
       ["main.ribbon.analytics", "bar-chart", () => this.activateHabitAnalyticsView()],

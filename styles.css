@@ -4961,6 +4961,17 @@ h2.tm-title.tm-title {
   overflow: visible;
 }
 
+/* Home view — HelloView + Dashboard composition */
+.wl-home-view-container {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.wl-home-view-container .dashboard {
+  padding: 4px 16px 24px;
+}
+
 .habit-tracker-panel {
   border-top: 1px solid var(--mcp-glass-border);
   padding: 12px 16px;
@@ -8606,7 +8617,20 @@ body > .task-actions-menu {
 
 .dashboard {
   margin: 0;
+  /* Match .hello's horizontal inset so both blocks align in a note */
+  padding: 8px 16px 16px;
+}
+
+/* Code-block wrappers: hello and dashboard render identically —
+   no chrome; content padding lives on the .hello / .dashboard roots. */
+.block-language-hello,
+.block-language-dashboard {
+  display: block;
+  margin: 0;
   padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .dashboard__grid {
@@ -8615,8 +8639,7 @@ body > .task-actions-menu {
   gap: clamp(16px, 2vw, 24px);
 }
 
-.markdown-preview-view .dashboard-card,
-.markdown-source-view .dashboard-card {
+.dashboard-card {
   position: relative;
   overflow: hidden;
   padding: clamp(16px, 2.5vw, 24px);
@@ -8633,9 +8656,9 @@ body > .task-actions-menu {
     transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
     box-shadow 0.65s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-  opacity: 0;
-  transform: translateY(20px) scale(0.97);
-  animation: dashboardCardIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  /* Entrance start state lives in dashboardCardIn keyframes only —
+     if animations are suppressed the card must stay visible. */
+  animation: dashboardCardIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: transform, opacity;
 }
 
@@ -8663,8 +8686,7 @@ body > .task-actions-menu {
   animation-delay: 0.40s;
 }
 
-.markdown-preview-view .dashboard-card:hover,
-.markdown-source-view .dashboard-card:hover {
+.dashboard-card:hover {
   transform: translateY(-6px) scale(1.015);
   border-color: color-mix(in srgb, var(--interactive-accent) 50%, transparent);
   box-shadow:
@@ -8673,8 +8695,7 @@ body > .task-actions-menu {
     0 0 0 1px color-mix(in srgb, var(--interactive-accent) 25%, transparent);
 }
 
-.markdown-preview-view .dashboard-card::before,
-.markdown-source-view .dashboard-card::before {
+.dashboard-card::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -8685,14 +8706,12 @@ body > .task-actions-menu {
   z-index: 1;
 }
 
-.markdown-preview-view .dashboard-card:hover::before,
-.markdown-source-view .dashboard-card:hover::before {
+.dashboard-card:hover::before {
   transform: translateX(110%);
   transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.markdown-preview-view .dashboard-card__title,
-.markdown-source-view .dashboard-card__title {
+.dashboard-card__title {
   position: relative;
   margin: 0 0 clamp(14px, 2vw, 20px);
   padding-bottom: clamp(10px, 1.5vw, 14px);
@@ -8702,8 +8721,7 @@ body > .task-actions-menu {
   letter-spacing: -0.01em;
 }
 
-.markdown-preview-view .dashboard-card__title::after,
-.markdown-source-view .dashboard-card__title::after {
+.dashboard-card__title::after {
   content: "";
   position: absolute;
   left: 0;
@@ -8715,8 +8733,7 @@ body > .task-actions-menu {
   transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.markdown-preview-view .dashboard-card:hover .dashboard-card__title::after,
-.markdown-source-view .dashboard-card:hover .dashboard-card__title::after {
+.dashboard-card:hover .dashboard-card__title::after {
   width: 100%;
 }
 
@@ -8745,9 +8762,7 @@ body > .task-actions-menu {
     background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
     border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
     color 0.4s ease;
-  opacity: 0;
-  transform: translateX(-8px);
-  animation: linkSlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: linkSlideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .dashboard-card__item:hover {
