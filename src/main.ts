@@ -6,8 +6,6 @@ import { get } from "svelte/store";
 
 const registeredMarkdownCodeBlocks = new Set<string>();
 
-
-
 import {
   VIEW_TYPE_CALENDAR,
   VIEW_TYPE_HOME,
@@ -445,10 +443,9 @@ export default class CalendarPlugin extends Plugin {
       this.registerRibbonIcons();
     }
 
-    // Register dashboard code block processor
+    // Register dashboard code block processor — same shared cards as the Home view
     safeRegisterMarkdownCodeBlockProcessor("dashboard", (_source, el) => {
-      const activeFile = this.app.workspace.getActiveFile();
-      new Dashboard({ target: el, props: { appInstance: this.app, filePath: activeFile?.path } });
+      new Dashboard({ target: el, props: { appInstance: this.app } });
     });
 
     // Register hello code block processor

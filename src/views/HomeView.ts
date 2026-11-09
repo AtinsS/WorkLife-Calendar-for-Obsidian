@@ -62,8 +62,6 @@ export default class HomeView extends ItemView {
       target: container,
       props: {
         appInstance: this.plugin.app,
-        // No filePath → cards persist to calendar-data/dashboard.json.
-        // Note-embedded ```dashboard``` blocks keep their frontmatter storage.
       },
     });
     return Promise.resolve();

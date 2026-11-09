@@ -27,7 +27,6 @@
   import { t } from "../i18n";
 
   export let appInstance: App;
-  export let filePath: string | undefined = undefined;
 
   let data: DashboardData = { cards: [] };
   let editingCard: DashboardCard | null = null;
@@ -99,8 +98,8 @@
     ids.splice(fromIdx, 1);
     ids.splice(toIdx, 0, draggedCardId);
 
-    await reorderCards(appInstance, ids, filePath);
-    data = await loadDashboard(appInstance, filePath);
+    await reorderCards(appInstance, ids);
+    data = await loadDashboard(appInstance);
     draggedCardId = null;
     dragOverCardId = null;
   }
@@ -265,7 +264,7 @@
   }
 
   onMount(async () => {
-    data = await loadDashboard(appInstance, filePath);
+    data = await loadDashboard(appInstance);
     // Carry incomplete savings goals (with money) into the current month
     ensureGoalsRollover(monthKey);
   });
@@ -282,15 +281,15 @@
     await updateCard(appInstance, editingCard.id, {
       title: editingCardTitle,
       icon: editingCardIcon,
-    }, filePath);
-    data = await loadDashboard(appInstance, filePath);
+    });
+    data = await loadDashboard(appInstance);
     showCardModal = false;
     editingCard = null;
   }
 
   async function removeCard(cardId: string) {
-    await deleteCard(appInstance, cardId, filePath);
-    data = await loadDashboard(appInstance, filePath);
+    await deleteCard(appInstance, cardId);
+    data = await loadDashboard(appInstance);
   }
 
   function openAddLink(cardId: string) {
@@ -302,21 +301,21 @@
 
   async function saveNewLink() {
     if (!addingLinkToCardId || !newLinkLabel) return;
-    await addLink(appInstance, addingLinkToCardId, newLinkLabel, newLinkPath, filePath);
-    data = await loadDashboard(appInstance, filePath);
+    await addLink(appInstance, addingLinkToCardId, newLinkLabel, newLinkPath);
+    data = await loadDashboard(appInstance);
     showLinkModal = false;
     addingLinkToCardId = null;
   }
 
   async function removeLink(cardId: string, linkId: string) {
-    await deleteLink(appInstance, cardId, linkId, filePath);
-    data = await loadDashboard(appInstance, filePath);
+    await deleteLink(appInstance, cardId, linkId);
+    data = await loadDashboard(appInstance);
   }
 
   async function createNewCard() {
     if (!newCardTitle) return;
-    await addCard(appInstance, newCardTitle, newCardIcon, filePath);
-    data = await loadDashboard(appInstance, filePath);
+    await addCard(appInstance, newCardTitle, newCardIcon);
+    data = await loadDashboard(appInstance);
     showAddCardModal = false;
     newCardTitle = "";
     newCardIcon = "📁";
