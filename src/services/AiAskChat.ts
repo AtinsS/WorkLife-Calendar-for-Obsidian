@@ -14,9 +14,14 @@ import { resolveModel } from "./OllamaService";
 import { resolveAiConnection, streamAiChat } from "./aiProvider";
 import {
   analyzeModelInternetSupport,
+  buildSearchPlanPrompt,
   buildSearchQuery,
   formatSearchContext,
+  parseSearchPlan,
+  SEARCH_PLAN_SYSTEM,
   searchWeb,
+  type SearchPlan,
+  type WebSearchResult,
 } from "./webSearch";
 import { errorMessage } from "../utils/sanitize";
 import { renderInline, renderMarkdown } from "../ui/markdown";
@@ -151,6 +156,8 @@ export class AiAskChat {
   private webSearchOn: boolean;
   private thinkingOn: boolean;
   private lastWebSources: Array<{ title: string; url: string; snippet: string }> = [];
+  /** Why the last turn has (no) web context — drives the system-prompt wording. */
+  private lastWebOutcome: "off" | "skipped" | "empty" | "ok" = "off";
 
   constructor(app: App, root: HTMLElement, files?: TFile[], label?: string) {
     this.app = app;
@@ -202,6 +209,13 @@ export class AiAskChat {
 
     const bar = this.root.createDiv({ cls: "ai-ask-bar" });
     // Chat-level actions only — per-message actions live on each bubble
+    const newChatBtn = bar.createEl("button", {
+      cls: "ai-sch-btn ai-sch-btn-ghost ai-ask-bar-btn",
+      text: tRaw("ai.askQa.newChat"),
+      attr: { type: "button" },
+    });
+    newChatBtn.addEventListener("click", () => this.newChat());
+
     const copyChatBtn = bar.createEl("button", {
       cls: "ai-sch-btn ai-sch-btn-ghost ai-ask-bar-btn",
       text: tRaw("ai.askQa.copyChat"),
@@ -321,6 +335,23 @@ export class AiAskChat {
   sendText(text: string): void {
     if (this.inputEl) this.inputEl.value = text;
     void this.send();
+  }
+
+  /** Reset the conversation (keeps note context, style and toggles). */
+  private newChat(): void {
+    this.abort?.abort();
+    this.abort = null;
+    this.isRunning = false;
+    this.messages = [];
+    this.lastWebSources = [];
+    this.lastWebOutcome = "off";
+    this.streamBodyEl = null;
+    this.root.removeClass("scanning", "generating");
+    if (this.sendBtn) this.sendBtn.disabled = false;
+    if (this.stopBtn) this.stopBtn.disabled = true;
+    this.setStatus("");
+    this.renderMessages();
+    this.inputEl?.focus();
   }
 
   private contextChipText(): string {
@@ -484,7 +515,10 @@ export class AiAskChat {
 
   /**
    * Optionally fetch web results and prepend them to the user payload.
-   * Skipped when the toggle is off. Failures degrade silently to no context.
+   * The model itself decides whether to search and what to look up
+   * (planner call) — the user never types a search query. Skipped when the
+   * toggle is off. Failures degrade to no context; set lastWebOutcome so the
+   * system prompt can phrase the web-access note correctly.
    */
   private async gatherWebContext(
     text: string,
@@ -492,33 +526,106 @@ export class AiAskChat {
     noteContext?: string,
     history?: string,
   ): Promise<string> {
-    if (!this.webSearchOn) return "";
-    const query = buildSearchQuery(text, noteContext, history);
-    if (!query) {
-      // Nothing searchable (chit-chat / empty) — skip silently
+    if (!this.webSearchOn) {
+      this.lastWebOutcome = "off";
       return "";
+    }
+
+    this.setStatus(tRaw("ai.askQa.webPlanning"), "busy");
+    let queries: string[] = [];
+    try {
+      const plan = await this.planWebQueries(text, noteContext, history, signal);
+      if (plan && !plan.search) {
+        // Model decided a live lookup would not help — skip silently
+        this.lastWebOutcome = "skipped";
+        this.setStatus("");
+        return "";
+      }
+      queries = plan?.queries ?? [];
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError" || signal?.aborted) throw e;
+      queries = [];
+    }
+
+    if (queries.length === 0) {
+      // Planner unavailable — heuristic keyword fallback
+      const q = buildSearchQuery(text, noteContext, history);
+      if (!q) {
+        this.lastWebOutcome = "skipped";
+        this.setStatus("");
+        return "";
+      }
+      queries = [q];
     }
 
     this.setStatus(tRaw("ai.askQa.webSearching"), "busy");
     try {
-      const resp = await searchWeb(query, 5, signal);
-      if (!resp.ok || resp.results.length === 0) {
+      const results: WebSearchResult[] = [];
+      const seen = new Set<string>();
+      const errors: string[] = [];
+      for (const q of queries.slice(0, 2)) {
+        const resp = await searchWeb(q, 4, signal);
+        if (!resp.ok || resp.results.length === 0) {
+          if (resp.error) errors.push(resp.error);
+          continue;
+        }
+        for (const r of resp.results) {
+          if (seen.has(r.url)) continue;
+          seen.add(r.url);
+          results.push(r);
+          if (results.length >= 6) break;
+        }
+        if (results.length >= 6) break;
+      }
+      if (results.length === 0) {
         this.lastWebSources = [];
+        this.lastWebOutcome = "empty";
         this.setStatus(
-          `${tRaw("ai.askQa.webSearchFailed")}${resp.error ? `: ${resp.error}` : ""}`,
+          `${tRaw("ai.askQa.webSearchFailed")}${errors.length ? `: ${errors.join(" | ")}` : ""}`,
           "error",
         );
         return "";
       }
-      this.lastWebSources = resp.results;
-      this.setStatus(`${tRaw("ai.askQa.webSearch")}: ${resp.results.length}`, "idle");
-      return formatSearchContext(resp.results, query);
+      this.lastWebSources = results;
+      this.lastWebOutcome = "ok";
+      this.setStatus(`${tRaw("ai.askQa.webSearch")}: ${results.length}`, "idle");
+      return formatSearchContext(results, queries.slice(0, 2).join(" | "));
     } catch (e) {
       if ((e as Error)?.name === "AbortError") throw e;
       this.lastWebSources = [];
+      this.lastWebOutcome = "empty";
       this.setStatus(`${tRaw("ai.askQa.webSearchFailed")}: ${errorMessage(e)}`, "error");
       return "";
     }
+  }
+
+  /** Small model call: decide whether to search and what to look up. */
+  private async planWebQueries(
+    text: string,
+    noteContext?: string,
+    history?: string,
+    signal?: AbortSignal,
+  ): Promise<SearchPlan | null> {
+    const opts = get(settings) as {
+      aiProvider?: "ollama" | "lmstudio";
+      ollamaUrl?: string;
+      lmstudioUrl?: string;
+      ollamaModel?: string;
+      ollamaModelExtract?: string;
+      lmstudioModel?: string;
+      lmstudioModelExtract?: string;
+      ollamaModelMode?: "single" | "dual";
+    };
+    const raw = await streamAiChat(
+      resolveAiConnection(opts),
+      resolveModel("extract", opts),
+      [
+        { role: "system", content: SEARCH_PLAN_SYSTEM },
+        { role: "user", content: buildSearchPlanPrompt(text, noteContext, history) },
+      ],
+      { signal, temperature: 0, think: false },
+    );
+    return parseSearchPlan(raw);
   }
 
   private renderMessages(): void {
@@ -728,18 +835,6 @@ export class AiAskChat {
           hide();
           if (text) this.rewrite(text, "explain");
         });
-
-        const taskBtn = this.selectionToolbarEl.createEl("button", {
-          cls: "ai-ask-sel-btn",
-          text: `✅ ${tRaw("ai.askQa.actMakeTask")}`,
-          attr: { type: "button" },
-        });
-        taskBtn.addEventListener("mousedown", (e) => e.preventDefault());
-        taskBtn.addEventListener("click", () => {
-          const text = getSel();
-          hide();
-          if (text) void this.makeTaskFromText(text);
-        });
       }
 
       const rect = range.getBoundingClientRect();
@@ -765,12 +860,6 @@ export class AiAskChat {
         .setTitle(tRaw("ai.askQa.contextMenuExplain"))
         .setIcon("lucide-lightbulb")
         .onClick(() => this.rewrite(sel, "explain"));
-    });
-    menu.addItem((item) => {
-      item
-        .setTitle(tRaw("ai.askQa.actMakeTask"))
-        .setIcon("check-square")
-        .onClick(() => void this.makeTaskFromText(sel));
     });
     menu.addSeparator();
     menu.addItem((item) => {
@@ -984,11 +1073,13 @@ export class AiAskChat {
         systemParts.push(
           "You WERE given current web search results below (fetched just now by the host app). Use them as live context: answer with those facts, cite site titles or domains when useful. Do NOT say that you cannot search the web or lack internet access — the search already happened and the results are in this message. If the snippets do not cover the question, say what is missing and answer from general knowledge.",
         );
-      } else if (this.webSearchOn) {
+      } else if (this.webSearchOn && this.lastWebOutcome === "empty") {
         systemParts.push(
           "Web search was attempted for this question but returned no usable snippets. Answer from general knowledge and the note context. Do not invent citations. You may mention in one short phrase that live sources were unavailable — then move on and still help.",
         );
       }
+      // "skipped" (the planner decided no lookup is needed) — stay silent about
+      // the internet entirely, same as when search is off.
 
       // Prior turns travel as real role messages — flattening them into one user
       // payload lost role semantics and degraded multi-turn answers.

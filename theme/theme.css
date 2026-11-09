@@ -461,50 +461,117 @@
 }
 
 /* ============================================
-   NIGHT SKY — static stars + twinkle only
-   (falling/shooting stars removed 2026-10 by request)
+   NIGHT SKY — deep space + milky-way band
+   (round nebula "bubbles" removed 2026-11;
+   falling/shooting stars removed 2026-10)
    Night sky paints on body (has .theme-dark vars).
    html gets a literal dark fallback so Electron's
-   gray canvas never shows. Stars sit at z-index: 0
-   — above the sky, below .workspace (z-index: 1).
+   gray canvas never shows. Star dots live in body's
+   background-image; the slow aurora drift is
+   body::before/after at z-index: 0 — above the sky,
+   below .workspace (z-index: 1).
    ============================================ */
 
 html {
-  background-color: #0b0d12 !important;
+  background-color: #070910 !important;
 }
 
 body {
   background-color: var(--wl-bg) !important;
   background-image:
-    radial-gradient(1100px 560px at 88% -8%, rgba(139, 108, 255, 0.14), transparent 62%),
-    radial-gradient(900px 520px at 8% 112%, rgba(106, 166, 255, 0.1), transparent 58%),
-    radial-gradient(1.5px 1.5px at 12% 22%, rgba(255, 255, 255, 0.7), transparent 100%),
+    /* deep-space vertical wash */
+    linear-gradient(180deg, rgba(14, 16, 38, 0) 0%, rgba(28, 22, 66, 0.2) 46%, rgba(9, 11, 24, 0.52) 100%),
+    /* milky-way band — elongated and diagonal, never a round patch */
+    linear-gradient(112deg, transparent 28%, rgba(146, 132, 255, 0.1) 45%, rgba(102, 148, 255, 0.075) 56%, transparent 72%),
+    /* starfield — bright pinpoints */
+    radial-gradient(1.5px 1.5px at 12% 22%, rgba(255, 255, 255, 0.72), transparent 100%),
     radial-gradient(1px 1px at 28% 64%, rgba(255, 255, 255, 0.55), transparent 100%),
-    radial-gradient(1.5px 1.5px at 46% 18%, rgba(255, 255, 255, 0.65), transparent 100%),
+    radial-gradient(1.5px 1.5px at 46% 18%, rgba(255, 255, 255, 0.66), transparent 100%),
     radial-gradient(1px 1px at 62% 72%, rgba(255, 255, 255, 0.45), transparent 100%),
     radial-gradient(1.5px 1.5px at 74% 34%, rgba(255, 255, 255, 0.6), transparent 100%),
     radial-gradient(1px 1px at 88% 58%, rgba(255, 255, 255, 0.5), transparent 100%),
-    radial-gradient(1px 1px at 8% 82%, rgba(255, 255, 255, 0.4), transparent 100%),
-    radial-gradient(1.5px 1.5px at 92% 12%, rgba(255, 255, 255, 0.7), transparent 100%),
+    radial-gradient(1.5px 1.5px at 92% 12%, rgba(255, 255, 255, 0.72), transparent 100%),
     radial-gradient(1px 1px at 18% 48%, rgba(255, 255, 255, 0.42), transparent 100%),
     radial-gradient(1.5px 1.5px at 38% 8%, rgba(255, 255, 255, 0.58), transparent 100%),
     radial-gradient(1px 1px at 54% 42%, rgba(255, 255, 255, 0.38), transparent 100%),
-    radial-gradient(1px 1px at 68% 88%, rgba(255, 255, 255, 0.48), transparent 100%),
     radial-gradient(1.5px 1.5px at 82% 28%, rgba(255, 255, 255, 0.55), transparent 100%),
     radial-gradient(1px 1px at 4% 36%, rgba(255, 255, 255, 0.4), transparent 100%),
     radial-gradient(1px 1px at 96% 78%, rgba(255, 255, 255, 0.45), transparent 100%),
-    radial-gradient(1.5px 1.5px at 42% 58%, rgba(255, 255, 255, 0.5), transparent 100%);
+    radial-gradient(1.5px 1.5px at 42% 58%, rgba(255, 255, 255, 0.5), transparent 100%),
+    /* faint dust — second, dimmer depth layer */
+    radial-gradient(1px 1px at 8% 82%, rgba(255, 255, 255, 0.28), transparent 100%),
+    radial-gradient(1px 1px at 24% 14%, rgba(255, 255, 255, 0.24), transparent 100%),
+    radial-gradient(1px 1px at 34% 88%, rgba(255, 255, 255, 0.22), transparent 100%),
+    radial-gradient(1px 1px at 48% 52%, rgba(255, 255, 255, 0.26), transparent 100%),
+    radial-gradient(1px 1px at 58% 26%, rgba(255, 255, 255, 0.2), transparent 100%),
+    radial-gradient(1px 1px at 68% 88%, rgba(255, 255, 255, 0.25), transparent 100%),
+    radial-gradient(1px 1px at 78% 52%, rgba(255, 255, 255, 0.22), transparent 100%),
+    radial-gradient(1px 1px at 86% 68%, rgba(255, 255, 255, 0.2), transparent 100%),
+    radial-gradient(1px 1px at 94% 36%, rgba(255, 255, 255, 0.24), transparent 100%),
+    radial-gradient(1px 1px at 14% 70%, rgba(255, 255, 255, 0.22), transparent 100%);
   background-attachment: fixed;
   background-repeat: no-repeat;
+}
+
+/* --- Slow aurora drift — smooth desynced breathe, no streaks.
+   Layers are wide translucent bands (never round orbs). --- */
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: -20% -10%;
+  pointer-events: none;
+  z-index: 0;
+  will-change: opacity, transform;
+}
+
+body::before {
+  background:
+    linear-gradient(118deg, transparent 32%, rgba(139, 108, 255, 0.12) 48%, transparent 64%),
+    linear-gradient(298deg, transparent 38%, rgba(106, 166, 255, 0.1) 54%, transparent 68%);
+  animation: aurora-a 22s ease-in-out infinite;
+}
+
+body::after {
+  background:
+    linear-gradient(100deg, transparent 40%, rgba(122, 92, 255, 0.08) 56%, transparent 72%);
+  animation: aurora-b 31s ease-in-out 6s infinite;
+}
+
+@keyframes aurora-a {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translate3d(-1.2%, 0, 0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: translate3d(1.2%, 0, 0);
+  }
+}
+
+@keyframes aurora-b {
+  0%,
+  100% {
+    opacity: 0.4;
+    transform: translate3d(1%, -0.5%, 0);
+  }
+
+  50% {
+    opacity: 0.85;
+    transform: translate3d(-1%, 0.5%, 0);
+  }
 }
 
 /* Light theme: keep flat sky, no starfield noise */
 .theme-light body {
   background-image:
-    radial-gradient(1100px 560px at 88% -8%, rgba(139, 108, 255, 0.08), transparent 62%),
-    radial-gradient(900px 520px at 8% 112%, rgba(106, 166, 255, 0.06), transparent 58%);
+    linear-gradient(180deg, rgba(122, 108, 210, 0.05) 0%, rgba(90, 120, 200, 0.035) 60%, transparent 100%);
 }
 
+.theme-light body::before,
+.theme-light body::after,
 .theme-light .workspace::before,
 .theme-light .workspace::after,
 .theme-light .horizontal-main-container::before,
@@ -567,7 +634,7 @@ body {
     22vw 40vh 0 0 rgba(255, 255, 255, 0.7),
     66vw 6vh 0 0 rgba(255, 255, 255, 0.8);
   opacity: 0.35;
-  animation: twinkle-a 6.5s ease-in-out 0s infinite;
+  animation: twinkle-a 10.5s ease-in-out 0s infinite;
 }
 
 .workspace::after {
@@ -580,7 +647,7 @@ body {
     34vw 88vh 0 0 rgba(255, 255, 255, 0.7),
     70vw 50vh 0 0 rgba(255, 255, 255, 0.85);
   opacity: 0.3;
-  animation: twinkle-b 8.2s ease-in-out 1.4s infinite;
+  animation: twinkle-b 13s ease-in-out 1.4s infinite;
 }
 
 .horizontal-main-container::before {
@@ -593,7 +660,7 @@ body {
     48vw 60vh 0 0 rgba(255, 255, 255, 0.75),
     16vw 10vh 0 0 rgba(255, 255, 255, 0.8);
   opacity: 0.28;
-  animation: twinkle-c 7.3s ease-in-out 2.6s infinite;
+  animation: twinkle-c 11.5s ease-in-out 2.6s infinite;
 }
 
 .horizontal-main-container::after {
@@ -606,89 +673,59 @@ body {
     94vw 40vh 0 0 rgba(255, 255, 255, 0.85),
     50vw 92vh 0 0 rgba(255, 255, 255, 0.7);
   opacity: 0.32;
-  animation: twinkle-d 9.1s ease-in-out 0.7s infinite;
+  animation: twinkle-d 14.5s ease-in-out 0.7s infinite;
 }
 
-/* Continuous breathe — always moving, never a dead flash window */
+/* Continuous breathe — smooth sine-like drift, never a dead flash window */
 @keyframes twinkle-a {
   0%,
   100% {
-    opacity: 0.28;
+    opacity: 0.3;
   }
-  20% {
-    opacity: 0.85;
-  }
-  40% {
-    opacity: 0.38;
-  }
-  65% {
-    opacity: 0.95;
-  }
-  85% {
-    opacity: 0.32;
+
+  50% {
+    opacity: 0.9;
   }
 }
 
 @keyframes twinkle-b {
   0%,
   100% {
-    opacity: 0.22;
+    opacity: 0.24;
   }
-  15% {
-    opacity: 0.7;
+
+  38% {
+    opacity: 0.82;
   }
-  35% {
-    opacity: 0.3;
-  }
-  55% {
-    opacity: 0.9;
-  }
-  75% {
-    opacity: 0.25;
-  }
-  90% {
-    opacity: 0.75;
+
+  72% {
+    opacity: 0.38;
   }
 }
 
 @keyframes twinkle-c {
   0%,
   100% {
-    opacity: 0.25;
+    opacity: 0.26;
   }
-  18% {
-    opacity: 0.8;
-  }
-  42% {
-    opacity: 0.35;
-  }
-  60% {
-    opacity: 0.92;
-  }
-  80% {
-    opacity: 0.3;
+
+  46% {
+    opacity: 0.86;
   }
 }
 
 @keyframes twinkle-d {
   0%,
   100% {
-    opacity: 0.3;
-  }
-  22% {
-    opacity: 0.88;
-  }
-  38% {
     opacity: 0.32;
   }
-  58% {
-    opacity: 0.78;
+
+  32% {
+    opacity: 0.58;
   }
-  78% {
-    opacity: 0.28;
-  }
-  92% {
-    opacity: 0.7;
+
+  66% {
+    opacity: 0.84;
   }
 }
 
@@ -2290,7 +2327,9 @@ input[type="range"] {
   pointer-events: auto !important;
 }
 
-/* Star / twinkle layers never take hits */
+/* Star / twinkle / aurora layers never take hits */
+body::before,
+body::after,
 .workspace::before,
 .workspace::after,
 .horizontal-main-container::before,
@@ -2765,15 +2804,17 @@ input[type="range"] {
 .is-phone .workspace::before,
 .is-phone .workspace::after,
 .is-phone .horizontal-main-container::before,
-.is-phone .horizontal-main-container::after {
+.is-phone .horizontal-main-container::after,
+.is-phone body::before,
+.is-phone body::after {
   animation: none !important;
   opacity: 0 !important;
 }
 
 .is-phone body {
   background-image:
-    radial-gradient(1100px 560px at 88% -8%, rgba(139, 108, 255, 0.12), transparent 62%),
-    radial-gradient(900px 520px at 8% 112%, rgba(106, 166, 255, 0.08), transparent 58%);
+    linear-gradient(180deg, rgba(14, 16, 38, 0) 0%, rgba(28, 22, 66, 0.18) 46%, rgba(9, 11, 24, 0.45) 100%),
+    linear-gradient(112deg, transparent 28%, rgba(146, 132, 255, 0.09) 45%, rgba(102, 148, 255, 0.065) 56%, transparent 72%);
   background-attachment: scroll;
 }
 
@@ -3026,5 +3067,13 @@ a.external-link,
   .horizontal-main-container::after {
     animation: none !important;
     opacity: 0 !important;
+  }
+
+  /* Aurora keeps its wash but stops drifting */
+  body::before,
+  body::after {
+    animation: none !important;
+    opacity: 0.7 !important;
+    transform: none !important;
   }
 }

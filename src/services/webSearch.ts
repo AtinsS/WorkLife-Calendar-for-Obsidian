@@ -436,3 +436,77 @@ export function formatSearchContext(results: WebSearchResult[], query?: string):
   );
   return `### LIVE web search results (fetched ${stamp} by the host app — treat as current, real sources)${qLine}\n${lines.join("\n")}`;
 }
+
+/** A model-authored decision about whether/what to search. */
+export interface SearchPlan {
+  search: boolean;
+  queries: string[];
+}
+
+/** Max queries the planner may emit per turn. */
+export const MAX_PLAN_QUERIES = 2;
+
+/**
+ * System prompt for the small "search planner" call.
+ * The planner decides IF a live web lookup helps and WHAT to look up —
+ * the user never types a search query.
+ */
+export const SEARCH_PLAN_SYSTEM = `You are a web-search planner inside a desktop app. The app can fetch live web results and inject them as context for the final answer — the language model itself cannot browse.
+
+Decide whether a live web search would meaningfully improve the answer to the user's latest message.
+Search IS worth it for: current events and news, prices and rates, software versions, documentation, product facts, how-tos about external tools — anything needing fresh outside data.
+Search is NOT worth it for: the user's own notes/tasks/calendar content (already provided as context), opinions, brainstorming, advice, rewriting or summarizing text, math, and pure chit-chat.
+
+Reply with ONLY one JSON object (no markdown fences, no commentary):
+{"search": true, "queries": ["short query 1", "short query 2"]}
+Rules:
+- "search": false → "queries" must be []
+- at most 2 queries, each 2-8 keywords, in the language of the user's message
+- queries must name what to look up (topics/entities), not echo the user's phrasing`;
+
+/** Compact user payload for the planner: question + light history/topic hints. */
+export function buildSearchPlanPrompt(
+  question: string,
+  noteContext?: string,
+  history?: string,
+): string {
+  const hist = (history || "").trim().slice(-800);
+  const note = (noteContext || "").trim().slice(0, 600);
+  const parts = [`Latest message:\n${question.slice(0, 2000)}`];
+  parts.push(`Conversation so far (may be empty):\n${hist || "(none)"}`);
+  parts.push(`Note/topic context (may be empty):\n${note || "(none)"}`);
+  return parts.join("\n\n");
+}
+
+/**
+ * Parse the planner's JSON reply. Tolerates prose/fences around the object.
+ * Returns null when no usable plan is found — caller falls back to the
+ * heuristic `buildSearchQuery`.
+ */
+export function parseSearchPlan(raw: string): SearchPlan | null {
+  const text = (raw || "").trim();
+  if (!text) return null;
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  let data: unknown;
+  try {
+    data = JSON.parse(text.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+  if (typeof data !== "object" || data === null) return null;
+  const obj = data as { search?: unknown; queries?: unknown };
+  if (typeof obj.search !== "boolean") return null;
+
+  const rawQueries = Array.isArray(obj.queries) ? obj.queries : [];
+  const queries: string[] = [];
+  for (const q of rawQueries) {
+    if (typeof q !== "string") continue;
+    const clean = q.replace(/\s+/g, " ").trim().slice(0, 80);
+    if (!clean) continue;
+    if (!queries.includes(clean)) queries.push(clean);
+    if (queries.length >= MAX_PLAN_QUERIES) break;
+  }
+  return { search: obj.search, queries };
+}

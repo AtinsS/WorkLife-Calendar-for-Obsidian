@@ -1,10 +1,12 @@
 import {
   analyzeModelInternetSupport,
+  buildSearchPlanPrompt,
   buildSearchQuery,
   extractKeywords,
   formatSearchContext,
   parseDdgHtml,
   parseDdgLite,
+  parseSearchPlan,
 } from "../webSearch";
 
 describe("analyzeModelInternetSupport", () => {
@@ -130,5 +132,61 @@ describe("formatSearchContext", () => {
 
   it("returns empty string when no results", () => {
     expect(formatSearchContext([])).toBe("");
+  });
+});
+
+describe("parseSearchPlan", () => {
+  it("parses a plain JSON plan", () => {
+    expect(parseSearchPlan('{"search": true, "queries": ["iphone 17 review"]}')).toEqual({
+      search: true,
+      queries: ["iphone 17 review"],
+    });
+  });
+
+  it("tolerates prose and markdown fences around the JSON", () => {
+    const plan = parseSearchPlan(
+      'Sure! Here is the plan:\n```json\n{"search": false, "queries": []}\n```',
+    );
+    expect(plan).toEqual({ search: false, queries: [] });
+  });
+
+  it("caps queries at 2 and drops empties", () => {
+    const plan = parseSearchPlan(
+      '{"search": true, "queries": ["a b c", "d e f", "g h i", "  "]}',
+    );
+    expect(plan?.queries).toEqual(["a b c", "d e f"]);
+  });
+
+  it("returns null on non-JSON garbage", () => {
+    expect(parseSearchPlan("I think we should search the web.")).toBeNull();
+  });
+
+  it("returns null when search is missing or not boolean", () => {
+    expect(parseSearchPlan('{"queries": ["x"]}')).toBeNull();
+    expect(parseSearchPlan('{"search": "yes", "queries": ["x"]}')).toBeNull();
+  });
+
+  it("keeps search:false with stray queries sanitized to a list", () => {
+    const plan = parseSearchPlan('{"search": false, "queries": ["leftover"]}');
+    expect(plan).toEqual({ search: false, queries: ["leftover"] });
+  });
+});
+
+describe("buildSearchPlanPrompt", () => {
+  it("includes the question and trims long context", () => {
+    const prompt = buildSearchPlanPrompt(
+      "Стоит ли покупать iPhone 17?",
+      `### note.md\n${"x".repeat(2000)}`,
+      `user: привет\n${"y".repeat(2000)}`,
+    );
+    expect(prompt).toContain("Стоит ли покупать iPhone 17?");
+    expect(prompt).toContain("Note/topic context");
+    // note head is capped at 600 chars
+    expect(prompt.length).toBeLessThan(4000);
+  });
+
+  it("marks missing context as (none)", () => {
+    const prompt = buildSearchPlanPrompt("привет");
+    expect(prompt).toContain("(none)");
   });
 });

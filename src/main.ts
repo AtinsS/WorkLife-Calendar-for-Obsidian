@@ -25,6 +25,7 @@ import {
 } from "./constants";
 import { settings } from "./ui/stores";
 import { installKeyboardOpenWatcher } from "./ui/keyboardViewport";
+import { registerSelectionExplain } from "./ui/selectionExplain";
 import { app as appStore } from "./stores/appStore";
 import {
   CalendarSettingsTab,
@@ -619,6 +620,9 @@ export default class CalendarPlugin extends Plugin {
         addAiMenuItems(menu, multiActions);
       })
     );
+
+    // Selection chip in Reading view → Explain with AI (editor-menu never fires there)
+    registerSelectionExplain(this);
 
     await this.loadOptions();
 
