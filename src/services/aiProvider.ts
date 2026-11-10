@@ -5,40 +5,64 @@ import { errorMessage } from "../utils/sanitize";
  * AI provider transport layer.
  * - "ollama"   — Ollama native API (/api/tags, /api/chat NDJSON)
  * - "lmstudio" — LM Studio, OpenAI-compatible API (/v1/models, /v1/chat/completions SSE)
+ * - "openai"   — OpenAI, same OpenAI-compatible API plus a Bearer key
  */
-export type AiProviderId = "ollama" | "lmstudio";
+export type AiProviderId = "ollama" | "lmstudio" | "openai";
 
 export interface AiConnection {
   provider: AiProviderId;
   url: string;
+  /** Sent as `Authorization: Bearer …` — required by OpenAI, optional elsewhere. */
+  apiKey?: string;
 }
 
 export const AI_PROVIDER_DEFAULT_URL: Record<AiProviderId, string> = {
   ollama: "http://localhost:11434",
   lmstudio: "http://localhost:1234/v1",
+  openai: "https://api.openai.com/v1",
 };
 
 export const AI_PROVIDER_LABEL: Record<AiProviderId, string> = {
   ollama: "Ollama",
   lmstudio: "LM Studio",
+  openai: "OpenAI",
 };
 
 export function isAiProviderId(v: unknown): v is AiProviderId {
-  return v === "ollama" || v === "lmstudio";
+  return v === "ollama" || v === "lmstudio" || v === "openai";
+}
+
+/** LM Studio and OpenAI speak the same OpenAI-compatible wire protocol. */
+export function isOpenAiCompatible(conn: AiConnection): boolean {
+  return conn.provider === "lmstudio" || conn.provider === "openai";
 }
 
 export interface AiConnectionSettings {
   aiProvider?: AiProviderId;
   ollamaUrl?: string;
   lmstudioUrl?: string;
+  openaiUrl?: string;
+  openaiApiKey?: string;
+}
+
+function providerUrlSetting(provider: AiProviderId, opts: AiConnectionSettings): string {
+  if (provider === "lmstudio") return opts.lmstudioUrl || "";
+  if (provider === "openai") return opts.openaiUrl || "";
+  return opts.ollamaUrl || "";
 }
 
 /** Resolve the active provider + its base URL from plugin options. */
 export function resolveAiConnection(opts: AiConnectionSettings): AiConnection {
   const provider: AiProviderId = isAiProviderId(opts.aiProvider) ? opts.aiProvider : "ollama";
-  const raw = (provider === "lmstudio" ? opts.lmstudioUrl : opts.ollamaUrl) || "";
-  const url = raw.trim() || AI_PROVIDER_DEFAULT_URL[provider];
-  return { provider, url: url.replace(/\/+$/, "") };
+  const url = providerUrlSetting(provider, opts).trim() || AI_PROVIDER_DEFAULT_URL[provider];
+  const apiKey = provider === "openai" ? (opts.openaiApiKey || "").trim() : "";
+  return { provider, url: url.replace(/\/+$/, ""), apiKey: apiKey || undefined };
+}
+
+function apiHeaders(conn: AiConnection): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (conn.apiKey) headers.Authorization = `Bearer ${conn.apiKey}`;
+  return headers;
 }
 
 export interface AiChatMessage {
@@ -66,25 +90,25 @@ export interface AiConnectionResult {
 
 /** List models: GET /api/tags (Ollama) or /models (OpenAI-compatible). */
 export async function testAiConnection(conn: AiConnection): Promise<AiConnectionResult> {
-  const url = conn.provider === "lmstudio" ? `${conn.url}/models` : `${conn.url}/api/tags`;
+  const openaiApi = isOpenAiCompatible(conn);
+  const url = openaiApi ? `${conn.url}/models` : `${conn.url}/api/tags`;
   try {
     const resp = await requestUrl({
       url,
       method: "GET",
-      headers: { "Content-Type": "application/json" },
+      headers: apiHeaders(conn),
       throw: false,
     });
     if (resp.status !== 200) {
       return { ok: false, error: `HTTP ${resp.status}` };
     }
-    const models =
-      conn.provider === "lmstudio"
-        ? ((resp.json as { data?: Array<{ id?: string }> }).data ?? [])
-            .map((m) => m.id)
-            .filter((n): n is string => !!n)
-        : ((resp.json as { models?: Array<{ name?: string }> }).models ?? [])
-            .map((m) => m.name)
-            .filter((n): n is string => !!n);
+    const models = openaiApi
+      ? ((resp.json as { data?: Array<{ id?: string }> }).data ?? [])
+          .map((m) => m.id)
+          .filter((n): n is string => !!n)
+      : ((resp.json as { models?: Array<{ name?: string }> }).models ?? [])
+          .map((m) => m.name)
+          .filter((n): n is string => !!n);
     return { ok: true, models };
   } catch (e) {
     return { ok: false, error: errorMessage(e) };
@@ -124,7 +148,7 @@ function chatRequestBody(
   stream: boolean,
 ): Record<string, unknown> {
   const temperature = opts.temperature ?? 0.1;
-  if (conn.provider === "lmstudio") {
+  if (isOpenAiCompatible(conn)) {
     // No response_format here: LM Studio rejects {"type":"json_object"} with 400 on
     // models without structured-output support. JSON is enforced by the prompts and
     // parseOllamaJson tolerates prose around the object.
@@ -169,7 +193,7 @@ export function applyThinkDirective(
 }
 
 function chatEndpoint(conn: AiConnection): string {
-  return conn.provider === "lmstudio"
+  return isOpenAiCompatible(conn)
     ? `${conn.url}/chat/completions`
     : `${conn.url}/api/chat`;
 }
@@ -179,7 +203,7 @@ function extractDelta(conn: AiConnection, obj: unknown): string {
     message?: { content?: string };
     choices?: Array<{ delta?: { content?: string }; message?: { content?: string } }>;
   };
-  if (conn.provider === "lmstudio") {
+  if (isOpenAiCompatible(conn)) {
     return o.choices?.[0]?.delta?.content ?? o.choices?.[0]?.message?.content ?? "";
   }
   return o.message?.content ?? "";
@@ -190,7 +214,7 @@ function extractContent(conn: AiConnection, obj: unknown): string {
     message?: { content?: string };
     choices?: Array<{ message?: { content?: string } }>;
   };
-  if (conn.provider === "lmstudio") {
+  if (isOpenAiCompatible(conn)) {
     return o.choices?.[0]?.message?.content ?? "";
   }
   return o.message?.content ?? "";
@@ -204,7 +228,7 @@ function extractReasoning(conn: AiConnection, obj: unknown): string {
       message?: { reasoning_content?: string };
     }>;
   };
-  if (conn.provider === "lmstudio") {
+  if (isOpenAiCompatible(conn)) {
     return (
       o.choices?.[0]?.delta?.reasoning_content ??
       o.choices?.[0]?.message?.reasoning_content ??
@@ -218,10 +242,8 @@ function extractReasoning(conn: AiConnection, obj: unknown): string {
 function abortRejection(signal: AbortSignal | undefined): Promise<never> {
   return new Promise((_, reject) => {
     const err = new DOMException("Aborted", "AbortError");
-    if (!signal) {
-      reject(err);
-      return;
-    }
+    // No signal = nothing can abort the request: never settle, so requestUrl wins the race.
+    if (!signal) return;
     if (signal.aborted) {
       reject(err);
       return;
@@ -244,7 +266,7 @@ export async function streamAiChat(
   // Qwen3 on the OpenAI-compatible route has no request-level think switch;
   // the marker in the last user message is consumed by the chat template.
   const effectiveMessages =
-    conn.provider === "lmstudio" && opts.think !== undefined
+    isOpenAiCompatible(conn) && opts.think !== undefined
       ? applyThinkDirective(model, messages, opts.think)
       : messages;
   const endpoint = chatEndpoint(conn);
@@ -261,7 +283,7 @@ export async function streamAiChat(
 
     const resp = await window.fetch(endpoint, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: apiHeaders(conn),
       body: JSON.stringify(body),
       signal: opts.signal,
     });
@@ -292,7 +314,7 @@ export async function streamAiChat(
       const trimmed = line.trim();
       if (!trimmed) return;
       // SSE frames from OpenAI-compatible servers are prefixed with "data: ".
-      const payload = conn.provider === "lmstudio"
+      const payload = isOpenAiCompatible(conn)
         ? trimmed.replace(/^data:\s*/, "")
         : trimmed;
       if (!payload || payload === "[DONE]") return;
@@ -341,7 +363,7 @@ export async function streamAiChat(
       requestUrl({
         url: endpoint,
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: apiHeaders(conn),
         body: JSON.stringify(chatRequestBody(conn, model, effectiveMessages, opts, false)),
         throw: false,
       }),

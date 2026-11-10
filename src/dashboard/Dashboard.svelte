@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from "svelte";
   import moment from "moment";
   import type { App } from "obsidian";
+  import { TFile } from "obsidian";
   import { FileSuggestModal } from "../modals/FileSuggestModal";
   import type { DashboardData, DashboardCard } from "./types";
   import {
@@ -11,6 +12,7 @@
     deleteCard,
     addLink,
     deleteLink,
+    moveLink,
     reorderCards,
   } from "./storage";
   import { tasks, projects, updateTaskStatus, updateTask } from "../task-tracker/stores";
@@ -58,50 +60,209 @@
   let goalsExpanded = false;
 
   // Drag & drop state
+  const DND_CARD = "application/x-worklife-dashboard-card";
+  const DND_LINK = "application/x-worklife-dashboard-link";
+
+  type DragKind = "card" | "link" | "note";
+
   let draggedCardId: string | null = null;
   let dragOverCardId: string | null = null;
+  let draggedLink: { cardId: string; linkId: string } | null = null;
+  let dragOverLink: { linkId: string; before: boolean } | null = null;
+  let activeDragKind: DragKind | null = null;
+
+  function dragKindOf(e: DragEvent): DragKind | null {
+    const dt = e.dataTransfer;
+    if (!dt) return null;
+    const types = Array.from(dt.types ?? []);
+    if (types.includes(DND_LINK)) return "link";
+    if (types.includes(DND_CARD)) return "card";
+    if (types.includes("Files") || types.includes("text/uri-list") || types.includes("text/plain")) return "note";
+    return null;
+  }
+
+  function clearDragState() {
+    draggedCardId = null;
+    dragOverCardId = null;
+    draggedLink = null;
+    dragOverLink = null;
+    activeDragKind = null;
+  }
 
   function onDragStart(e: DragEvent, cardId: string) {
     draggedCardId = cardId;
+    activeDragKind = "card";
     e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData(DND_CARD, cardId);
     e.dataTransfer.setData("text/plain", cardId);
     (e.target as HTMLElement).classList.add("dragging");
   }
 
   function onDragEnd(e: DragEvent) {
     (e.target as HTMLElement).classList.remove("dragging");
-    draggedCardId = null;
-    dragOverCardId = null;
+    clearDragState();
+  }
+
+  function onLinkDragStart(e: DragEvent, cardId: string, linkId: string) {
+    e.stopPropagation(); // don't also start the card drag
+    draggedLink = { cardId, linkId };
+    activeDragKind = "link";
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData(DND_LINK, JSON.stringify({ cardId, linkId }));
+    e.dataTransfer.setData("text/plain", linkId);
+    (e.currentTarget as HTMLElement).classList.add("is-dragging");
+  }
+
+  function onLinkDragEnd(e: DragEvent) {
+    e.stopPropagation();
+    (e.currentTarget as HTMLElement).classList.remove("is-dragging");
+    clearDragState();
+  }
+
+  function insertMarkerAt(e: DragEvent): void {
+    if (activeDragKind === "card") {
+      dragOverLink = null;
+      return;
+    }
+    const item = (e.target as HTMLElement)?.closest?.(".dashboard-card__item") as HTMLElement | null;
+    const linkId = item?.dataset.linkId;
+    if (!item || !linkId) {
+      dragOverLink = null;
+      return;
+    }
+    const rect = item.getBoundingClientRect();
+    dragOverLink = { linkId, before: e.clientY < rect.top + rect.height / 2 };
   }
 
   function onDragOver(e: DragEvent, cardId: string) {
+    const kind = dragKindOf(e);
+    if (!kind) return;
     e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    if (cardId !== draggedCardId) {
+    activeDragKind = kind;
+    if (kind !== "note") e.dataTransfer.dropEffect = "move";
+    if (!(kind === "card" && cardId === draggedCardId)) {
       dragOverCardId = cardId;
     }
+    insertMarkerAt(e);
   }
 
-  function onDragLeave() {
+  function onDragLeave(e: DragEvent) {
+    const el = e.currentTarget as HTMLElement;
+    const to = e.relatedTarget as Node | null;
+    if (to && el.contains(to)) return; // moved over a child — still inside
     dragOverCardId = null;
+    dragOverLink = null;
+    activeDragKind = null;
+  }
+
+  /** Insert index from the drop pointer: before/after the hovered link, or append. */
+  function dropIndexInCard(cardId: string, e: DragEvent): number {
+    const card = data.cards.find((c) => c.id === cardId);
+    if (!card) return 0;
+    const item = (e.target as HTMLElement)?.closest?.(".dashboard-card__item") as HTMLElement | null;
+    const linkId = item?.dataset.linkId;
+    const idx = linkId ? card.links.findIndex((l) => l.id === linkId) : -1;
+    if (idx === -1 || !item) return card.links.length;
+    const rect = item.getBoundingClientRect();
+    return e.clientY < rect.top + rect.height / 2 ? idx : idx + 1;
+  }
+
+  function findLinkOwner(linkId: string): { cardId: string; linkId: string } | null {
+    for (const c of data.cards) {
+      if (c.links.some((l) => l.id === linkId)) return { cardId: c.id, linkId };
+    }
+    return null;
+  }
+
+  /** A vault note dragged in (file explorer, search, internal link). */
+  function resolveDroppedNote(e: DragEvent): { label: string; notePath: string } | null {
+    const dt = e.dataTransfer;
+    if (!dt) return null;
+    const candidates: string[] = [];
+    const plain = dt.getData("text/plain")?.trim();
+    if (plain) candidates.push(plain);
+    const uriList = dt.getData("text/uri-list")?.trim();
+    if (uriList) {
+      for (const line of uriList.split(/\r?\n/)) {
+        const t = line.trim();
+        if (t) candidates.push(t);
+      }
+    }
+    for (const raw of candidates) {
+      const path = normalizeNoteRef(raw);
+      if (!path) continue;
+      const file =
+        appInstance.vault.getAbstractFileByPath(path) ??
+        appInstance.metadataCache.getFirstLinkpathDest(path.replace(/\.md$/i, ""), "");
+      if (file instanceof TFile) {
+        return { label: file.basename, notePath: file.path };
+      }
+    }
+    return null;
+  }
+
+  function normalizeNoteRef(raw: string): string | null {
+    let s = raw.trim();
+    if (!s || s.includes("\n")) return null;
+    const obsidianUri = s.match(/^obsidian:\/\/[^?\s]*\?[^#\s]*file=([^&#\s]+)/);
+    const appUri = s.match(/^app:\/\/obsidian\.md\/(.+)$/);
+    try {
+      if (obsidianUri) s = decodeURIComponent(obsidianUri[1]);
+      else if (appUri) s = decodeURIComponent(appUri[1]);
+    } catch {
+      return null;
+    }
+    if (s.startsWith("[[") && s.endsWith("]]")) s = s.slice(2, -2);
+    s = s.split("|")[0].split("#")[0].trim();
+    return s || null;
   }
 
   async function onDrop(e: DragEvent, targetCardId: string) {
     e.preventDefault();
-    if (!draggedCardId || draggedCardId === targetCardId) return;
+    const kind = dragKindOf(e);
+    const toIndex = dropIndexInCard(targetCardId, e);
 
-    const ids = data.cards.map(c => c.id);
-    const fromIdx = ids.indexOf(draggedCardId);
-    const toIdx = ids.indexOf(targetCardId);
-    if (fromIdx === -1 || toIdx === -1) return;
-
-    ids.splice(fromIdx, 1);
-    ids.splice(toIdx, 0, draggedCardId);
-
-    await reorderCards(appInstance, ids);
-    data = await loadDashboard(appInstance);
-    draggedCardId = null;
-    dragOverCardId = null;
+    if (kind === "link") {
+      const raw = e.dataTransfer?.getData(DND_LINK) ?? "";
+      let from = draggedLink;
+      if (raw) {
+        try {
+          const p = JSON.parse(raw) as { cardId?: string; linkId?: string };
+          if (p && p.linkId) from = findLinkOwner(p.linkId) ?? { cardId: p.cardId ?? "", linkId: p.linkId };
+        } catch {
+          /* fall back to state */
+        }
+      }
+      if (from && from.linkId) {
+        await moveLink(appInstance, from.cardId, targetCardId, from.linkId, toIndex);
+        data = await loadDashboard(appInstance);
+      }
+    } else if (kind === "card") {
+      const raw = e.dataTransfer?.getData(DND_CARD) ?? "";
+      const plain = e.dataTransfer?.getData("text/plain") ?? "";
+      const known = (id: string | null | undefined) => !!id && data.cards.some((c) => c.id === id);
+      const sourceCardId = [raw, plain, draggedCardId].find(known) ?? null;
+      if (!sourceCardId || sourceCardId === targetCardId) {
+        clearDragState();
+        return;
+      }
+      const ids = data.cards.map((c) => c.id);
+      const fromIdx = ids.indexOf(sourceCardId);
+      const toIdx = ids.indexOf(targetCardId);
+      if (fromIdx !== -1 && toIdx !== -1) {
+        ids.splice(fromIdx, 1);
+        ids.splice(toIdx, 0, sourceCardId);
+        await reorderCards(appInstance, ids);
+        data = await loadDashboard(appInstance);
+      }
+    } else if (kind === "note") {
+      const note = resolveDroppedNote(e);
+      if (note) {
+        await addLink(appInstance, targetCardId, note.label, note.notePath, toIndex);
+        data = await loadDashboard(appInstance);
+      }
+    }
+    clearDragState();
   }
 
   // Tasks widget data — react to `now` so day rollover works
@@ -598,6 +759,13 @@
             <a
               href={link.notePath}
               class="internal-link dashboard-card__item"
+              class:drop-above={dragOverLink && dragOverLink.linkId === link.id && dragOverLink.before}
+              class:drop-below={dragOverLink && dragOverLink.linkId === link.id && !dragOverLink.before}
+              data-link-id={link.id}
+              draggable="true"
+              title={$t("dashboard.dragToReorder")}
+              on:dragstart={(e) => onLinkDragStart(e, card.id, link.id)}
+              on:dragend={onLinkDragEnd}
               on:click={(e) => handleLinkClick(e, link.notePath)}
             >
               <span class="dash-link-label">{link.label}</span>
@@ -609,7 +777,9 @@
             </a>
           {/each}
           {#if card.links.length === 0}
-            <div class="dashboard-card__empty">{$t("dashboard.noLinks")}</div>
+            <div class="dashboard-card__empty" class:drop-note={dragOverCardId === card.id && activeDragKind === "note"}>
+              {dragOverCardId === card.id && activeDragKind === "note" ? $t("dashboard.dropNoteHere") : $t("dashboard.noLinks")}
+            </div>
           {/if}
         </div>
       </div>
@@ -1332,6 +1502,46 @@
     color: var(--text-faint);
     font-size: 13px;
     padding: 16px 0;
+  }
+
+  .dashboard-card__empty.drop-note {
+    color: var(--interactive-accent);
+    outline: 2px dashed var(--interactive-accent);
+    outline-offset: -4px;
+    border-radius: 8px;
+  }
+
+  /* Link drag & drop */
+  .dashboard-card__item {
+    cursor: grab;
+    position: relative;
+  }
+
+  .dashboard-card__item:active {
+    cursor: grabbing;
+  }
+
+  :global(.dashboard-card__item.is-dragging) {
+    opacity: 0.4;
+  }
+
+  .dashboard-card__item.drop-above::before,
+  .dashboard-card__item.drop-below::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--interactive-accent);
+    border-radius: 1px;
+  }
+
+  .dashboard-card__item.drop-above::before {
+    top: -1px;
+  }
+
+  .dashboard-card__item.drop-below::after {
+    bottom: -1px;
   }
 
   /* Add card button */

@@ -17,6 +17,8 @@ import {
   resolveAiConnection,
   testAiConnection,
   testAiModel,
+  isAiProviderId,
+  AI_PROVIDER_DEFAULT_URL,
   type AiProviderId,
 } from "./services/aiProvider";
 import { normalizeSummaryStyle, summaryStyleDesc } from "./services/summaryStyle";
@@ -217,10 +219,10 @@ export interface ISettings {
   showStatusBar: boolean;
   dtwShowOnAllPages: boolean;
 
-  // AI settings (Ollama / LM Studio)
+  // AI settings
   ollamaEnabled: boolean;
-  /** Active AI backend. "ollama" (default) or "lmstudio" (OpenAI-compatible API). */
-  aiProvider?: "ollama" | "lmstudio";
+  /** Active AI backend. "ollama" (default), "lmstudio" or "openai" (both OpenAI-compatible). */
+  aiProvider?: "ollama" | "lmstudio" | "openai";
   ollamaUrl: string;
   ollamaModel: string;
   /** LM Studio base URL, OpenAI-compatible (typically http://localhost:1234/v1). */
@@ -228,6 +230,13 @@ export interface ISettings {
   lmstudioModel: string;
   /** Model for structured extraction on LM Studio. Used only in "dual" mode. */
   lmstudioModelExtract?: string;
+  /** OpenAI base URL, OpenAI-compatible (typically https://api.openai.com/v1). */
+  openaiUrl: string;
+  /** OpenAI API key (Bearer). Required by the OpenAI API. */
+  openaiApiKey: string;
+  openaiModel: string;
+  /** Model for structured extraction on OpenAI. Used only in "dual" mode. */
+  openaiModelExtract?: string;
   /** "single" — one model for all roles; "dual" — separate model for structured extraction. */
   ollamaModelMode?: "single" | "dual";
   /** Model for structured extraction (JSON parsing). Used only in "dual" mode. */
@@ -380,7 +389,7 @@ export const defaultSettings = Object.freeze({
   showStatusBar: true,
   dtwShowOnAllPages: false,
 
-  // AI defaults (Ollama / LM Studio)
+  // AI defaults
   ollamaEnabled: false,
   aiProvider: "ollama" as const,
   ollamaUrl: "http://localhost:11434",
@@ -388,6 +397,10 @@ export const defaultSettings = Object.freeze({
   lmstudioUrl: "http://localhost:1234/v1",
   lmstudioModel: "",
   lmstudioModelExtract: "",
+  openaiUrl: "https://api.openai.com/v1",
+  openaiApiKey: "",
+  openaiModel: "",
+  openaiModelExtract: "",
   ollamaModelMode: "single" as const,
   ollamaModelExtract: "",
   ollamaContextSize: 0,
@@ -2828,6 +2841,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     if (!this.plugin.options.ollamaEnabled) {
       this.note(power, tRaw("settings.ai.howToSteps"));
       this.note(power, tRaw("settings.ai.howToStepsLmstudio"));
+      this.note(power, tRaw("settings.ai.howToStepsOpenai"));
       return;
     }
 
@@ -2837,9 +2851,19 @@ export class CalendarSettingsTab extends PluginSettingTab {
       icon: "plug",
     });
 
-    const provider: AiProviderId =
-      this.plugin.options.aiProvider === "lmstudio" ? "lmstudio" : "ollama";
+    const provider: AiProviderId = isAiProviderId(this.plugin.options.aiProvider)
+      ? this.plugin.options.aiProvider
+      : "ollama";
+    const isOllama = provider === "ollama";
     const isLmstudio = provider === "lmstudio";
+    const isOpenai = provider === "openai";
+    const urlKey = isLmstudio ? "lmstudioUrl" : isOpenai ? "openaiUrl" : "ollamaUrl";
+    const urlDefault = AI_PROVIDER_DEFAULT_URL[provider];
+    const urlDesc = isLmstudio
+      ? tRaw("settings.ai.urlDescLmstudio")
+      : isOpenai
+        ? tRaw("settings.ai.urlDescOpenai")
+        : tRaw("settings.ai.urlDesc");
 
     new Setting(connection)
       .setName(tRaw("settings.ai.provider"))
@@ -2847,10 +2871,11 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addDropdown((dropdown) => {
         dropdown.addOption("ollama", tRaw("settings.ai.providerOllama"));
         dropdown.addOption("lmstudio", tRaw("settings.ai.providerLmstudio"));
+        dropdown.addOption("openai", tRaw("settings.ai.providerOpenai"));
         dropdown.setValue(provider);
         dropdown.onChange(async (value) => {
           await this.plugin.writeOptions({
-            aiProvider: value === "lmstudio" ? "lmstudio" : "ollama",
+            aiProvider: isAiProviderId(value) ? value : "ollama",
           });
           this.render();
         });
@@ -2858,22 +2883,34 @@ export class CalendarSettingsTab extends PluginSettingTab {
 
     new Setting(connection)
       .setName(tRaw("settings.ai.url"))
-      .setDesc(isLmstudio ? tRaw("settings.ai.urlDescLmstudio") : tRaw("settings.ai.urlDesc"))
+      .setDesc(urlDesc)
       .addText((text) => {
         text
-          .setPlaceholder(isLmstudio ? "http://localhost:1234/v1" : "http://localhost:11434")
-          .setValue(
-            isLmstudio
-              ? this.plugin.options.lmstudioUrl || "http://localhost:1234/v1"
-              : this.plugin.options.ollamaUrl || "http://localhost:11434",
-          )
+          .setPlaceholder(urlDefault)
+          .setValue((this.plugin.options[urlKey] as string) || urlDefault)
           .onChange(async (value) => {
-            await this.plugin.writeOptions(isLmstudio ? { lmstudioUrl: value } : { ollamaUrl: value });
+            await this.plugin.writeOptions({ [urlKey]: value });
           });
         text.inputEl.addClass("mcp-input-xl");
       });
 
-    if (!isLmstudio) {
+    if (isOpenai) {
+      new Setting(connection)
+        .setName(tRaw("settings.ai.apiKey"))
+        .setDesc(tRaw("settings.ai.apiKeyDesc"))
+        .addText((text) => {
+          text
+            .setPlaceholder(tRaw("settings.ai.apiKeyPlaceholder"))
+            .setValue(this.plugin.options.openaiApiKey || "")
+            .onChange(async (value) => {
+              await this.plugin.writeOptions({ openaiApiKey: value });
+            });
+          text.inputEl.type = "password";
+          text.inputEl.addClass("mcp-input-xl");
+        });
+    }
+
+    if (isOllama) {
       new Setting(connection)
         .setName(tRaw("settings.ai.contextSize"))
         .setDesc(tRaw("settings.ai.contextSizeDesc"))
@@ -2892,7 +2929,10 @@ export class CalendarSettingsTab extends PluginSettingTab {
           text.inputEl.addClass("mcp-input-md");
         });
     } else {
-      this.note(connection, tRaw("settings.ai.contextSizeLmstudio"));
+      this.note(
+        connection,
+        tRaw(isLmstudio ? "settings.ai.contextSizeLmstudio" : "settings.ai.contextSizeOpenai"),
+      );
     }
 
     const btnRow = connection.createDiv({ cls: "mcp-btn-row" });
@@ -2929,9 +2969,17 @@ export class CalendarSettingsTab extends PluginSettingTab {
       getValue: () =>
         isLmstudio
           ? this.plugin.options.lmstudioModel || ""
-          : this.plugin.options.ollamaModel || "llama3.1",
+          : isOpenai
+            ? this.plugin.options.openaiModel || ""
+            : this.plugin.options.ollamaModel || "llama3.1",
       setValue: (v) =>
-        this.plugin.writeOptions(isLmstudio ? { lmstudioModel: v } : { ollamaModel: v }),
+        this.plugin.writeOptions(
+          isLmstudio
+            ? { lmstudioModel: v }
+            : isOpenai
+              ? { openaiModel: v }
+              : { ollamaModel: v },
+        ),
     });
 
     // Extract model — only in dual mode
@@ -2942,10 +2990,16 @@ export class CalendarSettingsTab extends PluginSettingTab {
         getValue: () =>
           isLmstudio
             ? this.plugin.options.lmstudioModelExtract || ""
-            : this.plugin.options.ollamaModelExtract || "",
+            : isOpenai
+              ? this.plugin.options.openaiModelExtract || ""
+              : this.plugin.options.ollamaModelExtract || "",
         setValue: (v) =>
           this.plugin.writeOptions(
-            isLmstudio ? { lmstudioModelExtract: v } : { ollamaModelExtract: v },
+            isLmstudio
+              ? { lmstudioModelExtract: v }
+              : isOpenai
+                ? { openaiModelExtract: v }
+                : { ollamaModelExtract: v },
           ),
         emptyLabel: tRaw("settings.ai.modelExtractSame"),
       });
@@ -3113,10 +3167,9 @@ export class CalendarSettingsTab extends PluginSettingTab {
       title: tRaw("settings.ai.howToTitle"),
       icon: "help-circle",
     });
-    this.note(
-      howToCard,
-      isLmstudio ? tRaw("settings.ai.howToStepsLmstudio") : tRaw("settings.ai.howToSteps"),
-    );
+    this.note(howToCard, tRaw("settings.ai.howToSteps"));
+    this.note(howToCard, tRaw("settings.ai.howToStepsLmstudio"));
+    this.note(howToCard, tRaw("settings.ai.howToStepsOpenai"));
   }
 
   /** Chat identity + tone — lives under AI settings (moved from General). */
@@ -3278,9 +3331,11 @@ export class CalendarSettingsTab extends PluginSettingTab {
             testBtn.addClass("mcp-color-success");
           } else {
             testBtn.textContent = tRaw(
-              resolveAiConnection(this.plugin.options).provider === "lmstudio"
+              conn.provider === "lmstudio"
                 ? "settings.ai.noModelsLmstudio"
-                : "settings.ai.noModels",
+                : conn.provider === "openai"
+                  ? "settings.ai.noModelsOpenai"
+                  : "settings.ai.noModels",
             );
             testBtn.addClass("mcp-color-danger");
           }

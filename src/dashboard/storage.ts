@@ -91,14 +91,41 @@ export async function deleteCard(app: App, cardId: string): Promise<void> {
   await saveDashboard(app, data);
 }
 
-export async function addLink(app: App, cardId: string, label: string, notePath: string): Promise<DashboardLink> {
+export async function addLink(app: App, cardId: string, label: string, notePath: string, index?: number): Promise<DashboardLink> {
   const data = await loadDashboard(app);
   const card = data.cards.find((c) => c.id === cardId);
   if (!card) throw new Error("Card not found");
   const link: DashboardLink = { id: generateId(), label, notePath };
-  card.links.push(link);
+  const at = index === undefined ? card.links.length : Math.max(0, Math.min(index, card.links.length));
+  card.links.splice(at, 0, link);
   await saveDashboard(app, data);
   return link;
+}
+
+/**
+ * Move a link within its card or to another card.
+ * `toIndex` is the insertion position in the target card's links *before* removal
+ * of the dragged link (i.e. as computed from the drop pointer).
+ */
+export async function moveLink(app: App, fromCardId: string, toCardId: string, linkId: string, toIndex: number): Promise<void> {
+  const data = await loadDashboard(app);
+  if (!moveLinkInData(data, fromCardId, toCardId, linkId, toIndex)) return;
+  await saveDashboard(app, data);
+}
+
+/** Pure move used by {@link moveLink}. Returns false when nothing moved. */
+export function moveLinkInData(data: DashboardData, fromCardId: string, toCardId: string, linkId: string, toIndex: number): boolean {
+  const fromCard = data.cards.find((c) => c.id === fromCardId);
+  const toCard = data.cards.find((c) => c.id === toCardId);
+  if (!fromCard || !toCard) return false;
+  const fromIdx = fromCard.links.findIndex((l) => l.id === linkId);
+  if (fromIdx === -1) return false;
+  const [link] = fromCard.links.splice(fromIdx, 1);
+  let idx = toIndex;
+  if (fromCard === toCard && fromIdx < toIndex) idx = toIndex - 1;
+  idx = Math.max(0, Math.min(idx, toCard.links.length));
+  toCard.links.splice(idx, 0, link);
+  return true;
 }
 
 export async function deleteLink(app: App, cardId: string, linkId: string): Promise<void> {

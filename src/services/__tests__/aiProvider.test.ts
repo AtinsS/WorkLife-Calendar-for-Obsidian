@@ -47,11 +47,25 @@ describe("resolveAiConnection", () => {
   });
 
   it("falls back to ollama on unknown provider and on blank URL", () => {
-    expect(resolveAiConnection({ aiProvider: "openai" as never }).provider).toBe("ollama");
+    expect(resolveAiConnection({ aiProvider: "groq" as never }).provider).toBe("ollama");
     expect(resolveAiConnection({ ollamaUrl: "   " }).url).toBe("http://localhost:11434");
     expect(resolveAiConnection({ aiProvider: "lmstudio", lmstudioUrl: "  " }).url).toBe(
       "http://localhost:1234/v1",
     );
+  });
+
+  it("switches to openai with its default URL and the API key", () => {
+    expect(resolveAiConnection({ aiProvider: "openai", openaiApiKey: "sk-test" })).toEqual({
+      provider: "openai",
+      url: "https://api.openai.com/v1",
+      apiKey: "sk-test",
+    });
+  });
+
+  it("omits apiKey when it is blank and never leaks an ollama key", () => {
+    expect(resolveAiConnection({ aiProvider: "openai", openaiApiKey: "  " }).apiKey).toBeUndefined();
+    expect(resolveAiConnection({ aiProvider: "ollama" }).apiKey).toBeUndefined();
+    expect(resolveAiConnection({ aiProvider: "lmstudio" }).apiKey).toBeUndefined();
   });
 });
 

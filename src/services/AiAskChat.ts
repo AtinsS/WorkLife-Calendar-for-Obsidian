@@ -607,13 +607,17 @@ export class AiAskChat {
     signal?: AbortSignal,
   ): Promise<SearchPlan | null> {
     const opts = get(settings) as {
-      aiProvider?: "ollama" | "lmstudio";
+      aiProvider?: "ollama" | "lmstudio" | "openai";
       ollamaUrl?: string;
       lmstudioUrl?: string;
+      openaiUrl?: string;
+      openaiApiKey?: string;
       ollamaModel?: string;
       ollamaModelExtract?: string;
       lmstudioModel?: string;
       lmstudioModelExtract?: string;
+      openaiModel?: string;
+      openaiModelExtract?: string;
       ollamaModelMode?: "single" | "dual";
     };
     const raw = await streamAiChat(

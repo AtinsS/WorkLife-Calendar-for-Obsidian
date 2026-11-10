@@ -18,11 +18,13 @@ export interface ExtractionOptions extends StreamChatOptions {
 export type ModelRole = "reason" | "extract";
 
 export interface ModelSettingsShape {
-  aiProvider?: "ollama" | "lmstudio";
+  aiProvider?: "ollama" | "lmstudio" | "openai";
   ollamaModel?: string;
   ollamaModelExtract?: string;
   lmstudioModel?: string;
   lmstudioModelExtract?: string;
+  openaiModel?: string;
+  openaiModelExtract?: string;
   /** "single" (default) — one model for all roles; "dual" — separate extract model. */
   ollamaModelMode?: "single" | "dual";
 }
@@ -35,12 +37,12 @@ export interface ModelSettingsShape {
  * a model id from one server to the other.
  */
 export function resolveModel(role: ModelRole, opts: ModelSettingsShape): string {
-  const lmstudio = opts.aiProvider === "lmstudio";
-  const main = ((lmstudio ? opts.lmstudioModel : opts.ollamaModel) || "").trim();
-  const primary = lmstudio ? main : main || "llama3.1";
+  const p = opts.aiProvider === "lmstudio" ? "lmstudio" : opts.aiProvider === "openai" ? "openai" : "ollama";
+  const main = ((p === "lmstudio" ? opts.lmstudioModel : p === "openai" ? opts.openaiModel : opts.ollamaModel) || "").trim();
+  const primary = p === "ollama" ? main || "llama3.1" : main;
   if (role === "reason") return primary;
   if (opts.ollamaModelMode !== "dual") return primary;
-  const extract = ((lmstudio ? opts.lmstudioModelExtract : opts.ollamaModelExtract) || "").trim();
+  const extract = ((p === "lmstudio" ? opts.lmstudioModelExtract : p === "openai" ? opts.openaiModelExtract : opts.ollamaModelExtract) || "").trim();
   return extract || primary;
 }
 
