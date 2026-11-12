@@ -59,6 +59,38 @@ function simpleHash(str: string): string {
   return (hash >>> 0).toString(36);
 }
 
+// --- In-file module meta ---
+// Each module file carries its own `__meta: { updatedAt, checksum }` so that
+// integrity and write-time never depend on meta.json (a separate file that
+// per-file sync can deliver out of order — the old checksum→.bak race).
+
+const FILE_META_KEY = "__meta";
+
+interface FileMeta {
+  updatedAt: string;
+  checksum: string;
+}
+
+function stripFileMeta(data: Record<string, unknown>): Record<string, unknown> {
+  if (data && typeof data === "object" && FILE_META_KEY in data) {
+    const rest = { ...data };
+    delete rest[FILE_META_KEY];
+    return rest;
+  }
+  return data;
+}
+
+/** Body string (no __meta) + full file string with a fresh in-file meta stamp. */
+function stampFileMeta(data: Record<string, unknown>): { body: string; full: string } {
+  const body = JSON.stringify(data, null, 2);
+  const meta: FileMeta = {
+    updatedAt: new Date().toISOString(),
+    checksum: simpleHash(body),
+  };
+  const full = JSON.stringify({ ...data, [FILE_META_KEY]: meta }, null, 2);
+  return { body, full };
+}
+
 // --- Per-module write queue ---
 // Serializes writes within each module so concurrent calls don't conflict.
 // Cross-module writes are independent and can run in parallel.
@@ -132,7 +164,9 @@ async function writeFileContent(app: App, path: string, content: string): Promis
 
 /**
  * Load a single module's data from its own file.
- * Falls back to .bak on parse error or missing file.
+ * Falls back to .bak ONLY when the primary is missing or unparseable —
+ * never on a checksum/updatedAt mismatch (per-file sync makes meta and data
+ * arrive out of order; rolling back to .bak there lost phone edits).
  */
 export async function loadModuleData(
   app: App,
@@ -145,27 +179,14 @@ export async function loadModuleData(
   const data = await tryLoadJson(app, primaryPath);
   console.debug(`[VS] loadModule(${moduleName}): primary=${data ? `${Object.keys(data).length}k` : 'null'}`);
   if (data !== null) {
-    // Verify checksum if meta exists
-    const meta = await loadMeta(app);
-    if (meta && meta.checksums[moduleName]) {
-      const expected = meta.checksums[moduleName];
-      const actual = simpleHash(JSON.stringify(data, null, 2));
-      if (expected !== actual) {
-        console.warn(
-          `[vaultStorage] Checksum mismatch for ${moduleName}, trying backup`
-        );
-        const backupData = await tryLoadJson(app, backupPath);
-        if (backupData !== null) return backupData;
-      }
-    }
-    return data;
+    return stripFileMeta(data);
   }
 
-  // Primary failed — try backup
+  // Primary failed to parse / missing — try backup
   const backupData = await tryLoadJson(app, backupPath);
   if (backupData !== null) {
     console.warn(`[vaultStorage] Primary missing/corrupt for ${moduleName}, using backup`);
-    return backupData;
+    return stripFileMeta(backupData);
   }
 
   return {};
@@ -181,8 +202,16 @@ async function tryLoadJson(app: App, path: string): Promise<Record<string, unkno
   }
 }
 
+function tryParse(content: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(content) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Save a module's data with backup and checksum.
+ * Save a module's data with backup and an in-file meta stamp.
  * Skips disk writes when content is unchanged (keeps Syncthing quiet).
  */
 export async function saveModuleData(
@@ -192,14 +221,19 @@ export async function saveModuleData(
 ): Promise<void> {
   const primaryPath = moduleFilePath(moduleName);
   const backupPath = backupFilePath(moduleName);
-  const content = JSON.stringify(data, null, 2);
-  const checksum = simpleHash(content);
+  const payload = stripFileMeta(data);
+  const { body, full } = stampFileMeta(payload);
 
   const existingContent = await readFileContent(app, primaryPath);
-  if (existingContent === content) {
-    // Identical payload — only ensure meta checksum is present (skip write if same)
-    await updateMeta(app, moduleName, checksum);
-    return;
+  if (existingContent !== null) {
+    const existingParsed = tryParse(existingContent);
+    if (existingParsed !== null) {
+      const existingBody = JSON.stringify(stripFileMeta(existingParsed), null, 2);
+      if (existingBody === body) {
+        // Identical payload — nothing to write (fresh stamp would only churn sync)
+        return;
+      }
+    }
   }
 
   // Backup previous primary (skip if backup already holds that exact content)
@@ -212,11 +246,11 @@ export async function saveModuleData(
     }
   }
 
-  // Write primary
-  await writeFileContent(app, primaryPath, content);
+  // Write primary (body + in-file __meta stamp)
+  await writeFileContent(app, primaryPath, full);
 
-  // Update checksum in meta
-  await updateMeta(app, moduleName, checksum);
+  // Keep meta.json bookkeeping for older readers: lastUpdated only, no checksums
+  await updateMeta(app);
 }
 
 // --- Meta file ---
@@ -231,18 +265,16 @@ async function loadMeta(app: App): Promise<ModuleMeta | null> {
   }
 }
 
-async function updateMeta(app: App, moduleName: string, checksum: string): Promise<void> {
+async function updateMeta(app: App): Promise<void> {
   try {
     const meta = (await loadMeta(app)) || {
       schemaVersion: 1,
       checksums: {},
       lastUpdated: new Date().toISOString(),
     };
-    // Skip meta write when checksum is already recorded (avoids Syncthing churn)
-    if (meta.checksums[moduleName] === checksum) {
-      return;
-    }
-    meta.checksums[moduleName] = checksum;
+    // Stale checksums from older versions are dropped — verify-on-mismatch is gone.
+    // meta.json is kept only for lastUpdated (remote-deletion inference on the app).
+    meta.checksums = {};
     meta.lastUpdated = new Date().toISOString();
     const content = JSON.stringify(meta, null, 2);
     await writeFileContent(app, META_FILE, content);
@@ -298,9 +330,9 @@ export async function migrateFromSingleFile(app: App): Promise<void> {
 
     for (const [key, moduleName] of Object.entries(keyMap)) {
       if (data[key] !== undefined) {
-        const moduleContent = JSON.stringify(data[key], null, 2);
-        await writeFileContent(app, moduleFilePath(moduleName), moduleContent);
-        await updateMeta(app, moduleName, simpleHash(moduleContent));
+        const { full } = stampFileMeta(data[key] as Record<string, unknown>);
+        await writeFileContent(app, moduleFilePath(moduleName), full);
+        await updateMeta(app);
       }
     }
 
@@ -351,8 +383,7 @@ export async function migrateRootModuleFiles(app: App): Promise<void> {
 
       if (content) {
         await writeFileContent(app, targetPath, content);
-        const data: Record<string, unknown> = JSON.parse(content) as Record<string, unknown>;
-        await updateMeta(app, moduleName, simpleHash(JSON.stringify(data, null, 2)));
+        await updateMeta(app);
         console.debug(`[vaultStorage] Migrated ${rootPath} → ${targetPath}`);
       }
     } catch (e: unknown) {

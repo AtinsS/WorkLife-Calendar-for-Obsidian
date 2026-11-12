@@ -714,6 +714,7 @@ export default class CalendarPlugin extends Plugin {
           await reloadFinanceStores();
           await reloadFinancialAnalyticsStores();
           await reloadWeightStores();
+          customEventsStore.set(await loadCustomEvents(this));
         })();
       }, 500);
     };
