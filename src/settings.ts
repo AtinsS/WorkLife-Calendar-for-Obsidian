@@ -2887,7 +2887,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
       .addText((text) => {
         text
           .setPlaceholder(urlDefault)
-          .setValue((this.plugin.options[urlKey] as string) || urlDefault)
+          .setValue(this.plugin.options[urlKey] || urlDefault)
           .onChange(async (value) => {
             await this.plugin.writeOptions({ [urlKey]: value });
           });

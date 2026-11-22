@@ -19,6 +19,7 @@
   import { TaskModal } from "./TaskModal";
   import { ProjectModal } from "./ProjectModal";
   import { t } from "../i18n";
+  import { formatDayLabel } from "../utils/moment";
   import { settings } from "../ui/stores";
   import { errorMessage } from "../utils/sanitize";
   import { pluginUpdateInfo, updatePluginNow, fetchLatestRelease } from "../services/updateCheck";
@@ -121,7 +122,9 @@
     tooltip: string;
   }
 
-  function dayRange(dateUID: string): { start: Date; end: Date } | null {
+  function dayRange(dateUID: string | null): { start: Date; end: Date } | null {
+    // «Все задачи» clears selectedDate — there is no day to build events for.
+    if (!dateUID) return null;
     const match = dateUID.match(/(\d{4}-\d{2}-\d{2})/);
     if (!match) return null;
     const start = new Date(`${match[1]}T00:00:00`);
@@ -137,7 +140,7 @@
   }
 
   function buildDayEvents(
-    dateUID: string,
+    dateUID: string | null,
     opts: { calendarSubscriptions?: ICalendarSubscription[] },
     customEvents: ICustomEvent[],
     feeds: Map<string, IcsCalendar>,
@@ -312,13 +315,8 @@
   function formatDate(dateUID: string): string {
     if (!dateUID) return $t("tasks.panel.dateNotSelected");
     const match = dateUID.match(/^(?:day|week|month)-(\d{4}-\d{2}-\d{2})/);
-    if (match) {
-      try {
-        const m = window.moment(match[1], "YYYY-MM-DD", true);
-        if (m.isValid()) return m.format("D MMMM YYYY");
-        return match[1];
-      } catch { return match[1]; }
-    }
+    // Short weekday («пн») on small screens — full names eat the chrome.
+    if (match) return formatDayLabel(match[1], isMobile);
     return dateUID;
   }
 

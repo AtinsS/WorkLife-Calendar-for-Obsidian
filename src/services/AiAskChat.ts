@@ -126,6 +126,8 @@ export class AiAskChat {
   private files: TFile[];
   private contextLabel: string;
   private contextCache: string | null = null;
+  /** Paths of notes the user pinned — these survive note switches. */
+  private pinnedPaths = new Set<string>();
   /** Keeps the hosting view's pending context in sync when the chip is cleared. */
   onContextChange?: (files: TFile[], label: string) => void;
   private messages: ChatMsg[] = [];
@@ -188,7 +190,7 @@ export class AiAskChat {
     const headText = head.createDiv({ cls: "ai-sch-head-text" });
     headText.createEl("h2", { text: tRaw("ai.askQa.title"), cls: "ai-sch-title" });
     const ctx = headText.createDiv({ cls: "ai-ask-context" });
-    this.contextChipEl = ctx.createSpan({ cls: "ai-ask-context-chip" });
+    this.contextChipEl = ctx;
     this.renderContextChip();
 
     // Style switcher on the same row as «Чат с ИИ»
@@ -292,9 +294,13 @@ export class AiAskChat {
     this.root.empty();
   }
 
-  /** Swap note context (e.g. re-open from another note). Keeps the conversation. */
+  /**
+   * Swap the note context (e.g. re-open from another note). Keeps the
+   * conversation and the pinned notes — only the unpinned entries are replaced.
+   */
   setContext(files?: TFile[], label?: string): void {
-    this.files = files ? files.slice(0, MAX_FILES) : resolveActiveFiles(this.app);
+    const incoming = files ? files.slice(0, MAX_FILES) : resolveActiveFiles(this.app);
+    this.files = mergeContextFiles(this.files, this.pinnedPaths, incoming);
     this.contextLabel = label || labelForFiles(this.files);
     this.contextCache = null;
     this.renderContextChip();
@@ -302,9 +308,10 @@ export class AiAskChat {
     this.renderChips();
   }
 
-  /** Drop the note context (chat keeps the conversation). */
+  /** Drop the whole note context — pinned included (chat keeps the conversation). */
   private clearContext(): void {
     this.files = [];
+    this.pinnedPaths.clear();
     this.contextLabel = "";
     this.contextCache = null;
     this.renderContextChip();
@@ -312,23 +319,69 @@ export class AiAskChat {
     this.renderChips();
   }
 
+  /** Drop one note from the context (chip ✕), pinned or not. */
+  private removeFile(file: TFile): void {
+    this.pinnedPaths.delete(file.path);
+    this.files = this.files.filter((f) => f.path !== file.path);
+    this.contextLabel = labelForFiles(this.files);
+    this.contextCache = null;
+    this.renderContextChip();
+    this.onContextChange?.(this.files, this.contextLabel);
+    this.renderChips();
+  }
+
+  /** Pin/unpin one context note: pinned notes survive `setContext` swaps. */
+  private togglePin(file: TFile): void {
+    if (this.pinnedPaths.has(file.path)) this.pinnedPaths.delete(file.path);
+    else this.pinnedPaths.add(file.path);
+    this.renderContextChip();
+  }
+
   private renderContextChip(): void {
     const chip = this.contextChipEl;
     if (!chip) return;
     chip.empty();
-    chip.createSpan({ text: this.contextChipText() });
-    if (this.files.length > 0) {
-      const x = chip.createEl("button", {
+    if (this.files.length === 0) {
+      chip.createDiv({ cls: "ai-ask-context-chip", text: this.contextChipText() });
+      return;
+    }
+    for (const file of this.files) {
+      const pinned = this.pinnedPaths.has(file.path);
+      const item = chip.createDiv({ cls: `ai-ask-context-chip${pinned ? " is-pinned" : ""}` });
+      const pinLabel = pinned ? tRaw("ai.askQa.ctxUnpin") : tRaw("ai.askQa.ctxPin");
+      const pin = item.createEl("button", {
+        cls: `ai-ask-chip-pin${pinned ? " is-active" : ""}`,
+        text: "\u{1F4CC}",
+        attr: {
+          type: "button",
+          "aria-pressed": pinned ? "true" : "false",
+          "aria-label": pinLabel,
+          title: pinLabel,
+        },
+      });
+      pin.addEventListener("click", () => this.togglePin(file));
+      item.createSpan({ text: file.basename });
+      const x = item.createEl("button", {
         cls: "ai-ask-chip-x",
-        text: "✕",
+        text: "\u2715",
         attr: {
           type: "button",
           "aria-label": tRaw("ai.askQa.ctxRemove"),
           title: tRaw("ai.askQa.ctxRemove"),
         },
       });
-      x.addEventListener("click", () => this.clearContext());
+      x.addEventListener("click", () => this.removeFile(file));
     }
+    const clear = chip.createEl("button", {
+      cls: "ai-ask-chip-x ai-ask-chip-clear",
+      text: "\u2715",
+      attr: {
+        type: "button",
+        "aria-label": tRaw("ai.askQa.ctxClearAll"),
+        title: tRaw("ai.askQa.ctxClearAll"),
+      },
+    });
+    clear.addEventListener("click", () => this.clearContext());
   }
 
   /** Public send with an explicit message (used by editor context menu). */
@@ -1134,6 +1187,9 @@ export class AiAskChat {
         showTypingDots(answerEl);
       };
       const onReasoningDelta = (delta: string) => {
+        // Toggle OFF hides reasoning completely — a backend that streams
+        // reasoning_content anyway must not resurrect the «Размышления…» block.
+        if (!this.thinkingOn) return;
         ensureThinkBlock();
         pendingThink += delta;
         thinkingText += delta;
@@ -1231,6 +1287,21 @@ function labelForFiles(files: TFile[]): string {
     .slice(0, 3)
     .map((f) => f.basename)
     .join(", ");
+}
+
+/**
+ * Merge a fresh note context into the current list: pinned files are kept,
+ * everything else is replaced by `incoming`. This is what lets a pinned note
+ * survive `setContext` while the «current» note follows the user around.
+ */
+export function mergeContextFiles(
+  current: TFile[],
+  pinnedPaths: ReadonlySet<string>,
+  incoming: TFile[],
+): TFile[] {
+  const pinned = current.filter((f) => pinnedPaths.has(f.path));
+  const rest = incoming.filter((f) => !pinnedPaths.has(f.path));
+  return [...pinned, ...rest].slice(0, MAX_FILES);
 }
 
 function fmtStamp(): string {

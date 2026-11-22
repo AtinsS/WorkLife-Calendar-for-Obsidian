@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { onMount, onDestroy } from "svelte";
   import moment from "moment";
   import type { App } from "obsidian";
+  import { getDateUID } from "obsidian-daily-notes-interface";
   import type { IHabit } from "./types";
   import {
     habits,
@@ -15,6 +17,7 @@
   import HabitItem from "./HabitItem.svelte";
   import { HabitModal } from "./HabitModal";
   import { t } from "../i18n";
+  import { formatDayLabel } from "../utils/moment";
   import { app } from "../stores/appStore";
   import { get } from "svelte/store";
   import { VIEW_TYPE_HABIT_ANALYTICS } from "../constants";
@@ -72,6 +75,55 @@
     }
     const match = dateUID.match(/^(?:day|week)-(\d{4}-\d{2}-\d{2})/);
     return match ? match[1] : moment().format("YYYY-MM-DD");
+  }
+
+  // Day navigation — same shared selectedDate the task panel follows.
+  // Short weekday («пн») on small screens — full names eat the chrome.
+  let isMobile = typeof window !== "undefined" && window.innerWidth <= 768;
+  let mqlMobile: MediaQueryList | null = null;
+  let mqlHandler: ((e: MediaQueryListEvent) => void) | null = null;
+
+  onMount(() => {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      mqlMobile = window.matchMedia("(max-width: 768px)");
+      isMobile = mqlMobile.matches;
+      mqlHandler = (e: MediaQueryListEvent) => {
+        isMobile = e.matches;
+      };
+      mqlMobile.addEventListener("change", mqlHandler);
+    }
+  });
+
+  onDestroy(() => {
+    if (mqlMobile && mqlHandler) {
+      mqlMobile.removeEventListener("change", mqlHandler);
+    }
+  });
+
+  $: dateLabel = formatDayLabel(dateStr, isMobile);
+
+  function shiftDay(delta: number): void {
+    const m = moment(dateStr, "YYYY-MM-DD", true).add(delta, "day");
+    selectedDate.set(getDateUID(m, "day"));
+  }
+
+  function prevDay(): void {
+    shiftDay(-1);
+  }
+
+  function nextDay(): void {
+    shiftDay(1);
+  }
+
+  function goToday(): void {
+    selectedDate.set(getDateUID(moment(), "day"));
+  }
+
+  /** Enter/Space on the date label returns to today (ignored while typing). */
+  function onDateKeydown(e: KeyboardEvent): void {
+    const tgt = e.target as HTMLElement;
+    if (tgt?.tagName === "INPUT" || tgt?.tagName === "TEXTAREA" || tgt?.isContentEditable) return;
+    if (e.key === "Enter" || e.key === " ") goToday();
   }
 
   function openCreateHabit() {
@@ -152,6 +204,19 @@
     </div>
   </div>
 
+  <div class="habit-tracker-date-row">
+    <button class="date-nav-btn" on:click={prevDay} title={$t("tasks.panel.prevDay")}>‹</button>
+    <!-- svelte-ignore a11y-no-noninteractive-element-interactions -->
+    <span
+      class="task-tracker-date"
+      role="button"
+      tabindex="0"
+      on:click={goToday}
+      on:keydown={onDateKeydown}
+      title={$t("tasks.panel.today")}>{dateLabel}</span>
+    <button class="date-nav-btn" on:click={nextDay} title={$t("tasks.panel.nextDay")}>›</button>
+  </div>
+
   <div class="habit-tracker-list">
     {#if activeHabits.length === 0}
       <div class="habit-tracker-empty">
@@ -197,6 +262,14 @@
 </div>
 
 <style>
+  .habit-tracker-date-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 2px 0 10px;
+  }
+
   .habit-tracker-header {
     min-height: 44px;
   }

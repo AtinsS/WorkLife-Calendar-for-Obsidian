@@ -1559,6 +1559,11 @@
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.07);
   transition: background 0.15s ease, border-color 0.15s ease;
+  /* Weekday-first labels get long — truncate instead of overflowing. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .task-tracker-date:hover {
@@ -6273,7 +6278,7 @@ body > .task-actions-menu {
 
 .task-tracker-date {
   font-size: 10px;
-  max-width: 80px;
+  max-width: 220px;
 }
 
 .task-tracker-count {
@@ -9525,9 +9530,10 @@ body.task-view-sidebar-resizing iframe {
 
 .task-tracker-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  /* Title + date nav on their own top row — controls row below it. */
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
   padding: 12px 0;
 }
 
@@ -9547,6 +9553,7 @@ body.task-view-sidebar-resizing iframe {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 860px) {
@@ -13756,6 +13763,10 @@ input.ai-task-time-input.ai-task-est-input {
 
 .ai-ask-context {
   margin-top: 2px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
 }
 
 .ai-ask-context-chip {
@@ -13774,10 +13785,9 @@ input.ai-task-time-input.ai-task-est-input {
   white-space: nowrap;
 }
 
-.ai-ask-context-chip::before {
-  content: "📎";
-  font-size: 10px;
-  opacity: 0.8;
+.ai-ask-context-chip.is-pinned {
+  background: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 12%, transparent);
+  border-color: color-mix(in srgb, var(--mcp-accent, #7c5cfc) 26%, transparent);
 }
 
 .ai-ask-context-chip > span {
@@ -13788,6 +13798,34 @@ input.ai-task-time-input.ai-task-est-input {
 
 .ai-ask-context-chip .ai-ask-chip-x {
   flex-shrink: 0;
+}
+
+.ai-ask-chip-pin {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1;
+  border-radius: 4px;
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+.ai-ask-chip-pin:hover {
+  opacity: 0.9;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.ai-ask-chip-pin.is-active {
+  opacity: 1;
+  filter: none;
+}
+
+.ai-ask-chip-clear {
+  margin-left: 2px;
+  opacity: 0.6;
 }
 
 .ai-ask-messages {

@@ -74,7 +74,7 @@ export function registerSelectionExplain(plugin: Plugin): void {
     const text = sel?.toString().trim() || "";
     const range = sel && sel.rangeCount ? sel.getRangeAt(0) : null;
     const node = range?.commonAncestorContainer ?? null;
-    const el = node ? (node instanceof Element ? node : node.parentElement) : null;
+    const el = node ? (node.instanceOf(Element) ? node : node.parentElement) : null;
     const inReadingView = !!el?.closest(".markdown-reading-view");
 
     if (!text || !range || !inReadingView || !aiEnabled()) {

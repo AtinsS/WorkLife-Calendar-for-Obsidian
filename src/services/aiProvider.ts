@@ -140,6 +140,21 @@ function estimateNumCtx(messages: AiChatMessage[]): number {
   return Math.max(4096, Math.min(32768, needed));
 }
 
+/**
+ * OpenAI-compatible bodies have no universal think switch (the Ollama branch
+ * gets `think` in the body instead). MiMo-family models declare `none` among
+ * their reasoning-effort values, so `reasoning_effort: "none"` is their off
+ * switch. Name-gated like the Qwen3 marker below: `none` is not a valid effort
+ * value on every backend, and a 400 there would break the whole chat.
+ */
+export function thinkingBodyFields(
+  model: string,
+  think: boolean | undefined,
+): Record<string, unknown> {
+  if (think !== false || !/mimo/i.test(model)) return {};
+  return { reasoning_effort: "none" };
+}
+
 function chatRequestBody(
   conn: AiConnection,
   model: string,
@@ -157,6 +172,7 @@ function chatRequestBody(
       messages,
       stream,
       temperature,
+      ...thinkingBodyFields(model, opts.think),
     };
   }
   return {
@@ -293,7 +309,7 @@ export async function streamAiChat(
 
     const contentType = resp.headers.get("content-type") ?? "";
     if (contentType.includes("application/json") && !resp.body) {
-      const data = await resp.json();
+      const data: unknown = await resp.json();
       const reasoning = extractReasoning(conn, data);
       if (reasoning) opts.onReasoning?.(reasoning, reasoning);
       const content = extractContent(conn, data);
@@ -319,7 +335,7 @@ export async function streamAiChat(
         : trimmed;
       if (!payload || payload === "[DONE]") return;
       try {
-        const obj = JSON.parse(payload);
+        const obj: unknown = JSON.parse(payload);
         const reasoning = extractReasoning(conn, obj);
         if (reasoning) {
           reasoningFull += reasoning;

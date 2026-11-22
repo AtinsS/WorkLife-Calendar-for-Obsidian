@@ -55,13 +55,14 @@ export default class AIAskView extends ItemView {
     this.pendingSend = false;
   }
 
-  /** Make the picked note the chat context (conversation is kept). */
+  /** Make the picked note the chat context (conversation and pinned notes are kept). */
   private followNote(file: TFile | null): void {
     if (!file || file.extension !== "md") return;
     if (this.pendingFiles?.length === 1 && this.pendingFiles[0].path === file.path) return;
     this.pendingFiles = [file];
     this.pendingLabel = file.basename;
-    this.chat?.setContext([file], file.basename);
+    // No explicit label: the chat derives one covering the pinned notes too.
+    this.chat?.setContext([file]);
   }
 
   onOpen(): Promise<void> {

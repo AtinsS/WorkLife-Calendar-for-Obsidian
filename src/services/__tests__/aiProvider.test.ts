@@ -1,6 +1,7 @@
 import {
   resolveAiConnection,
   applyThinkDirective,
+  thinkingBodyFields,
   type AiChatMessage,
   AI_PROVIDER_DEFAULT_URL,
 } from "../aiProvider";
@@ -107,5 +108,24 @@ describe("applyThinkDirective", () => {
     ], false);
     expect(out[0].content).toBe("q1");
     expect(out[2].content).toBe("q2\n\n/no_think");
+  });
+});
+
+describe("thinkingBodyFields", () => {
+  it("turns mimo-family reasoning off with reasoning_effort: none", () => {
+    expect(thinkingBodyFields("mimo-v2.6 pro", false)).toEqual({ reasoning_effort: "none" });
+    expect(thinkingBodyFields("MiMo-V2.6-Pro", false)).toEqual({ reasoning_effort: "none" });
+    expect(thinkingBodyFields("xiaomi/mimo-v2.5", false)).toEqual({ reasoning_effort: "none" });
+  });
+
+  it("sends nothing for mimo when thinking is on or undecided", () => {
+    expect(thinkingBodyFields("mimo-v2.6 pro", true)).toEqual({});
+    expect(thinkingBodyFields("mimo-v2.6 pro", undefined)).toEqual({});
+  });
+
+  it("never touches non-mimo models", () => {
+    expect(thinkingBodyFields("qwen3-4b", false)).toEqual({});
+    expect(thinkingBodyFields("llama3.1", false)).toEqual({});
+    expect(thinkingBodyFields("gpt-4o", false)).toEqual({});
   });
 });
