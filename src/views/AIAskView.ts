@@ -3,6 +3,7 @@ import type { TFile } from "obsidian";
 import { VIEW_TYPE_AI_ASK } from "../constants";
 import { tRaw } from "../i18n";
 import { AiAskChat, type AskSelection } from "../services/AiAskChat";
+import { loadAiChatSnapshot } from "../services/aiChatStorage";
 
 /**
  * Detached "Ask AI" chat window (Obsidian popout leaf).
@@ -15,6 +16,8 @@ export default class AIAskView extends ItemView {
   private pendingSelection: AskSelection | null = null;
   private pendingPrefill: string | null = null;
   private pendingSend = false;
+  /** After a restore, ignore the workspace's own file-open until the user navigates. */
+  private followSuppressedUntil = 0;
 
   getViewType(): string {
     return VIEW_TYPE_AI_ASK;
@@ -58,6 +61,7 @@ export default class AIAskView extends ItemView {
   /** Make the picked note the chat context (conversation and pinned notes are kept). */
   private followNote(file: TFile | null): void {
     if (!file || file.extension !== "md") return;
+    if (Date.now() < this.followSuppressedUntil) return;
     if (this.pendingFiles?.length === 1 && this.pendingFiles[0].path === file.path) return;
     this.pendingFiles = [file];
     this.pendingLabel = file.basename;
@@ -65,16 +69,31 @@ export default class AIAskView extends ItemView {
     this.chat?.setContext([file]);
   }
 
-  onOpen(): Promise<void> {
+  async onOpen(): Promise<void> {
     const container = this.containerEl.children[1] as HTMLElement;
     container.empty();
     container.addClass("ai-ask-view");
-    this.chat = new AiAskChat(this.app, container, this.pendingFiles ?? undefined, this.pendingLabel);
+    const restored = await loadAiChatSnapshot(this.app);
+    this.chat = new AiAskChat(
+      this.app,
+      container,
+      this.pendingFiles ?? undefined,
+      this.pendingLabel,
+      restored,
+    );
     this.chat.onContextChange = (files, label) => {
       this.pendingFiles = files;
       this.pendingLabel = label;
     };
+    const state = this.chat.getContextState();
+    this.pendingFiles = state.files;
+    this.pendingLabel = state.label;
     this.chat.mount();
+    if (restored) {
+      // Obsidian re-fires file-open for the note that was active before the
+      // restart; that must not wipe the just-restored chat context.
+      this.followSuppressedUntil = Date.now() + 2000;
+    }
     // The chat reads the note the user selects: switching tabs/notes in the main
     // window makes that note the context (the header chip shows which one).
     this.registerEvent(

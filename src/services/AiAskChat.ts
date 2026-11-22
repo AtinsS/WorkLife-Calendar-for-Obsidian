@@ -26,6 +26,12 @@ import {
 import { errorMessage } from "../utils/sanitize";
 import { renderInline, renderMarkdown } from "../ui/markdown";
 import { showTypingDots, showModelCaption } from "../ui/typingDots";
+import {
+  saveAiChatSnapshot,
+  resolveSnapshotFiles,
+  type AiChatSnapshot,
+  type ChatMsg,
+} from "./aiChatStorage";
 
 const MAX_CONTEXT_CHARS = 14000;
 const MAX_FILES = 12;
@@ -109,13 +115,6 @@ export function collectAskFiles(root: TFolderClass, depth = 0, maxDepth = 2): TF
 
 export { MAX_FILES };
 
-interface ChatMsg {
-  role: "user" | "assistant";
-  text: string;
-  /** Reasoning trace kept with the answer (when thinking was on). */
-  thinking?: string;
-}
-
 /**
  * Live chat UI for brainstorming in the context of notes.
  * Hosted in a detached workspace window (not a modal).
@@ -161,11 +160,25 @@ export class AiAskChat {
   /** Why the last turn has (no) web context — drives the system-prompt wording. */
   private lastWebOutcome: "off" | "skipped" | "empty" | "ok" = "off";
 
-  constructor(app: App, root: HTMLElement, files?: TFile[], label?: string) {
+  constructor(
+    app: App,
+    root: HTMLElement,
+    files?: TFile[],
+    label?: string,
+    restored?: AiChatSnapshot | null,
+  ) {
     this.app = app;
     this.root = root;
-    this.files = files ? files.slice(0, MAX_FILES) : resolveActiveFiles(app);
-    this.contextLabel = label || labelForFiles(this.files);
+    if (restored) {
+      const resolved = resolveSnapshotFiles(app, restored);
+      this.files = resolved.files;
+      this.pinnedPaths = resolved.pinnedPaths;
+      this.contextLabel = restored.contextLabel || labelForFiles(this.files);
+      this.messages = restored.messages;
+    } else {
+      this.files = files ? files.slice(0, MAX_FILES) : resolveActiveFiles(app);
+      this.contextLabel = label || labelForFiles(this.files);
+    }
     const opts = get(settings) as {
       userName?: string;
       aiName?: string;
@@ -178,6 +191,21 @@ export class AiAskChat {
     this.chatStyle = resolveChatStyle(opts.aiChatStyle);
     this.webSearchOn = opts.aiWebSearchEnabled === true;
     this.thinkingOn = opts.aiChatThinking === true;
+  }
+
+  /** Current note context — lets the hosting view stay in sync after a restore. */
+  getContextState(): { files: TFile[]; label: string } {
+    return { files: this.files, label: this.contextLabel };
+  }
+
+  /** Snapshot the chat to the vault so it survives Obsidian restarts. */
+  private persistState(): void {
+    void saveAiChatSnapshot(this.app, {
+      files: this.files.map((f) => f.path),
+      pinnedPaths: [...this.pinnedPaths],
+      contextLabel: this.contextLabel,
+      messages: this.messages,
+    });
   }
 
   mount(): void {
@@ -306,6 +334,7 @@ export class AiAskChat {
     this.renderContextChip();
     this.onContextChange?.(this.files, this.contextLabel);
     this.renderChips();
+    this.persistState();
   }
 
   /** Drop the whole note context — pinned included (chat keeps the conversation). */
@@ -317,6 +346,7 @@ export class AiAskChat {
     this.renderContextChip();
     this.onContextChange?.(this.files, this.contextLabel);
     this.renderChips();
+    this.persistState();
   }
 
   /** Drop one note from the context (chip ✕), pinned or not. */
@@ -328,6 +358,7 @@ export class AiAskChat {
     this.renderContextChip();
     this.onContextChange?.(this.files, this.contextLabel);
     this.renderChips();
+    this.persistState();
   }
 
   /** Pin/unpin one context note: pinned notes survive `setContext` swaps. */
@@ -335,6 +366,7 @@ export class AiAskChat {
     if (this.pinnedPaths.has(file.path)) this.pinnedPaths.delete(file.path);
     else this.pinnedPaths.add(file.path);
     this.renderContextChip();
+    this.persistState();
   }
 
   private renderContextChip(): void {
@@ -404,6 +436,7 @@ export class AiAskChat {
     if (this.stopBtn) this.stopBtn.disabled = true;
     this.setStatus("");
     this.renderMessages();
+    this.persistState();
     this.inputEl?.focus();
   }
 
@@ -1083,6 +1116,7 @@ export class AiAskChat {
 
     this.isRunning = true;
     this.messages.push({ role: "user", text: text.slice(0, MAX_MSG_CHARS) });
+    this.persistState();
     if (this.inputEl) this.inputEl.value = "";
     this.abort = new AbortController();
     if (this.sendBtn) this.sendBtn.disabled = true;
@@ -1230,6 +1264,7 @@ export class AiAskChat {
         text: result.trim(),
         thinking: thinkingText.trim() || undefined,
       });
+      this.persistState();
       this.streamBodyEl = null;
       this.renderMessages();
       this.mountSourceList();

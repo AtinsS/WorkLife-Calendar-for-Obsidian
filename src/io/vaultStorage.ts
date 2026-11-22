@@ -15,6 +15,7 @@ export const MODULES = [
   "weight",
   "events",
   "dashboard",
+  "aiChat",
 ] as const;
 
 export type ModuleName = (typeof MODULES)[number];
