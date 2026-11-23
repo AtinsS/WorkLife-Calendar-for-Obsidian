@@ -13971,6 +13971,37 @@ input.ai-task-time-input.ai-task-est-input {
   line-height: 1.72;
 }
 
+/* Tool calls used for this answer — small muted caption under the text */
+.ai-ask-msg-tools {
+  margin: 2px 4px 10px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+/* Tokens spent on this answer */
+.ai-ask-msg-usage {
+  margin: 0 4px 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-faint);
+  cursor: default;
+}
+
+/* Session token total in the chat bottom bar — sits next to the
+   web-search / thinking toggles, not stranded at the far end. */
+.ai-ask-tokens {
+  align-self: center;
+  padding: 0 6px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.ai-ask-tokens-text.is-empty {
+  opacity: 0.55;
+}
+
 .ai-ask-msg--assistant .ai-ask-msg-col {
   flex: 1 1 100%;
   width: 100%;

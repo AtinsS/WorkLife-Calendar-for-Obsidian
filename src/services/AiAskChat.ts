@@ -11,7 +11,14 @@ import { get } from "svelte/store";
 import { tRaw } from "../i18n";
 import { settings } from "../ui/stores";
 import { resolveModel } from "./OllamaService";
-import { resolveAiConnection, streamAiChat } from "./aiProvider";
+import {
+  resolveAiConnection,
+  streamAiChat,
+  type AiChatMessage,
+  type AiTokenUsage,
+  type AiToolCall,
+} from "./aiProvider";
+import { CHAT_TOOLS, executeChatTool } from "./aiChatTools";
 import {
   analyzeModelInternetSupport,
   buildSearchPlanPrompt,
@@ -37,6 +44,8 @@ const MAX_CONTEXT_CHARS = 14000;
 const MAX_FILES = 12;
 const MAX_MSG_CHARS = 6000;
 const MAX_SELECTION_CHARS = 4000;
+/** Cap on model→tool→model round-trips per user message (runaway guard). */
+const MAX_TOOL_ROUNDS = 3;
 
 export type ChatStyle = "open" | "brainstorm" | "advisor";
 
@@ -153,6 +162,7 @@ export class AiAskChat {
   private selectionToolbarEl: HTMLElement | null = null;
   private styleRowEl: HTMLElement | null = null;
   private barTogglesEl: HTMLElement | null = null;
+  private tokenTotalEl: HTMLElement | null = null;
   private chatStyle: ChatStyle;
   private webSearchOn: boolean;
   private thinkingOn: boolean;
@@ -226,7 +236,9 @@ export class AiAskChat {
     this.renderStylePicker();
 
     this.messagesEl = this.root.createDiv({ cls: "ai-ask-messages" });
-    this.renderEmptyChat();
+    // Restored history must render on open — renderMessages() falls back to the
+    // empty state when there is none.
+    this.renderMessages();
     this.bindSelectionToolbar();
     // Model caption ABOVE the messages field (outside of it) — always visible
     this.modelCaptionEl = this.root.createDiv({ cls: "ai-model-caption-slot" });
@@ -263,6 +275,10 @@ export class AiAskChat {
     // Web toggle lives next to Copy/Save at the bottom
     this.barTogglesEl = bar.createDiv({ cls: "ai-ask-websearch ai-ask-websearch--bar" });
     this.renderBarToggles();
+
+    // Running session total of spent tokens (sum over the conversation)
+    this.tokenTotalEl = bar.createDiv({ cls: "ai-ask-tokens" });
+    this.renderTokenCounter();
 
     const composer = this.root.createDiv({ cls: "ai-ask-composer" });
 
@@ -318,6 +334,7 @@ export class AiAskChat {
     this.contextChipEl = null;
     this.styleRowEl = null;
     this.barTogglesEl = null;
+    this.tokenTotalEl = null;
     this.modelCaptionEl = null;
     this.root.empty();
   }
@@ -436,6 +453,7 @@ export class AiAskChat {
     if (this.stopBtn) this.stopBtn.disabled = true;
     this.setStatus("");
     this.renderMessages();
+    this.renderTokenCounter();
     this.persistState();
     this.inputEl?.focus();
   }
@@ -599,6 +617,40 @@ export class AiAskChat {
     });
   }
 
+  /** Session total of tokens spent in this conversation (summed over messages). */
+  private renderTokenCounter(): void {
+    const el = this.tokenTotalEl;
+    if (!el) return;
+    let prompt = 0;
+    let completion = 0;
+    let total = 0;
+    for (const m of this.messages) {
+      if (!m.usage) continue;
+      prompt += m.usage.promptTokens;
+      completion += m.usage.completionTokens;
+      total += m.usage.totalTokens;
+    }
+    el.empty();
+    if (total <= 0) {
+      el.createSpan({
+        cls: "ai-ask-tokens-text is-empty",
+        text: "🪙 —",
+        attr: { title: tRaw("ai.askQa.tokensNone") },
+      });
+      return;
+    }
+    el.createSpan({
+      cls: "ai-ask-tokens-text",
+      text: `🪙 ${total}`,
+      attr: {
+        title: tRaw("ai.askQa.tokensSplit", {
+          prompt: String(prompt),
+          completion: String(completion),
+        }),
+      },
+    });
+  }
+
   /**
    * Optionally fetch web results and prepend them to the user payload.
    * The model itself decides whether to search and what to look up
@@ -730,7 +782,7 @@ export class AiAskChat {
     }
     el.empty();
     for (const m of this.messages) {
-      this.appendBubble(el, m.role, m.text, false, m.thinking);
+      this.appendBubble(el, m.role, m.text, false, m.thinking, m.tools, m.usage);
     }
     el.scrollTop = el.scrollHeight;
   }
@@ -770,6 +822,8 @@ export class AiAskChat {
     text: string,
     streaming = false,
     thinking?: string,
+    tools?: string[],
+    usage?: AiTokenUsage,
   ): void {
     const row = host.createDiv({ cls: `ai-ask-msg ai-ask-msg--${role}` });
     const avatar = row.createDiv({ cls: "ai-ask-msg-avatar" });
@@ -787,11 +841,13 @@ export class AiAskChat {
       cls: `ai-ask-msg-body${streaming ? " is-streaming" : ""}`,
     });
     if (!text.trim()) {
-      showTypingDots(body);
-      return;
-    }
-
-    if (role === "assistant") {
+      // An empty answer after tool calls still deserves a real bubble — no eternal dots.
+      if (!tools?.length) {
+        showTypingDots(body);
+        return;
+      }
+      body.createDiv({ cls: "ai-sch-out-p", text: tRaw("ai.askQa.toolsDone") });
+    } else if (role === "assistant") {
       renderMarkdown(body, text);
     } else {
       const lines = text.split(/\r?\n/);
@@ -818,6 +874,28 @@ export class AiAskChat {
         const p = body.createEl("p", { cls: "ai-sch-out-p" });
         renderInline(p, line);
       }
+    }
+
+    // Which tools the model ran for this answer — transparency for tool calls.
+    if (role === "assistant" && tools?.length) {
+      col.createDiv({
+        cls: "ai-ask-msg-tools",
+        text: `🔧 ${tRaw("ai.askQa.toolsUsed", { names: tools.join(", ") })}`,
+      });
+    }
+
+    // Tokens spent on this answer (when the backend reports them).
+    if (role === "assistant" && usage) {
+      col.createDiv({
+        cls: "ai-ask-msg-usage",
+        text: `🪙 ${tRaw("ai.askQa.tokensUsed", { count: String(usage.totalTokens) })}`,
+        attr: {
+          title: tRaw("ai.askQa.tokensSplit", {
+            prompt: String(usage.promptTokens),
+            completion: String(usage.completionTokens),
+          }),
+        },
+      });
     }
 
     // Message actions live in the right-click menu (a hover bar squashes narrow panes)
@@ -925,6 +1003,17 @@ export class AiAskChat {
           hide();
           if (text) this.rewrite(text, "explain");
         });
+        const taskBtn = this.selectionToolbarEl.createEl("button", {
+          cls: "ai-ask-sel-btn",
+          text: `✅ ${tRaw("ai.askQa.actMakeTask")}`,
+          attr: { type: "button" },
+        });
+        taskBtn.addEventListener("mousedown", (e) => e.preventDefault());
+        taskBtn.addEventListener("click", () => {
+          const text = getSel();
+          hide();
+          if (text) void this.makeTaskFromText(text);
+        });
       }
 
       const rect = range.getBoundingClientRect();
@@ -950,6 +1039,12 @@ export class AiAskChat {
         .setTitle(tRaw("ai.askQa.contextMenuExplain"))
         .setIcon("lucide-lightbulb")
         .onClick(() => this.rewrite(sel, "explain"));
+    });
+    menu.addItem((item) => {
+      item
+        .setTitle(tRaw("ai.askQa.actMakeTask"))
+        .setIcon("check-square")
+        .onClick(() => void this.makeTaskFromText(sel));
     });
     menu.addSeparator();
     menu.addItem((item) => {
@@ -1108,6 +1203,12 @@ export class AiAskChat {
       ollamaModel?: string;
       userAbout?: string;
       aiTone?: string;
+      aiChatTemperature?: number;
+      aiChatTopP?: number;
+      aiChatMaxTokens?: number;
+      aiChatSystemPrompt?: string;
+      aiChatToolsEnabled?: boolean;
+      ollamaContextSize?: number;
     };
     if (!opts.ollamaEnabled) {
       new Notice(tRaw("ai.needOllama"));
@@ -1148,15 +1249,30 @@ export class AiAskChat {
 
       const about = (opts.userAbout || "").trim();
       const tone = (opts.aiTone || "").trim();
+      const toolsOn = opts.aiChatToolsEnabled !== false;
       const systemParts = [CHAT_STYLE_SYSTEM[this.chatStyle]];
+      // Relative dates ("завтра", "в пятницу") only resolve when the model knows today.
+      const now = new Date();
+      const weekday = now.toLocaleDateString("en-US", { weekday: "long" });
+      const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      systemParts.push(`Today is ${iso} (${weekday}).`);
       if (about) {
         systemParts.push(`About the user (use for tone and context): ${about}`);
       }
       if (tone) {
         systemParts.push(`Communication style — follow these rules strictly:\n${tone}`);
       }
+      const extraPrompt = (opts.aiChatSystemPrompt || "").trim();
+      if (extraPrompt) {
+        systemParts.push(extraPrompt);
+      }
       if (this.aiLabel && this.aiLabel !== tRaw("ai.askQa.ai")) {
         systemParts.push(`Your name is ${this.aiLabel}. Address yourself by this name if needed.`);
+      }
+      if (toolsOn) {
+        systemParts.push(
+          "You can call tools to work with the user's task tracker and notes. Use them when they help: list_tasks before scheduling, create_task / update_task when the user asks to add or change something, search_notes / read_note for vault content, create_note / append_note to write notes (create_note takes an optional folder). Confirm ambiguous details with the user first; never invent task ids.",
+        );
       }
       // Only talk about web access when the search toggle is on. Local models
       // otherwise volunteer a canned "I have no internet" refusal.
@@ -1174,8 +1290,8 @@ export class AiAskChat {
 
       // Prior turns travel as real role messages — flattening them into one user
       // payload lost role semantics and degraded multi-turn answers.
-      const chatMessages = [
-        { role: "system" as const, content: systemParts.join("\n\n") },
+      const chatMessages: AiChatMessage[] = [
+        { role: "system", content: systemParts.join("\n\n") },
         ...this.messages
           .slice(0, -1)
           .filter((m) => m.text.trim())
@@ -1183,7 +1299,7 @@ export class AiAskChat {
             role: m.role,
             content: m.text.slice(0, MAX_MSG_CHARS),
           })),
-        { role: "user" as const, content: userContent },
+        { role: "user", content: userContent },
       ];
 
       // Live "thinking" block above the streamed answer (plain divs; rAF-throttled).
@@ -1241,32 +1357,97 @@ export class AiAskChat {
         }
       };
 
-      const result = await streamAiChat(
-        resolveAiConnection(opts),
-        resolveModel("reason", opts),
-        chatMessages,
-        {
-          signal: this.abort.signal,
-          temperature: 0.4,
-          think: this.thinkingOn,
-          onReasoning: onReasoningDelta,
-          onDelta: onAnswerStart,
-          onProgress: (stage) => {
-            // Reasoning shell appears at once so thinking is visible even before
-            // the first reasoning token lands.
-            if (stage === "streaming" && this.thinkingOn) ensureThinkBlock();
-          },
-        },
-      );
+      const temperature =
+        typeof opts.aiChatTemperature === "number" ? opts.aiChatTemperature : 0.4;
+      const topP = typeof opts.aiChatTopP === "number" ? opts.aiChatTopP : undefined;
+      const maxTokens =
+        typeof opts.aiChatMaxTokens === "number" && opts.aiChatMaxTokens > 0
+          ? opts.aiChatMaxTokens
+          : undefined;
+
+      const conn = resolveAiConnection(opts);
+      const model = resolveModel("reason", opts);
+
+      // Tool round-trips: model asks → host runs the tool → result goes back.
+      // The last round runs without tools so the model must answer in text.
+      let toolsActive = toolsOn;
+      let toolBatches = 0;
+      let result = "";
+      const usedTools: string[] = [];
+      const usageSum: AiTokenUsage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+      for (;;) {
+        const captured: AiToolCall[] = [];
+        const allowTools = toolsActive && toolBatches < MAX_TOOL_ROUNDS;
+        try {
+          result = await streamAiChat(conn, model, chatMessages, {
+            signal: this.abort.signal,
+            temperature,
+            topP,
+            maxTokens,
+            contextSize: opts.ollamaContextSize || undefined,
+            think: this.thinkingOn,
+            onReasoning: onReasoningDelta,
+            onDelta: onAnswerStart,
+            onProgress: (stage) => {
+              // Reasoning shell appears at once so thinking is visible even before
+              // the first reasoning token lands.
+              if (stage === "streaming" && this.thinkingOn) ensureThinkBlock();
+            },
+            tools: allowTools ? CHAT_TOOLS : undefined,
+            onToolCalls: (calls) => {
+              captured.push(...calls);
+            },
+            onUsage: (u) => {
+              usageSum.promptTokens += u.promptTokens;
+              usageSum.completionTokens += u.completionTokens;
+              usageSum.totalTokens += u.totalTokens;
+            },
+          });
+        } catch (e) {
+          // Backends that reject the tools field (HTTP 4xx) get one plain retry.
+          if (
+            allowTools &&
+            !this.abort?.signal.aborted &&
+            /HTTP 4\d\d/.test((e as Error)?.message ?? "")
+          ) {
+            toolsActive = false;
+            continue;
+          }
+          throw e;
+        }
+        if (captured.length === 0 || !allowTools) break;
+        toolBatches += 1;
+        chatMessages.push({ role: "assistant", content: result, tool_calls: captured });
+        for (const call of captured) {
+          this.setStatus(tRaw("ai.askQa.toolRunning", { name: call.name }), "busy");
+          const res = await executeChatTool(this.app, call);
+          usedTools.push(call.name);
+          if (res.notice) new Notice(res.notice);
+          chatMessages.push({
+            role: "tool",
+            content: res.output,
+            tool_call_id: call.id,
+            name: call.name,
+          });
+        }
+      }
 
       this.messages.push({
         role: "assistant",
         text: result.trim(),
         thinking: thinkingText.trim() || undefined,
+        tools: usedTools.length > 0 ? usedTools : undefined,
+        usage:
+          usageSum.totalTokens > 0 ||
+          usageSum.promptTokens > 0 ||
+          usageSum.completionTokens > 0
+            ? usageSum
+            : undefined,
       });
       this.persistState();
       this.streamBodyEl = null;
       this.renderMessages();
+      this.renderTokenCounter();
       this.mountSourceList();
       this.setStatus("");
     } catch (e) {

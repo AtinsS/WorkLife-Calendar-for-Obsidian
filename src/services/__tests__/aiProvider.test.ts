@@ -2,6 +2,10 @@ import {
   resolveAiConnection,
   applyThinkDirective,
   thinkingBodyFields,
+  extractUsage,
+  toWireMessages,
+  toWireTools,
+  ToolCallAccumulator,
   type AiChatMessage,
   AI_PROVIDER_DEFAULT_URL,
 } from "../aiProvider";
@@ -127,5 +131,176 @@ describe("thinkingBodyFields", () => {
     expect(thinkingBodyFields("qwen3-4b", false)).toEqual({});
     expect(thinkingBodyFields("llama3.1", false)).toEqual({});
     expect(thinkingBodyFields("gpt-4o", false)).toEqual({});
+  });
+});
+
+describe("ToolCallAccumulator", () => {
+  it("merges streamed OpenAI fragments into one call", () => {
+    const acc = new ToolCallAccumulator();
+    acc.ingest([{ index: 0, id: "call_1", function: { name: "create_", arguments: '{"ti' } }]);
+    acc.ingest([{ index: 0, function: { name: "task", arguments: 'tle": "Buy milk"}' } }]);
+    expect(acc.finalize()).toEqual([
+      { id: "call_1", name: "create_task", args: { title: "Buy milk" } },
+    ]);
+  });
+
+  it("keeps parallel calls in index order", () => {
+    const acc = new ToolCallAccumulator();
+    acc.ingest([
+      { index: 0, id: "a", function: { name: "list_tasks", arguments: "{}" } },
+      { index: 1, id: "b", function: { name: "search_notes", arguments: '{"query":"x"}' } },
+    ]);
+    const calls = acc.finalize();
+    expect(calls.map((c) => c.name)).toEqual(["list_tasks", "search_notes"]);
+    expect(calls[1].id).toBe("b");
+  });
+
+  it("accepts Ollama-style parsed object arguments", () => {
+    const acc = new ToolCallAccumulator();
+    acc.ingest([{ function: { name: "list_tasks", arguments: { limit: 5 } } }]);
+    expect(acc.finalize()).toEqual([{ id: "call_0", name: "list_tasks", args: { limit: 5 } }]);
+  });
+
+  it("falls back to raw text on malformed JSON arguments", () => {
+    const acc = new ToolCallAccumulator();
+    acc.ingest([{ function: { name: "search_notes", arguments: "not json" } }]);
+    expect(acc.finalize()[0].args).toEqual({ _raw: "not json" });
+  });
+
+  it("yields nothing when no calls arrived", () => {
+    expect(new ToolCallAccumulator().finalize()).toEqual([]);
+  });
+});
+
+describe("toWireTools", () => {
+  it("wraps definitions in the shared function envelope", () => {
+    expect(
+      toWireTools([
+        {
+          name: "create_task",
+          description: "d",
+          parameters: { type: "object", properties: {} },
+        },
+      ]),
+    ).toEqual([
+      {
+        type: "function",
+        function: {
+          name: "create_task",
+          description: "d",
+          parameters: { type: "object", properties: {} },
+        },
+      },
+    ]);
+  });
+});
+
+describe("toWireMessages", () => {
+  const ollama = { provider: "ollama" as const, url: "http://localhost:11434" };
+  const lmstudio = { provider: "lmstudio" as const, url: "http://localhost:1234/v1" };
+
+  it("serializes tool calls with string arguments for OpenAI-compatible", () => {
+    const msgs: AiChatMessage[] = [
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [{ id: "call_1", name: "create_task", args: { title: "Milk" } }],
+      },
+    ];
+    expect(toWireMessages(lmstudio, msgs)).toEqual([
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [
+          {
+            id: "call_1",
+            type: "function",
+            function: { name: "create_task", arguments: '{"title":"Milk"}' },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("serializes tool calls with object arguments for Ollama", () => {
+    const msgs: AiChatMessage[] = [
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [{ id: "call_1", name: "create_task", args: { title: "Milk" } }],
+      },
+    ];
+    expect(toWireMessages(ollama, msgs)).toEqual([
+      {
+        role: "assistant",
+        content: "",
+        tool_calls: [{ function: { name: "create_task", arguments: { title: "Milk" } } }],
+      },
+    ]);
+  });
+
+  it("labels tool results per provider", () => {
+    const msgs: AiChatMessage[] = [
+      { role: "tool", content: "ok", tool_call_id: "call_1", name: "create_task" },
+    ];
+    expect(toWireMessages(lmstudio, msgs)[0]).toEqual({
+      role: "tool",
+      content: "ok",
+      tool_call_id: "call_1",
+    });
+    expect(toWireMessages(ollama, msgs)[0]).toEqual({
+      role: "tool",
+      content: "ok",
+      tool_name: "create_task",
+    });
+  });
+
+  it("passes plain messages through unchanged", () => {
+    const msgs: AiChatMessage[] = [
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+    ];
+    expect(toWireMessages(ollama, msgs)).toEqual([
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+    ]);
+    expect(toWireMessages(lmstudio, msgs)).toEqual([
+      { role: "system", content: "sys" },
+      { role: "user", content: "hi" },
+    ]);
+  });
+});
+
+describe("extractUsage", () => {
+  const ollama = { provider: "ollama" as const, url: "http://localhost:11434" };
+  const openai = { provider: "openai" as const, url: "https://api.openai.com/v1" };
+
+  it("reads Ollama eval counts", () => {
+    expect(extractUsage(ollama, { prompt_eval_count: 120, eval_count: 45 })).toEqual({
+      promptTokens: 120,
+      completionTokens: 45,
+      totalTokens: 165,
+    });
+  });
+
+  it("reads OpenAI usage blocks", () => {
+    expect(
+      extractUsage(openai, { usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 } }),
+    ).toEqual({ promptTokens: 10, completionTokens: 5, totalTokens: 15 });
+  });
+
+  it("computes the total when the backend omits it", () => {
+    expect(extractUsage(openai, { usage: { prompt_tokens: 7, completion_tokens: 3 } })).toEqual({
+      promptTokens: 7,
+      completionTokens: 3,
+      totalTokens: 10,
+    });
+  });
+
+  it("returns null when no counts are present", () => {
+    expect(extractUsage(ollama, { message: { content: "x" }, done: false })).toBeNull();
+    expect(extractUsage(openai, { choices: [{ delta: { content: "x" } }] })).toBeNull();
+    expect(extractUsage(openai, { usage: {} })).toBeNull();
+    expect(extractUsage(openai, { usage: null })).toBeNull();
   });
 });

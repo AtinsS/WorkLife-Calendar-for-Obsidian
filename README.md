@@ -47,7 +47,7 @@ Many workflows have the same problem: tasks live in one place, the calendar in a
 | **⚖️ Habits & health** | Habit streaks, weight chart |
 | **💰 Finances** | Budget planning, savings goals, income, expenses, Markdown / Excel summaries |
 | **📊 Analytics** | Charts for projects, income, and habits |
-| **🤖 Local AI (Ollama)** | Task extraction, summaries, schedule commands, AI chat (styles, web search, selection tools), expense analysis, workout plans, brainstorming in the context of a note |
+| **🤖 Local AI** | Task extraction, summaries, schedule commands, AI chat (styles, web search, tool calls, token usage, selection tools), expense analysis, workout plans, brainstorming in the context of a note |
 | **🔔 Notifications** | Desktop reminders + phone push notifications via ntfy.sh |
 
 > [!NOTE] 🎁 Bonus
@@ -160,8 +160,11 @@ Runs entirely on your computer—your data isn’t sent anywhere.
 - **AI chat (Ask AI)** — live chat in the context of a note or folder (right-click → *AI Tools* or the command palette).
   - **Styles** in the chat header: *Open* (free chat) / *Brainstorm* / *Advisor* (verdict, pros/cons, risks). Switch anytime; the next message uses the new style.
   - **Web search** (`🌐 Web` in the bottom bar): the plugin fetches top results (DuckDuckGo → Wikipedia) and injects them into the prompt. Ollama models have no browsing of their own — the search is always plugin-side. The search query is built from your message **and** note keywords so short chit-chat («как тебе идея?») is not sent as-is. Sources are listed under the answer. Turn the toggle off for fully offline chats.
+  - **Thinking** (`💡` in the bottom bar): show the model's reasoning above the answer on reasoning-capable models.
+  - **Tools** (function calling): the model can create and update tasks, check the schedule, search and read notes, **create a note in a chosen folder** (missing folders are created for you) and append to notes. Tools run only when they help — the ones used are listed under the answer (`🔧 …`). Switch them off in *Settings → AI → Chat*.
+  - **Token usage**: every answer shows the tokens it spent (`🪙 …`, hover for the prompt/completion split). The counter next to the `🌐` / `💡` toggles keeps a running total for the whole chat.
   - Selection toolbar (**Explain** / **Make task**), per-message actions (copy, to note, make task, shorter/longer), save/copy chat. The active model name is always visible above the messages.
-  - Name, assistant name, “About you”, and tone extras — in *Settings → AI → Chat*.
+  - Name, assistant name, “About you”, tone extras, **temperature, top-p, max response tokens, context size (Ollama `num_ctx`), a custom system prompt** and the tools switch — in *Settings → AI → Chat*.
 - **Finances** — analyze expenses from text, forecast budgets, create allocation rules, and provide tips in Markdown / Excel summaries.
 - **Workout plans** — questionnaire → plan → tasks and workout streaks. If you have no equipment, the plan uses bodyweight exercises only; static exercises (such as planks) always include a hold duration.
 

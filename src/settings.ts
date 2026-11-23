@@ -248,6 +248,16 @@ export interface ISettings {
   aiChatEnabled?: boolean;
   /** Model reasoning (thinking) in AI chat: requested on/off and shown live. */
   aiChatThinking?: boolean;
+  /** Chat sampling temperature (0–2). Undefined = 0.4. */
+  aiChatTemperature?: number;
+  /** Chat nucleus sampling top_p (0–1). Undefined = model default. */
+  aiChatTopP?: number;
+  /** Max response tokens in chat. 0 / undefined = model default. */
+  aiChatMaxTokens?: number;
+  /** Extra instructions appended to the chat system prompt. */
+  aiChatSystemPrompt?: string;
+  /** Let the chat model call app tools (tasks, notes). */
+  aiChatToolsEnabled?: boolean;
   /** Саммари заметок (ПКМ → папка / выделение) */
   aiSummaryEnabled: boolean;
   /** Разбить задачу на подзадачи (ПКМ → задача) */
@@ -407,6 +417,11 @@ export const defaultSettings = Object.freeze({
   aiExtractEnabled: true,
   aiChatEnabled: true,
   aiChatThinking: false,
+  aiChatTemperature: 0.4,
+  aiChatTopP: 1,
+  aiChatMaxTokens: 0,
+  aiChatSystemPrompt: "",
+  aiChatToolsEnabled: true,
   aiChatStyle: "open" as const,
   aiWebSearchEnabled: true,
   aiSummaryEnabled: true,
@@ -2854,7 +2869,6 @@ export class CalendarSettingsTab extends PluginSettingTab {
     const provider: AiProviderId = isAiProviderId(this.plugin.options.aiProvider)
       ? this.plugin.options.aiProvider
       : "ollama";
-    const isOllama = provider === "ollama";
     const isLmstudio = provider === "lmstudio";
     const isOpenai = provider === "openai";
     const urlKey = isLmstudio ? "lmstudioUrl" : isOpenai ? "openaiUrl" : "ollamaUrl";
@@ -2908,31 +2922,6 @@ export class CalendarSettingsTab extends PluginSettingTab {
           text.inputEl.type = "password";
           text.inputEl.addClass("mcp-input-xl");
         });
-    }
-
-    if (isOllama) {
-      new Setting(connection)
-        .setName(tRaw("settings.ai.contextSize"))
-        .setDesc(tRaw("settings.ai.contextSizeDesc"))
-        .addText((text) => {
-          text
-            .setPlaceholder("0")
-            .setValue(String(this.plugin.options.ollamaContextSize || 0))
-            .onChange(async (value) => {
-              const num = parseInt(value);
-              if (!isNaN(num) && num >= 0) {
-                await this.plugin.writeOptions({ ollamaContextSize: num });
-              }
-            });
-          text.inputEl.type = "number";
-          text.inputEl.min = "0";
-          text.inputEl.addClass("mcp-input-md");
-        });
-    } else {
-      this.note(
-        connection,
-        tRaw(isLmstudio ? "settings.ai.contextSizeLmstudio" : "settings.ai.contextSizeOpenai"),
-      );
     }
 
     const btnRow = connection.createDiv({ cls: "mcp-btn-row" });
@@ -3215,6 +3204,110 @@ export class CalendarSettingsTab extends PluginSettingTab {
         area.inputEl.rows = 3;
         area.inputEl.addClass("mcp-input-lg");
       });
+
+    // ── Sampling / generation ──
+    const temperature = this.plugin.options.aiChatTemperature ?? 0.4;
+    new Setting(container)
+      .setName(`${tRaw("settings.ai.chatTemperature")} · ${temperature}`)
+      .setDesc(tRaw("settings.ai.chatTemperatureDesc"))
+      .addSlider((slider) => {
+        slider
+          .setLimits(0, 2, 0.1)
+          .setValue(temperature)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ aiChatTemperature: value });
+            slider.sliderEl
+              .closest(".setting-item")
+              ?.querySelector(".setting-item-name")
+              ?.setText(`${tRaw("settings.ai.chatTemperature")} · ${value}`);
+          });
+      });
+
+    const topP = this.plugin.options.aiChatTopP ?? 1;
+    new Setting(container)
+      .setName(`${tRaw("settings.ai.chatTopP")} · ${topP}`)
+      .setDesc(tRaw("settings.ai.chatTopPDesc"))
+      .addSlider((slider) => {
+        slider
+          .setLimits(0, 1, 0.05)
+          .setValue(topP)
+          .setDynamicTooltip()
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ aiChatTopP: value });
+            slider.sliderEl
+              .closest(".setting-item")
+              ?.querySelector(".setting-item-name")
+              ?.setText(`${tRaw("settings.ai.chatTopP")} · ${value}`);
+          });
+      });
+
+    new Setting(container)
+      .setName(tRaw("settings.ai.chatMaxTokens"))
+      .setDesc(tRaw("settings.ai.chatMaxTokensDesc"))
+      .addText((text) => {
+        text
+          .setPlaceholder("0")
+          .setValue(String(this.plugin.options.aiChatMaxTokens || 0))
+          .onChange(async (value) => {
+            const n = parseInt(value);
+            if (!isNaN(n) && n >= 0) {
+              await this.plugin.writeOptions({ aiChatMaxTokens: n });
+            }
+          });
+        text.inputEl.type = "number";
+        text.inputEl.min = "0";
+        text.inputEl.addClass("mcp-input-md");
+      });
+
+    // Context window — Ollama only; LM Studio / OpenAI own it server-side.
+    const provider: AiProviderId = isAiProviderId(this.plugin.options.aiProvider)
+      ? this.plugin.options.aiProvider
+      : "ollama";
+    if (provider === "ollama") {
+      new Setting(container)
+        .setName(tRaw("settings.ai.contextSize"))
+        .setDesc(tRaw("settings.ai.contextSizeDesc"))
+        .addText((text) => {
+          text
+            .setPlaceholder("0")
+            .setValue(String(this.plugin.options.ollamaContextSize || 0))
+            .onChange(async (value) => {
+              const num = parseInt(value);
+              if (!isNaN(num) && num >= 0) {
+                await this.plugin.writeOptions({ ollamaContextSize: num });
+              }
+            });
+          text.inputEl.type = "number";
+          text.inputEl.min = "0";
+          text.inputEl.addClass("mcp-input-md");
+        });
+    } else {
+      this.note(
+        container,
+        tRaw(
+          provider === "lmstudio"
+            ? "settings.ai.contextSizeLmstudio"
+            : "settings.ai.contextSizeOpenai",
+        ),
+      );
+    }
+
+    new Setting(container)
+      .setName(tRaw("settings.ai.chatSystemPrompt"))
+      .setDesc(tRaw("settings.ai.chatSystemPromptDesc"))
+      .addTextArea((area) => {
+        area
+          .setPlaceholder(tRaw("settings.ai.chatSystemPromptPlaceholder"))
+          .setValue(this.plugin.options.aiChatSystemPrompt || "")
+          .onChange(async (value) => {
+            await this.plugin.writeOptions({ aiChatSystemPrompt: value });
+          });
+        area.inputEl.rows = 3;
+        area.inputEl.addClass("mcp-input-xl");
+      });
+
+    this.addCompactToggle(container, "aiChatToolsEnabled", "chatTools", "chatToolsDesc");
   }
 
   /** Small helper: toggle with short label, one-line desc. */
@@ -3223,6 +3316,7 @@ export class CalendarSettingsTab extends PluginSettingTab {
     key:
       | "aiExtractEnabled"
       | "aiChatEnabled"
+      | "aiChatToolsEnabled"
       | "aiSubtasksEnabled"
       | "aiWorkoutEnabled"
       | "aiQuickAddEnabled"
